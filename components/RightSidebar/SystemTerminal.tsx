@@ -14,7 +14,7 @@ export const SystemTerminal = memo(() => {
                 </span>
             </div>
 
-            <div className="flex-1 bg-[#050b14] p-4 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-2 min-h-0 shadow-inner">
+            <div className="flex-1 bg-black p-4 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-2 min-h-0 shadow-inner">
                 {systemLogs.map((log) => (
                     <div
                         key={log.id}
@@ -24,19 +24,19 @@ export const SystemTerminal = memo(() => {
                         <div className="flex flex-col">
                             <span
                                 className={`font-bold text-[10px] uppercase tracking-wide mb-0.5 ${log.type === 'ERROR'
-                                        ? 'text-red-400'
-                                        : log.type === 'WARN'
-                                            ? 'text-amber-400'
-                                            : log.type === 'AI'
-                                                ? 'text-cyan-400'
-                                                : log.type === 'CORE'
-                                                    ? 'text-purple-400'
-                                                    : 'text-emerald-400'
+                                    ? 'text-red-400'
+                                    : log.type === 'WARN'
+                                        ? 'text-amber-400'
+                                        : log.type === 'AI'
+                                            ? 'text-cyan-400'
+                                            : log.type === 'CORE'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
                                     }`}
                             >
                                 {log.type}
                             </span>
-                            <span className="text-slate-300/90 break-words">{log.content}</span>
+                            <span className="text-slate-200 break-words font-medium uppercase">{log.content}</span>
                         </div>
                     </div>
                 ))}

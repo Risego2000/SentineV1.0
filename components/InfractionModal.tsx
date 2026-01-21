@@ -23,9 +23,9 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                             </div>
                             <div className="space-y-4">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Scale size={16} className="text-cyan-500" /> Fundamento Legal</h3>
-                                <p className="text-sm text-slate-300 leading-relaxed italic">"{log.description}"</p>
+                                <p className="text-sm text-slate-300 leading-relaxed italic uppercase">"{log.description}"</p>
                                 <div className="p-4 bg-cyan-900/10 border border-cyan-500/20 rounded-2xl space-y-3">
-                                    {log.reasoning?.map((r, i) => (<div key={i} className="flex gap-3 text-[11px] font-mono text-cyan-200"><div className="w-4 h-4 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">{i + 1}</div><span>{r}</span></div>))}
+                                    {log.reasoning?.map((r, i) => (<div key={i} className="flex gap-3 text-[11px] font-mono text-cyan-200 uppercase"><div className="w-4 h-4 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">{i + 1}</div><span>{r}</span></div>))}
                                 </div>
                             </div>
                             <button onClick={onClose} className="w-full py-5 bg-red-600 text-white rounded-[25px] font-black uppercase tracking-widest shadow-2xl hover:bg-red-500 active:scale-95">Confirmar Sanción</button>

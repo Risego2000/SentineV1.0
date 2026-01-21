@@ -205,9 +205,12 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
     const runAudit = useCallback(async (track: any, line: GeometryLine) => {
         try {
+            setIsAnalyzing(true);
             await aiRunAudit(track, line, directives);
         } catch (error) {
             handleError('AUDIT', error);
+        } finally {
+            setIsAnalyzing(false);
         }
     }, [aiRunAudit, directives, handleError]);
 

@@ -27,7 +27,7 @@ export const EngineSettings = () => {
                                     }`}
                             >
                                 <span className="text-[9px] font-black uppercase">{data.label}</span>
-                                <span className="text-[7.5px] leading-tight opacity-60 font-medium">
+                                <span className="text-[7.5px] leading-tight opacity-60 font-medium uppercase">
                                     {data.description}
                                 </span>
                             </button>

@@ -77,14 +77,14 @@ const SentinelApp = () => {
         <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
             <Sidebar
                 toggleListening={toggleListening}
-                startLiveFeed={handleStartLive}
-                onUploadClick={handleFileSelect}
             />
 
             <React.Suspense fallback={<div className="flex-1 bg-black animate-pulse" />}>
                 <MainViewer
                     videoRef={videoRef}
                     canvasRef={canvasRef}
+                    onLive={handleStartLive}
+                    onUpload={handleFileSelect}
                 />
             </React.Suspense>
 

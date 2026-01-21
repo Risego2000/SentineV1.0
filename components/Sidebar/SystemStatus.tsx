@@ -27,7 +27,7 @@ export const SystemStatus = () => {
                             <span className="text-[10px] font-mono text-cyan-400 font-bold italic">
                                 EFFICIENTDET_LITE0
                             </span>
-                            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 tracking-tighter">
+                            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 tracking-tighter uppercase">
                                 {statusLabel}
                             </span>
                         </div>

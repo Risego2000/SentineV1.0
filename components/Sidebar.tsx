@@ -3,19 +3,17 @@ import { ShieldCheck } from 'lucide-react';
 import { SystemStatus } from './Sidebar/SystemStatus';
 import { EngineSettings } from './Sidebar/EngineSettings';
 import { SecurityProtocol } from './Sidebar/SecurityProtocol';
-import { SidebarActions } from './Sidebar/SidebarActions';
+
 
 interface SidebarProps {
     toggleListening: () => void;
-    startLiveFeed: () => void;
-    onUploadClick: () => void;
 }
 
 /**
  * Componente Sidebar modularizado.
  * Utiliza memoización para evitar re-renders innecesarios.
  */
-export const Sidebar = memo(({ toggleListening, startLiveFeed, onUploadClick }: SidebarProps) => {
+export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
     return (
         <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0 h-screen overflow-hidden">
             <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-cyan-950/10 shrink-0">
@@ -34,7 +32,7 @@ export const Sidebar = memo(({ toggleListening, startLiveFeed, onUploadClick }: 
                 <SecurityProtocol toggleListening={toggleListening} />
             </div>
 
-            <SidebarActions startLiveFeed={startLiveFeed} onUploadClick={onUploadClick} />
+
         </aside>
     );
 });

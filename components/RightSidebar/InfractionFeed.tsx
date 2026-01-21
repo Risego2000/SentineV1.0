@@ -17,7 +17,7 @@ export const InfractionFeed = () => {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/10 min-h-0">
                 {logs.length === 0 ? (
                     <div className="p-6 text-center border border-dashed border-white/10 rounded-xl">
-                        <span className="text-xs text-slate-500 italic block">Sin infracciones registradas</span>
+                        <span className="text-xs text-slate-500 italic block uppercase">Sin infracciones registradas</span>
                         <span className="text-[10px] text-slate-600 uppercase tracking-widest mt-1">
                             Sistema Monitorizando
                         </span>
@@ -45,7 +45,7 @@ export const InfractionFeed = () => {
                                     </span>
                                     <span className="text-[10px] text-slate-400">{log.time}</span>
                                 </div>
-                                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed uppercase">
                                     {log.description}
                                 </p>
                             </div>

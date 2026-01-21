@@ -4,17 +4,21 @@ import { useSentinel } from '../hooks/useSentinel';
 import { EmptyState } from './MainViewer/EmptyState';
 import { NeuralStatusHUD } from './MainViewer/NeuralStatusHUD';
 import { ControlBar } from './MainViewer/ControlBar';
+import { HeaderActions } from './MainViewer/HeaderActions';
+import { ForensicAnalysisOverlay } from './MainViewer/ForensicAnalysisOverlay';
 
 interface MainViewerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
+    onLive: () => void;
+    onUpload: () => void;
 }
 
 /**
  * MainViewer modularizado.
  * Estructura optimizada para renderizado fluido.
  */
-export const MainViewer = memo(({ videoRef, canvasRef }: MainViewerProps) => {
+export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainViewerProps) => {
     const { source, isAnalyzing } = useSentinel();
 
     return (
@@ -30,8 +34,12 @@ export const MainViewer = memo(({ videoRef, canvasRef }: MainViewerProps) => {
                 style={{ opacity: 0 }} // Mantener oculto pero renderizado para que MediaPipe pueda leerlo
             />
 
-            {/* Capa de Información (HUD) */}
+            {/* Capa de Información (HUD) y Acciones */}
             <NeuralStatusHUD />
+            <HeaderActions onLive={onLive} onUpload={onUpload} activeMode={source === 'upload' ? 'video' : source} />
+
+            {/* Overlay de Análisis Forense */}
+            <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
 
             {/* Área Central de Visualización */}
             <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full">

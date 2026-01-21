@@ -88,30 +88,62 @@ export const renderScence = (
                 }
                 ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
             }
+            // 3.1 Draw Historical Trajectory (Ghost Trail)
+            ctx.setLineDash([2, 4]); // Punteado para el pasado
+            ctx.globalAlpha = 0.4;
             ctx.stroke();
+            ctx.setLineDash([]);
             ctx.globalAlpha = 1.0;
 
-            // 3.2 Draw Predictive Vector (Arrow to future)
+            // 3.2 Draw Predictive Vector (SOLID FUTURE)
             const last = points[points.length - 1];
             if (track.kf) {
-                // Proyección visual de velocidad (amplificada para visibilidad)
-                const futureX = last.x + (track.kf.vx * width * 15);
-                const futureY = last.y + (track.kf.vy * height * 15);
+                // Proyección visual amplificada
+                const futurePoints = 5;
+                const stepX = track.kf.vx * width * 5; // Paso de 5 frames aprox
+                const stepY = track.kf.vy * height * 5;
 
                 ctx.beginPath();
-                ctx.strokeStyle = color; // Mismo color o white?
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([4, 4]); // Línea punteada para predicción
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3; // Más grueso
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10; // Glow effect
+
                 ctx.moveTo(last.x, last.y);
+
+                let currX = last.x;
+                let currY = last.y;
+
+                // Dibujar curva predictiva suavizada (no recta simple)
+                // Asumimos inercia lineal por ahora, pero podríamos añadir curvatura si tenemos velocidad angular
+                const futureX = last.x + (track.kf.vx * width * 25);
+                const futureY = last.y + (track.kf.vy * height * 25);
+
                 ctx.lineTo(futureX, futureY);
                 ctx.stroke();
-                ctx.setLineDash([]); // Reset
 
-                // Punta de flecha o círculo final
+                ctx.shadowBlur = 0; // Reset glow
+
+                // Marcadores de tiempo futuro (Dots cada X distancia)
+                for (let i = 1; i <= 3; i++) {
+                    ctx.beginPath();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.arc(last.x + (stepX * i), last.y + (stepY * i), 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Punta de flecha táctica
                 ctx.beginPath();
                 ctx.fillStyle = color;
-                ctx.arc(futureX, futureY, 2, 0, Math.PI * 2);
+                const headSize = 6;
+                const angle = Math.atan2(futureY - last.y, futureX - last.x);
+                ctx.translate(futureX, futureY);
+                ctx.rotate(angle);
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-headSize, -headSize / 2);
+                ctx.lineTo(-headSize, headSize / 2);
                 ctx.fill();
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
             }
         }
 
@@ -129,7 +161,7 @@ export const renderScence = (
         // Label Text
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 11px sans-serif';
-        ctx.fillText(`${label} #${track.id}`, x + 5, y - 6);
+        ctx.fillText(`${label.toUpperCase()} #${track.id}`, x + 5, y - 6);
 
         // 3.4 Forensic Audit Indicator
         // Asumimos que podemos marcar tracks bajo análisis

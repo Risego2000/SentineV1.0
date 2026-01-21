@@ -39,7 +39,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                                 );
                             }
                         }}
-                        className="w-full h-32 bg-black/40 border border-white/5 rounded-xl p-4 text-[11px] font-mono text-cyan-300 outline-none resize-none shadow-inner focus:border-cyan-500/50 transition-all"
+                        className="w-full h-32 bg-black/40 border border-white/5 rounded-xl p-4 text-[11px] font-mono text-cyan-300 outline-none resize-none shadow-inner focus:border-cyan-500/50 transition-all uppercase"
                         placeholder="Ingrese directivas del sistema..."
                     />
                     <div className="absolute bottom-3 right-3 opacity-20 pointer-events-none font-mono text-[8px] text-cyan-500">

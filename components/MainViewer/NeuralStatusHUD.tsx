@@ -7,34 +7,30 @@ export const NeuralStatusHUD = () => {
     const modelLoaded = systemStatus.neural === 'ready';
 
     return (
+
         <div className="absolute top-6 left-6 z-40 flex items-start gap-4 pointer-events-none">
-            <div className="px-5 py-3 bg-black/90 border border-white/10 text-cyan-400 text-[10px] font-black rounded-2xl flex flex-col gap-1 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center gap-3">
-                    <Activity
-                        size={14}
-                        className={modelLoaded ? 'text-green-500 animate-pulse' : 'text-amber-500'}
-                    />
-                    <div className="flex flex-col">
-                        <span>
-                            RADAR: {source === 'none' ? 'EN ESPERA' : `EJECUTANDO [${modelLoaded ? 'RED:OK' : 'RED:CARGANDO'}]`}
-                        </span>
-                        <div className="flex gap-3 text-[7px] font-mono text-cyan-500/80">
-                            <span>{fps} FPS</span>
-                            <span>DELAY: {latency.toFixed(1)}ms</span>
-                        </div>
+            <div className="h-14 px-8 bg-black border border-white/20 text-cyan-400 rounded-full flex items-center gap-4 shadow-2xl min-w-[280px]">
+                <Activity
+                    size={20}
+                    className={modelLoaded ? 'text-green-500 animate-pulse' : 'text-amber-500'}
+                />
+                <div className="flex flex-col justify-center">
+                    <span className="text-[11px] font-black uppercase tracking-wider leading-none mb-1">
+                        {source === 'none' ? 'RADAR: EN ESPERA' : `RADAR: EJECUTANDO [${modelLoaded ? 'RED:OK' : 'CARGANDO'}]`}
+                    </span>
+                    <div className="flex gap-3 text-[9px] font-bold font-mono text-slate-400">
+                        <span className="text-cyan-600">{fps} FPS</span>
+                        <span className="text-white">DELAY: {latency.toFixed(1)}ms</span>
                     </div>
                 </div>
+
                 {statusMsg && (
-                    <div className="text-[8px] text-cyan-500/60 border-t border-white/5 pt-1 mt-1 font-mono uppercase">
+                    <div className="ml-auto text-[9px] text-red-500 font-bold animate-pulse uppercase">
                         {statusMsg}
-                    </div>
-                )}
-                {isDetecting && (
-                    <div className="text-[8px] text-purple-400 animate-pulse absolute top-2 right-2 font-mono">
-                        RED_OCUPADA
                     </div>
                 )}
             </div>
         </div>
     );
+
 };
