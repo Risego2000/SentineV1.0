@@ -54,7 +54,7 @@ const CATEGORIES = [
 ];
 
 export const ProtocolSelector = () => {
-    const { generateGeometry, setDirectives } = useSentinel();
+    const { generateGeometry, setDirectives, directives } = useSentinel();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [openCategories, setOpenCategories] = useState<string[]>(['access']); // Default open
     const [isGenerating, setIsGenerating] = useState(false);
@@ -83,18 +83,19 @@ export const ProtocolSelector = () => {
         CONTEXTO MUNICIPAL SELECCIONADO:
         ${contextSummary}
         
+        PROTOCOLOS BASE EXISTENTES:
+        "${directives}"
+
         MISIÓN DE FUSIÓN DE DATOS (IMPORTANTE):
-        1. ANALIZA LA IMAGEN/VIDEO ACTUAL (Análisis Espacial en Tiempo Real). Detecta la geometría visual de la vía (carriles, bordillos, señales visibles).
-        2. COMPLEMENTA ese análisis visual con las REGLAS DEL CONTEXTO MUNICIPAL seleccionado arriba.
-           - EJEMPLO: Si ves una calle estrecha y el usuario seleccionó "Casco Histórico", ASUME prioridad peatonal y crea líneas de restricción en bordes.
-           - EJEMPLO: Si ves una vía ancha y se seleccionó "Polígono Los Frailes", PREPARA líneas para detectar giros de camiones.
-           - EJEMPLO: Si detectas un paso de cebra y se seleccionó "Entorno Escolar", crea líneas de STOP estrictas antes del paso.
+        1. ANALIZA LA IMAGEN/VIDEO ACTUAL junto con los PROTOCOLOS BASE ya definidos por el usuario/IA.
+        2. COMPLEMENTA ese análisis con las REGLAS DEL CONTEXTO MUNICIPAL seleccionado.
+           - FUSIONA las reglas: Si el usuario ya definió "Cuidado con peatones" y seleccionas "Entorno Escolar", REFUERZA la geometría de protección.
         
         OBJETIVO GEOMÉTRICO:
-        Genera un JSON con líneas de detección (Horizontales, Verticales, Oblicuas) que representen la intersección lógica entre LO QUE VES y LO QUE SABES del municipio.
+        Genera un JSON con líneas de detección que INTEGREN tanto las directivas existentes como las nuevas selecciones del municipio.
         `;
 
-        const displayDirectives = `PROTOCOLO ACTIVO DAGANZO:\n${activeOptions.map(o => `- ${o.label}`).join('\n')}`;
+        const displayDirectives = `${directives}\n\n[ACTUALIZACIÓN TÁCTICA]:\n${activeOptions.map(o => `- ${o.label}`).join('\n')}`;
         setDirectives(displayDirectives);
 
         await generateGeometry(fullPrompt);

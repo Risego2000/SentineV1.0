@@ -95,73 +95,54 @@ export const renderScence = (
             ctx.setLineDash([]);
             ctx.globalAlpha = 1.0;
 
-            // 3.2 Draw Predictive Vector (SOLID FUTURE)
+            // 3.2 Draw Predictive Vector (LIGHTWEIGHT)
             const last = points[points.length - 1];
             if (track.kf) {
-                // Proyección visual amplificada
-                const futurePoints = 5;
-                const stepX = track.kf.vx * width * 5; // Paso de 5 frames aprox
-                const stepY = track.kf.vy * height * 5;
+                // Proyección lineal simple (menos costosa)
+                const futureX = last.x + (track.kf.vx * width * 15);
+                const futureY = last.y + (track.kf.vy * height * 15);
 
                 ctx.beginPath();
                 ctx.strokeStyle = color;
-                ctx.lineWidth = 3; // Más grueso
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 10; // Glow effect
+                ctx.lineWidth = 2;
+                // Eliminado shadowBlur y shadowColor para rendimiento
 
                 ctx.moveTo(last.x, last.y);
-
-                let currX = last.x;
-                let currY = last.y;
-
-                // Dibujar curva predictiva suavizada (no recta simple)
-                // Asumimos inercia lineal por ahora, pero podríamos añadir curvatura si tenemos velocidad angular
-                const futureX = last.x + (track.kf.vx * width * 25);
-                const futureY = last.y + (track.kf.vy * height * 25);
-
                 ctx.lineTo(futureX, futureY);
                 ctx.stroke();
 
-                ctx.shadowBlur = 0; // Reset glow
-
-                // Marcadores de tiempo futuro (Dots cada X distancia)
-                for (let i = 1; i <= 3; i++) {
-                    ctx.beginPath();
-                    ctx.fillStyle = '#ffffff';
-                    ctx.arc(last.x + (stepX * i), last.y + (stepY * i), 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                // Punta de flecha táctica
+                // Punta de flecha simplificada (sin transformaciones de contexto costosas)
+                // Se dibuja un pequeño círculo al final en lugar de una flecha rotada
                 ctx.beginPath();
                 ctx.fillStyle = color;
-                const headSize = 6;
-                const angle = Math.atan2(futureY - last.y, futureX - last.x);
-                ctx.translate(futureX, futureY);
-                ctx.rotate(angle);
-                ctx.moveTo(0, 0);
-                ctx.lineTo(-headSize, -headSize / 2);
-                ctx.lineTo(-headSize, headSize / 2);
+                ctx.arc(futureX, futureY, 3, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
             }
         }
 
-        // 3.3 Draw Bounding Box
+        // 3.3 Draw Bounding Box (PERFORMANCE MODE)
+        // Usamos solo esquinas ("Brackets") para reducir el área de dibujado y oclusión
+        const lineLen = Math.min(w, h) * 0.2;
+
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, w, h);
+        ctx.beginPath();
 
-        // Label Background
+        // Top-Left
+        ctx.moveTo(x, y + lineLen); ctx.lineTo(x, y); ctx.lineTo(x + lineLen, y);
+        // Top-Right
+        ctx.moveTo(x + w - lineLen, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + lineLen);
+        // Bottom-Right
+        ctx.moveTo(x + w, y + h - lineLen); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - lineLen, y + h);
+        // Bottom-Left
+        ctx.moveTo(x + lineLen, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - lineLen);
+
+        ctx.stroke();
+
+        // Label Simple (Sin fondo transparente costoso)
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.8;
-        ctx.fillRect(x, y - 20, ctx.measureText(`${label} #${track.id}`).width + 10, 20);
-        ctx.globalAlpha = 1.0;
-
-        // Label Text
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.fillText(`${label.toUpperCase()} #${track.id}`, x + 5, y - 6);
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText(`${label} #${track.id}`, x, y - 5);
 
         // 3.4 Forensic Audit Indicator
         // Asumimos que podemos marcar tracks bajo análisis

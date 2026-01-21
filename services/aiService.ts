@@ -168,19 +168,44 @@ export const AIService = {
                 parts: [
                     { inlineData: { mimeType: 'image/jpeg', data: track.snapshots[track.snapshots.length - 1] } },
                     {
-                        text: `SISTEMA SENTINEL - AUDITORÍA DE CONDUCTA VIAL
+                        text: `SISTEMA SENTINEL - AUDITORÍA FORENSE AVANZADA V1.5
                       
-                      CONTEXTO ESPACIAL: El vehículo (Clase: ${kinematicData.label}) ha interactuado con la zona "${line.label}" (Tipo: ${line.type}).
-                      TELEMETRÍA CINEMÁTICA: Velocidad relativa ${kinematicData.velocity}, Dirección ${kinematicData.heading}.
-                      PROTOCOLOS VIGENTES: ${directives}.
+                      CONTEXTO OPERATIVO:
+                      - ZONA ACTIVADA: "${line.label}" (Tipo: ${line.type})
+                      - VEHÍCULO OBJETIVO: ${kinematicData.label} (Track ID: ${track.id})
+                      - DATOS CINEMÁTICOS: Velocidad ${kinematicData.velocity}, Orientación ${kinematicData.heading}, Puntos Trazados: ${kinematicData.trajectoryPoints}.
+                      - PROTOCOLOS DE SEGURIDAD ACTIVOS:
+                      ${directives}
                       
-                      TAREA FRENSE:
-                      1. Examina la imagen y la trayectoria para detectar conductas infractoras.
-                      2. VALIDA ESTRICTAMENTE si la conducta viola los "PROTOCOLOS VIGENTES" listados arriba.
-                      3. SI DETECTAS INFRACCIÓN: Cita explícitamente qué protocolo fue vulnerado en el campo "reasoning".
-                      4. Dictamina (infraction: true/false) basado en la conexión entre geometría, cinemática y protocolos.
-                      3. Genera un reporte JSON técnico.
-                      IMPORTANTE: Todo el texto (descripción, razonamiento, categoría) DEBE estar en ESPAÑOL.` }
+                      MISIÓN DE ANÁLISIS FORENSE:
+                      Actúa como un Perito de Tráfico experto. Tu tarea es validar si la interacción del vehículo con la zona constituye una INFRACCIÓN CONFIRMADA basándote en la evidencia visual y telemétrica.
+
+                      PROCEDIMIENTO DE VALIDACIÓN (Paso a Paso):
+
+                      1. ANÁLISIS VISUAL DE ENTORNO:
+                         - Observa la posición relativa del vehículo respecto a las marcas viales (líneas continuas, pasos de cebra, líneas de stop).
+                         - ¿El vehículo está ocupando físicamente una zona prohibida (isleta, arcén, acera)?
+
+                      2. ANÁLISIS VECTORIAL (Cinemática):
+                         - Si es un STOP/SEMÁFORO: ¿La velocidad es cercana a 0 en la línea de detención? (Si cruza con velocidad alta > Infracción).
+                         - Si es SENTIDO CONTRARIO: ¿El ángulo de movimiento (${kinematicData.heading}) es opuesto al flujo natural de la vía (+- 160-180 grados)?
+                         - Si es GIRO PROHIBIDO: ¿La curva de trayectoria cruza la barrera geométrica hacia la dirección restringida?
+
+                      3. CORRELACIÓN CON PROTOCOLOS:
+                         - Compara la maniobra observada con la lista de "PROTOCOLOS ACTIVOS".
+                         - EJEMPLO: Si el protocolo dice "Prohibido Giro Izquierda" y el vehículo gira a la izquierda -> INFRACCIÓN VERDADERA.
+                         - EJEMPLO: Si el protocolo dice "Estacionamiento Doble Fila" y el vehículo tiene velocidad 0 en carril -> INFRACCIÓN VERDADERA.
+
+                      CRITERIOS DE SENTENCIA:
+                      - Solo marca "infraction: true" si la evidencia es contundente.
+                      - Si es una maniobra dubitativa o leve corrección dentro del carril, marca "false".
+                      
+                      GENERACIÓN DE REPORTE:
+                      - "description": Describe la maniobra técnica (ej: "Vehículo cruza línea continua invadiendo carril contrario").
+                      - "reasoning": Explica POR QUÉ viola el protocolo específico (ej: "La trayectoria balística confirma giro prohibido a la izquierda en intersección señalizada").
+                      - "ruleCategory": Usa categorías estándar DGT (ej: "SEGURIDAD_VIAL", "PRIORIDAD_PASO").
+                      
+                      Idioma de salida: ESPAÑOL TÉCNICO.` }
                 ]
             },
             config: {
