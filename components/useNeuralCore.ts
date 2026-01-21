@@ -138,8 +138,8 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
     // --- HELPERS ---
     const preprocessYolo = (source: HTMLVideoElement): Float32Array => {
         const ctx = ctxCacheRef.current!;
-        // Re-initialize cache if detached or missing
-        if (!float32CacheRef.current || float32CacheRef.current.length === 0) {
+        // Use byteLength check for detached buffers
+        if (!float32CacheRef.current || float32CacheRef.current.buffer.byteLength === 0) {
             float32CacheRef.current = new Float32Array(3 * 640 * 640);
         }
         const cache = float32CacheRef.current!;
@@ -161,8 +161,8 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
 
         // ... (Existing Detection Logics)
         if (selectedModel === 'mediapipe' && mediaPipeRef.current) {
-            let ts = performance.now();
-            if (ts <= objTimestampRef.current) ts = objTimestampRef.current + 0.01;
+            let ts = Math.floor(performance.now() * 1000);
+            if (ts <= objTimestampRef.current) ts = objTimestampRef.current + 1;
             objTimestampRef.current = ts;
             try {
                 const result = mediaPipeRef.current.detectForVideo(source, ts);
@@ -212,6 +212,10 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
                     });
                 }
             }
+            if (detections.length > 0) {
+                // Periodically log to system log for user feedback
+                if (Math.random() > 0.98) onLog('AI', `Núcleo YOLO: ${detections.length} objetos detectados en frame.`);
+            }
             return detections;
         }
         return [];
@@ -220,8 +224,8 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
     // --- DETECT POSE ---
     const detectPose = useCallback(async (source: HTMLVideoElement): Promise<PoseResult[]> => {
         if (!poseLandmarkerRef.current) return [];
-        let ts = performance.now();
-        if (ts <= poseTimestampRef.current) ts = poseTimestampRef.current + 0.01;
+        let ts = Math.floor(performance.now() * 1000);
+        if (ts <= poseTimestampRef.current) ts = poseTimestampRef.current + 1;
         poseTimestampRef.current = ts;
         try {
             const result = poseLandmarkerRef.current.detectForVideo(source, ts);

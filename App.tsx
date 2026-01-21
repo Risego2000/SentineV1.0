@@ -29,11 +29,11 @@ export const App = () => {
     const { status: neuralStatus, statusLabel, detect, detectPose } = useNeuralCore({
         selectedModel,
         onLog: addLog,
-        confidenceThreshold: 0.55
+        confidenceThreshold: 0.4
     });
 
     const [engineConfig] = useState<EngineConfig>({
-        confidenceThreshold: 0.55,
+        confidenceThreshold: 0.4,
         nmsThreshold: 0.4,
         detectionSkip: 3,
         persistence: 20,
@@ -170,22 +170,23 @@ export const App = () => {
         });
 
         // --- DETECT ---
-        // Only run detection if playing and ready
         if (isPlaying && neuralStatus === 'ready') {
             frameCountRef.current++;
 
             if (selectedModel && !isDetectingRef.current && frameCountRef.current % engineConfig.detectionSkip === 0) {
                 isDetectingRef.current = true;
-                // ... logic
+
+                // Real-time detection logic
                 Promise.all([
                     detect(v),
                     detectPose(v)
                 ]).then(([detections, poses]) => {
-                    if (workerRef.current) {
+                    if (workerRef.current && detections) {
                         const flattened = detections.map(d => ({ ...d.box, score: d.score, label: d.label }));
                         workerRef.current.postMessage({ type: 'UPDATE', data: { detections: flattened } });
                     }
-                    if (statusMsg !== "GENERANDO VECTORES...") {
+                    // Pose visualization (always on main thread for lower latency)
+                    if (statusMsg !== "GENERANDO VECTORES..." && poses) {
                         poses.forEach(p => {
                             p.landmarks.forEach(l => {
                                 ctx.beginPath();
@@ -195,6 +196,8 @@ export const App = () => {
                             });
                         });
                     }
+                }).catch(err => {
+                    console.error("Inference Error:", err);
                 }).finally(() => { isDetectingRef.current = false; });
             }
         }
@@ -345,10 +348,13 @@ export const App = () => {
     // Loop
     useEffect(() => {
         let anim: number;
-        const loop = async () => { await processFrame(); anim = requestAnimationFrame(loop); };
-        if (isPlaying) loop();
+        const loop = async () => {
+            await processFrame();
+            anim = requestAnimationFrame(loop);
+        };
+        if (source !== 'none') loop();
         return () => cancelAnimationFrame(anim);
-    }, [isPlaying, processFrame]);
+    }, [source, processFrame]);
 
     return (
         <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
