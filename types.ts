@@ -57,5 +57,6 @@ export interface SystemStatus {
     neural: string;
     forensic: string;
     bionics: string;
-    vector: string;
+    vector?: string;
+    mediapipeReady?: boolean;
 }

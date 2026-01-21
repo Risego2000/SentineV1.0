@@ -6,16 +6,17 @@ interface RightSidebarProps {
     logs: InfractionLog[];
     systemLogs: SystemLog[];
     setSelectedLog: (log: InfractionLog | null) => void;
+    stats: { det: number; inf: number };
 }
 
-export const RightSidebar = ({ logs, systemLogs, setSelectedLog }: RightSidebarProps) => {
+export const RightSidebar = ({ logs, systemLogs, setSelectedLog, stats }: RightSidebarProps) => {
     return (
         <aside className="w-80 border-l border-white/10 flex flex-col bg-[#020617]/95 z-50 h-full shrink-0">
 
             {/* Header Logs Sanciones */}
             <div className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0">
                 <FileText className="text-red-400" size={18} />
-                <span className="text-sm font-bold text-red-100 uppercase tracking-wider">Infracciones Detectadas (Resultados)</span>
+                <span className="text-sm font-bold text-red-100 uppercase tracking-wider">Infracciones Detectadas</span>
             </div>
 
             {/* Lista Infracciones */}
@@ -44,6 +45,24 @@ export const RightSidebar = ({ logs, systemLogs, setSelectedLog }: RightSidebarP
                         </div>
                     ))
                 )}
+            </div>
+
+            {/* MÉTRICAS TÁCTICAS (Relocated) */}
+            <div className="p-4 bg-slate-900/60 border-b border-white/10 space-y-3 shrink-0">
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-black/40 p-3 rounded-xl border border-white/10">
+                        <span className="text-[9px] text-slate-500 block uppercase mb-1 font-black">Total Detecciones</span>
+                        <span className="text-2xl font-black text-white leading-none font-mono">
+                            {stats.det.toString().padStart(3, '0')}
+                        </span>
+                    </div>
+                    <div className="bg-black/30 p-3 rounded-xl border border-white/10">
+                        <span className="text-[9px] text-slate-500 block uppercase mb-1 font-black">Total Sanciones</span>
+                        <span className="text-2xl font-black text-red-500 leading-none font-mono">
+                            {stats.inf.toString().padStart(3, '0')}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {/* Header System Logs */}

@@ -35,12 +35,13 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         setIsAnalyzing(true);
 
         try {
+            addLog('AI', 'Conectando con Gemini 3.0 Pro (Thinking Core) para análisis espacial...');
             const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY });
             const prompt = `INSTRUCCIÓN: "${directives} ${instruction || ''}". 
       Genera JSON con líneas (x1,y1,x2,y2 0-1), etiqueta y tipo ('forbidden','lane_divider','stop_line').`;
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-1.5-pro', // High Reasoning for Geometry
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
@@ -76,10 +77,10 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         setIsAnalyzing(true);
 
         try {
-            addLog('AI', `Unidad Forense: Iniciando auditoría de sospecha (${line.label})...`);
+            addLog('AI', `Gemini 3.0 Flash: Auditando evento en "${line.label}"...`);
             const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY });
             const response = await ai.models.generateContent({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-2.0-flash-exp', // High Speed for Audits
                 contents: {
                     parts: [
                         { inlineData: { mimeType: 'image/jpeg', data: track.snapshots[0] } },

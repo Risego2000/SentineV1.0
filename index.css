@@ -8,32 +8,37 @@
     --red-glow: rgba(239, 68, 68, 0.6);
     --purple-glow: rgba(168, 85, 247, 0.6);
   }
+
   body {
     @apply transition-colors duration-500 ease-out;
   }
 }
 
 @layer utilities {
-  .scan-line {
-    @apply absolute top-0 left-0 w-full h-[3px] z-50 opacity-60 pointer-events-none;
-    background: #22d3ee;
-    box-shadow: 0 0 20px #22d3ee, 0 0 40px rgba(34, 211, 238, 0.4);
-    animation: scan 4s linear infinite;
-  }
+
 
   .hud-grid {
-    background-image: 
-        linear-gradient(to right, rgba(34, 211, 238, 0.15) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(34, 211, 238, 0.15) 1px, transparent 1px);
+    background-image:
+      linear-gradient(to right, rgba(34, 211, 238, 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(34, 211, 238, 0.15) 1px, transparent 1px);
     background-size: 50px 50px;
   }
 
   .shadow-neon {
     box-shadow: 0 0 20px rgba(34, 211, 238, 0.15);
   }
-  
+
   /* Log scrollbar styling */
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+  }
 }
