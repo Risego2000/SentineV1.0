@@ -19,6 +19,7 @@ export const AIService = {
       Eres un experto en seguridad vial. Analiza la geometría de la vía y:
       1. Genera JSON con líneas (x1,y1,x2,y2 0-1), etiqueta y tipo ('forbidden','lane_divider','stop_line').
          IMPORTANTE: Los valores numéricos DEBEN tener un máximo de 3 posiciones decimales (ej: 0.123).
+         LIMITA el análisis a un máximo de 10 zonas críticas para garantizar estabilidad técnica.
       2. Basado EXCLUSIVAMENTE en la geometría que has creado, genera un texto breve (máximo 3 puntos) con las reglas de protocolo de seguridad (directivas) que Sentinel debe auditar.
       
       RETORNA UN ÚNICO OBJETO JSON con este formato:
@@ -64,18 +65,28 @@ export const AIService = {
         }
 
         // AGGRESSIVE CLEANUP: Fix cases where AI returns floats with hundreds of decimals
-        // This regex finds numbers with more than 10 digits after the dot and truncates them
         cleanJson = cleanJson.replace(/(\d+\.\d{6})\d+/g, "$1");
+
+        // TRUNCATED JSON FALLBACK: If the JSON is cut off, try to close it
+        let openBraces = (cleanJson.match(/\{/g) || []).length;
+        let closeBraces = (cleanJson.match(/\}/g) || []).length;
+        if (openBraces > closeBraces) {
+            // Very basic repair: if we have an unclosed array or object, close it
+            if (cleanJson.includes('"lines": [') && !cleanJson.includes(']')) {
+                cleanJson += ']}';
+            } else if (openBraces > closeBraces) {
+                cleanJson += '}'.repeat(openBraces - closeBraces);
+            }
+        }
 
         try {
             const data = JSON.parse(cleanJson);
             return {
-                lines: (data.lines || []) as GeometryLine[],
+                lines: (data.lines || []).slice(0, 10) as GeometryLine[], // Limit to 10 for stability
                 suggestedDirectives: data.suggestedDirectives || ""
             };
         } catch (e) {
-            console.error("Malformed AI JSON (Cleaned):", cleanJson.substring(0, 100) + "...");
-            // Final fallback: try to find anything that looks like current schema if it's still broken
+            console.error("Malformed AI JSON (Final Catch):", cleanJson);
             throw new Error("Respuesta de IA con formato incorrecto");
         }
     },
