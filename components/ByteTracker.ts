@@ -87,13 +87,23 @@ export class ByteTracker {
                 this.trackIdCount++;
                 const cx = d.x + d.w / 2;
                 const cy = d.y + d.h / 2;
+
+                // Color mapping: Car (cyan), Truck (orange), Bus (green), Bike (purple)
+                const colors: Record<string, string> = {
+                    car: '#22d3ee',
+                    truck: '#fb923c',
+                    bus: '#4ade80',
+                    motorcycle: '#a78bfa',
+                    person: '#f472b6'
+                };
+
                 this.tracks.push({
                     id: this.trackIdCount,
                     bbox: d,
                     label: d.label,
                     missedFrames: 0,
                     history: [d],
-                    color: '#00ff99',
+                    color: colors[d.label.toLowerCase()] || '#00ff99',
                     kf: new KalmanFilter(cx, cy), // Initialize Filter
                     processedLines: []
                 });

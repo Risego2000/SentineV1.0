@@ -200,15 +200,25 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
                     if (s > maxS) { maxS = s; maxC = c; }
                 }
                 if (maxS > confidenceThreshold) {
-                    const x = data[0 * numElements + i];
-                    const y = data[1 * numElements + i];
-                    const w = data[2 * numElements + i];
-                    const h = data[3 * numElements + i];
-                    if ((w / h) < 0.25 || (w / h) > 4.0 || (w * h) < 1500) continue;
+                    // YOLOv8/v11 Standard Output: [cx, cy, w, h] in pixel coordinates
+                    const cx = data[0 * numElements + i];
+                    const py = data[1 * numElements + i];
+                    const pw = data[2 * numElements + i];
+                    const ph = data[3 * numElements + i];
+
+                    // Filter unrealistic aspect ratios or noise
+                    if ((pw / ph) < 0.2 || (pw / ph) > 5.0 || (pw * ph) < 800) continue;
+
                     detections.push({
                         label: YOLO_CLASSES[maxC],
                         score: maxS,
-                        box: { x: (x - w / 2) / 640, y: (y - h / 2) / 640, w: w / 640, h: h / 640 }
+                        // Normalize to 0-1 for the tracker/renderer
+                        box: {
+                            x: (cx - pw / 2) / 640,
+                            y: (py - ph / 2) / 640,
+                            w: pw / 640,
+                            h: ph / 640
+                        }
                     });
                 }
             }

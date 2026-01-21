@@ -29,11 +29,11 @@ export const App = () => {
     const { status: neuralStatus, statusLabel, detect, detectPose } = useNeuralCore({
         selectedModel,
         onLog: addLog,
-        confidenceThreshold: 0.4
+        confidenceThreshold: 0.5
     });
 
     const [engineConfig] = useState<EngineConfig>({
-        confidenceThreshold: 0.4,
+        confidenceThreshold: 0.5,
         nmsThreshold: 0.4,
         detectionSkip: 3,
         persistence: 20,
@@ -217,19 +217,33 @@ export const App = () => {
                 vx = (p2.x - p1.x) / 5; vy = (p2.y - p1.y) / 5;
             }
 
-            ctx.strokeStyle = t.color || '#00ff99';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, w, h);
-            ctx.fillStyle = t.color || '#00ff99';
-            ctx.fillRect(x, y - 15, 60, 15);
-            ctx.fillStyle = 'black';
-            ctx.fillText(`${t.id} ${t.label}`, x + 2, y - 4);
+            const color = t.color || '#22d3ee';
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.setLineDash([5, 5]);
+            // Box
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(x, y, w, h);
+
+            // Subtle fill
+            ctx.fillStyle = `${color}22`;
+            ctx.fillRect(x, y, w, h);
+
+            // Label HUD
+            ctx.fillStyle = color;
+            ctx.font = 'bold 10px "Share Tech Mono"';
+            const labelStr = `${t.id} ${t.label.toUpperCase()}`;
+            const labelW = ctx.measureText(labelStr).width + 8;
+
+            ctx.fillRect(x, y - 14, labelW, 14);
+            ctx.fillStyle = 'black';
+            ctx.fillText(labelStr, x + 4, y - 3);
+
+            // Velocity Vector
+            ctx.strokeStyle = `${color}88`;
+            ctx.setLineDash([2, 4]);
             ctx.beginPath();
             ctx.moveTo(x + w / 2, y + h / 2);
-            ctx.lineTo(x + w / 2 + vx * dW * 20, y + h / 2 + vy * dH * 20);
+            ctx.lineTo(x + w / 2 + vx * dW * 15, y + h / 2 + vy * dH * 15);
             ctx.stroke();
             ctx.setLineDash([]);
         });
