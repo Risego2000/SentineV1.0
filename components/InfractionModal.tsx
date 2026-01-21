@@ -19,6 +19,7 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                             <div><span className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-2 block">Captura Forense</span><h2 className="text-4xl font-black text-white italic tracking-tighter">{log.ruleCategory}</h2></div>
                             <div className="bg-black/60 p-6 rounded-3xl border border-white/5 space-y-4">
                                 <div className="flex justify-between items-center pb-4 border-b border-white/5"><span className="text-[10px] font-black text-slate-500 uppercase">Vehículo</span><span className="text-2xl font-mono font-black text-cyan-400">{log.plate || 'SENT-IA'}</span></div>
+                                <div className="flex justify-between items-center pb-4 border-b border-white/5"><span className="text-[10px] font-black text-slate-500 uppercase">Velocidad</span><span className="text-xl font-mono font-black text-emerald-400">{log.telemetry?.speedEstimated || 'CALCULANDO...'}</span></div>
                                 <div className="flex justify-between"><span className="text-[10px] font-black text-slate-500 uppercase">Gravedad</span><span className="text-xl font-black text-red-600 uppercase italic">{log.severity}</span></div>
                             </div>
                             <div className="space-y-4">
