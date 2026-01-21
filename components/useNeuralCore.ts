@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ObjectDetector, FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import { MEDIAPIPE_MODEL_PATH, MEDIAPIPE_WASM_PATH, MEDIAPIPE_POSE_PATH, RELEVANT_CLASSES } from '../constants';
+import { logger } from '../services/logger';
 
 // Standardized Output
 export interface StandardDetection {
@@ -44,20 +45,20 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
 
             // 1. Init Vision (Shared)
             if (!visionRef.current) {
-                onLog('CORE', 'Sincronizando Motor de Visión Artificial...');
+                logger.core('NEURAL_CORE', 'Sincronizando Motor de Visión Artificial...');
                 visionRef.current = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
             }
 
             // 2. Init Google Core (MediaPipe Object Detector)
             if (!mediaPipeRef.current) {
                 setStatusLabel('VINCULANDO_DETECTOR...');
-                onLog('CORE', 'Iniciando carga de Detector de Objetos (EfficientDet)...');
+                logger.core('NEURAL_CORE', 'Iniciando carga de Detector de Objetos (EfficientDet)...');
                 mediaPipeRef.current = await ObjectDetector.createFromOptions(visionRef.current, {
                     baseOptions: { modelAssetPath: MEDIAPIPE_MODEL_PATH, delegate: "GPU" },
                     scoreThreshold: 0.1,
                     runningMode: 'VIDEO'
                 });
-                onLog('AI', 'Unidad de Detección Visual Calibrada y Activa.');
+                logger.ai('NEURAL_CORE', 'Unidad de Detección Visual Calibrada y Activa.');
             }
 
             setStatusLabel('NÚCLEO_OPERATIVO');
@@ -98,12 +99,28 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
 
     useEffect(() => {
         initCore();
+
+        return () => {
+            if (mediaPipeRef.current) {
+                logger.core('NEURAL_CORE', 'Liberando recursos de Detector de Objetos...');
+                mediaPipeRef.current.close();
+                mediaPipeRef.current = null;
+            }
+        };
     }, []);
 
     useEffect(() => {
         if (isPoseEnabled && status === 'ready') {
             initPose();
         }
+
+        return () => {
+            if (!isPoseEnabled && poseLandmarkerRef.current) {
+                logger.core('NEURAL_CORE', 'Desactivando módulo de Pose (Ahorro de recursos)...');
+                poseLandmarkerRef.current.close();
+                poseLandmarkerRef.current = null;
+            }
+        };
     }, [isPoseEnabled, status]);
 
     // --- DETECT OBJECTS ---
@@ -116,6 +133,8 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
         let mpts = ts;
         if (mpts <= objTimestampRef.current) mpts = objTimestampRef.current + 0.001;
         objTimestampRef.current = mpts;
+
+        if (source.videoWidth === 0 || source.videoHeight === 0 || source.readyState < 2) return [];
 
         try {
             const mpResult = mediaPipeRef.current.detectForVideo(source, mpts);
@@ -156,6 +175,7 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
         let ts = timestamp ?? performance.now();
         if (ts <= poseTimestampRef.current) ts = poseTimestampRef.current + 0.001;
         poseTimestampRef.current = ts;
+        if (source.videoWidth === 0 || source.videoHeight === 0 || source.readyState < 2) return [];
         try {
             const result = poseLandmarkerRef.current.detectForVideo(source, ts);
             if (!result.landmarks) return [];

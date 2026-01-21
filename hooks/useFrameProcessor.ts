@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { useSentinel } from '../context/SentinelContext';
+import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../components/ByteTracker';
 import { lineIntersect } from '../utils';
 

@@ -2,9 +2,12 @@ import React, { useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { RightSidebar } from './components/RightSidebar';
 import { MainViewer } from './components/MainViewer';
-import { InfractionModal } from './components/InfractionModal';
-import { SentinelProvider, useSentinel } from './context/SentinelContext';
-import { TacticalOverlay } from './components/TacticalOverlay';
+import { SentinelProvider } from './context/SentinelContext';
+import { useSentinel } from './hooks/useSentinel';
+import { logger } from './services/logger';
+
+const TacticalOverlay = React.lazy(() => import('./components/TacticalOverlay').then(m => ({ default: m.TacticalOverlay })));
+const InfractionModal = React.lazy(() => import('./components/InfractionModal').then(m => ({ default: m.InfractionModal })));
 import './index.css';
 
 const SentinelApp = () => {
@@ -78,19 +81,24 @@ const SentinelApp = () => {
                 onUploadClick={handleFileSelect}
             />
 
-            <MainViewer
-                videoRef={videoRef}
-                canvasRef={canvasRef}
-                startLiveFeed={handleStartLive}
-                onUploadClick={handleFileSelect}
-            />
+            <React.Suspense fallback={<div className="flex-1 bg-black animate-pulse" />}>
+                <MainViewer
+                    videoRef={videoRef}
+                    canvasRef={canvasRef}
+                />
+            </React.Suspense>
 
-            <TacticalOverlay videoRef={videoRef} canvasRef={canvasRef} />
+            <React.Suspense fallback={null}>
+                <TacticalOverlay videoRef={videoRef} canvasRef={canvasRef} />
+            </React.Suspense>
 
             <RightSidebar />
 
             <input id="file-up" type="file" className="hidden" accept="video/*" onChange={handleFileInput} />
-            {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+
+            <React.Suspense fallback={null}>
+                {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+            </React.Suspense>
         </div>
     );
 };

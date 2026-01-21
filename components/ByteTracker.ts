@@ -113,10 +113,6 @@ export class ByteTracker {
                 t.isCoasting = false;
                 t.tail.push({ x: cx, y: cy });
                 if (t.tail.length > 100) t.tail.shift();
-
-                // Sincronizar telemetría para auditoría
-                t.velocity = t.kf.getVelocity();
-                t.heading = t.kf.getHeading();
             }
         }
 
