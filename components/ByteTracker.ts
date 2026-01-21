@@ -5,10 +5,11 @@ class AdvancedKalman {
     vx: number = 0; vy: number = 0;
     ax: number = 0; ay: number = 0;
 
-    // Smoothness factors
-    alpha = 0.85; // Position filter
-    beta = 0.25;  // Velocity filter
-    gamma = 0.05; // Acceleration filter
+    // Smoothness factors - Refined for jitter reduction
+    // Increasing alpha/beta slightly for responsiveness while keeping gravity on acceleration
+    alpha = 0.65; // Position filter (lower = smoother, less jumpy)
+    beta = 0.15;  // Velocity filter (lower = smoother velocity transition)
+    gamma = 0.02; // Acceleration filter (very low to avoid erratic jumps)
 
     constructor(x: number, y: number) {
         this.x = x; this.y = y;
@@ -23,21 +24,29 @@ class AdvancedKalman {
         const rx = mx - px;
         const ry = my - py;
 
-        // Correct State
-        const prevVx = this.vx;
-        const prevVy = this.vy;
-
+        // Correct State softly to avoid "jumps"
         this.x = px + this.alpha * rx;
         this.y = py + this.alpha * ry;
-        this.vx = this.vx + (this.beta / dt) * rx;
-        this.vy = this.vy + (this.beta / dt) * ry;
-        this.ax = this.ax + (this.gamma / (dt * dt)) * rx;
-        this.ay = this.ay + (this.gamma / (dt * dt)) * ry;
+
+        // Velocity update with damping
+        const targetVx = (this.beta / dt) * rx;
+        const targetVy = (this.beta / dt) * ry;
+        this.vx += targetVx;
+        this.vy += targetVy;
+
+        // Acceleration update (minimal influence)
+        this.ax += (this.gamma / (dt * dt)) * rx;
+        this.ay += (this.gamma / (dt * dt)) * ry;
     }
 
     step(dt: number = 1) {
+        // Constant velocity motion model for coasting
         this.x += this.vx * dt + 0.5 * this.ax * dt * dt;
         this.y += this.vy * dt + 0.5 * this.ay * dt * dt;
+
+        // Apply friction/damping during coasting to avoid drifting indefinitely
+        this.vx *= 0.98;
+        this.vy *= 0.98;
     }
 
     getVelocity() {
@@ -45,6 +54,8 @@ class AdvancedKalman {
     }
 
     getHeading() {
+        // Only update heading if there's significant movement to avoid flickering
+        if (this.getVelocity() < 0.001) return 0;
         return Math.atan2(this.vy, this.vx);
     }
 }
@@ -87,7 +98,7 @@ export class ByteTracker {
                 }
             }
 
-            if (bestIoU > 0.15) { // High tolerance for fast movers
+            if (bestIoU > 0.25) { // Increased threshold to avoid Jumps between close objects
                 usedDets.add(bestDet);
                 usedTracks.add(i);
 
@@ -97,7 +108,14 @@ export class ByteTracker {
                 const cy = d.h ? d.y + d.h / 2 : d.y; // Handle points if w/h missing
 
                 t.kf.update(cx, cy);
-                t.bbox = d;
+                t.hits++; // Real detection match
+
+                // Box Interpolation for smoother visuals
+                t.bbox.w = t.bbox.w * 0.8 + d.w * 0.2;
+                t.bbox.h = t.bbox.h * 0.8 + d.h * 0.2;
+                t.bbox.x = t.kf.x - t.bbox.w / 2;
+                t.bbox.y = t.kf.y - t.bbox.h / 2;
+
                 t.score = d.score;
                 t.missedFrames = 0;
                 t.isCoasting = false;
@@ -128,6 +146,7 @@ export class ByteTracker {
                     score: d.score,
                     missedFrames: 0,
                     isCoasting: false,
+                    hits: 1, // First detection
                     tail: [{ x: cx, y: cy }],
                     color: colors[d.label.toLowerCase()] || '#00ff99',
                     kf: new AdvancedKalman(cx, cy),

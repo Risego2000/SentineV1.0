@@ -22,7 +22,7 @@ interface UseNeuralCoreProps {
 
 export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: UseNeuralCoreProps) => {
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-    const [statusLabel, setStatusLabel] = useState('BOOTING_CORE...');
+    const [statusLabel, setStatusLabel] = useState('INICIANDO_NÚCLEO...');
 
     // Refs
     const mediaPipeRef = useRef<ObjectDetector | null>(null);
@@ -40,27 +40,27 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
 
         try {
             setStatus('loading');
-            setStatusLabel('INICIALIZANDO_AGI...');
+            setStatusLabel('CARGANDO_IA...');
 
             // 1. Init Vision (Shared)
             if (!visionRef.current) {
-                onLog('CORE', 'Sincronizando Motor de Visión Compartido...');
+                onLog('CORE', 'Sincronizando Motor de Visión Artificial...');
                 visionRef.current = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
             }
 
             // 2. Init Google Core (MediaPipe Object Detector)
             if (!mediaPipeRef.current) {
                 setStatusLabel('VINCULANDO_DETECTOR...');
-                onLog('CORE', 'Iniciando carga de Google EfficientDet-Lite0...');
+                onLog('CORE', 'Iniciando carga de Detector de Objetos (EfficientDet)...');
                 mediaPipeRef.current = await ObjectDetector.createFromOptions(visionRef.current, {
                     baseOptions: { modelAssetPath: MEDIAPIPE_MODEL_PATH, delegate: "GPU" },
                     scoreThreshold: 0.1,
                     runningMode: 'VIDEO'
                 });
-                onLog('AI', 'Núcleo Neuronal Google (Object Detector) Vinculado.');
+                onLog('AI', 'Unidad de Detección Visual Calibrada y Activa.');
             }
 
-            setStatusLabel('SISTEMA_DENTRITO_OK');
+            setStatusLabel('NÚCLEO_OPERATIVO');
             setStatus('ready');
 
         } catch (e: any) {

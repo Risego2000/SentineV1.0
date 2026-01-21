@@ -68,7 +68,7 @@ export const Sidebar = ({
                                     <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.forensic === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-slate-700'}`} />
                                 </div>
                                 <span className="text-[9px] font-mono text-white italic block truncate">
-                                    {systemStatus.forensic === 'ready' ? 'FLASH_ON' : 'OFFLINE'}
+                                    {systemStatus.forensic === 'ready' ? 'FLASH_ACTIVO' : 'DESCONECTADO'}
                                 </span>
                             </div>
 
@@ -79,7 +79,7 @@ export const Sidebar = ({
                                     <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.vector === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-slate-700'}`} />
                                 </div>
                                 <span className="text-[9px] font-mono text-white italic block truncate">
-                                    {systemStatus.vector === 'ready' ? 'PRO_ACTIVE' : 'READY'}
+                                    {systemStatus.vector === 'ready' ? 'VECT_ACTIVO' : 'ESPERANDO'}
                                 </span>
                             </div>
                         </div>

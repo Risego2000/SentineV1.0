@@ -8,7 +8,7 @@ import { useNeuralCore } from './components/useNeuralCore';
 import { useSentinelSystem } from './components/useSentinelSystem';
 import { ByteTracker } from './components/ByteTracker'; // Importar Tracker
 import { EngineConfig, GeometryLine, InfractionLog, Track } from './types';
-import { TRACK_SMOOTHING, DETECTION_PRESETS, PresetType } from './constants';
+import { TRACK_SMOOTHING, DETECTION_PRESETS, PresetType, LABEL_MAP } from './constants';
 import { lineIntersect } from './utils';
 import './index.css';
 
@@ -60,9 +60,10 @@ export const App = () => {
     const processTrackResults = (activeTracks: any[]) => {
         tracksRef.current = activeTracks;
 
-        // UNIQUE DETECTION COUNTER
+        // UNIQUE DETECTION COUNTER (Confirmed vehicles only)
         activeTracks.forEach(t => {
-            if (!seenTrackIds.current.has(t.id)) {
+            // Only count if it's a stable track (at least 10 real detections)
+            if (t.hits >= 10 && !seenTrackIds.current.has(t.id)) {
                 seenTrackIds.current.add(t.id);
                 setStats(prev => ({ ...prev, det: prev.det + 1 }));
             }
@@ -243,7 +244,8 @@ export const App = () => {
             ctx.fillRect(x, y, w, h);
 
             // 3. LABEL HUD & TELEMETRY
-            const labelStr = `[KINETIC_${t.id}] ${t.label.toUpperCase()}${t.isCoasting ? '_COASTING' : ''}`;
+            const spanishLabel = (LABEL_MAP[t.label.toLowerCase()] || t.label).toUpperCase();
+            const labelStr = `[CINÉTICO_${t.id}] ${spanishLabel}${t.isCoasting ? '_INERCIA' : ''}`;
             const labelW = (labelStr.length * 6) + 12;
 
             ctx.fillStyle = color;

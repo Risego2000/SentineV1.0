@@ -4,6 +4,15 @@ export const VEHICLE_COLORS: Record<string, string> = {
     car: '#06b6d4', truck: '#f59e0b', motorcycle: '#8b5cf6', bus: '#10b981', person: '#f43f5e'
 };
 
+export const LABEL_MAP: Record<string, string> = {
+    car: 'COCHE',
+    truck: 'CAMIÓN',
+    motorcycle: 'MOTO',
+    bus: 'AUTOBÚS',
+    person: 'PEATÓN',
+    bicycle: 'BICI'
+};
+
 export const RELEVANT_CLASSES = ['car', 'truck', 'motorcycle', 'bus', 'person'];
 
 // MediaPipe Assets
