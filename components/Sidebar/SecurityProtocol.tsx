@@ -18,8 +18,8 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                 <button
                     onClick={toggleListening}
                     className={`p-2 rounded-xl transition-all ${isListening
-                            ? 'bg-red-500 text-white animate-pulse'
-                            : 'bg-slate-800 text-cyan-500 hover:bg-slate-700'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-slate-800 text-cyan-500 hover:bg-slate-700'
                         }`}
                 >
                     <Mic size={14} />
@@ -50,7 +50,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                 <button
                     onClick={() =>
                         generateGeometry(
-                            'ANÁLISIS EXHAUSTIVO: Detecta TODAS las marcas viales (carriles, líneas de parada, pasos peatonales) Y señalización vertical (STOP, Ceda el paso, Semáforos). Genera vectores precisos.'
+                            'ANÁLISIS EXHAUSTIVO: Detecta TODAS las marcas viales y señalización. IMPORTANTE: Genera directivas de seguridad en ESPAÑOL.'
                         )
                     }
                     className="w-full py-4 bg-cyan-500/5 border border-cyan-500/20 text-cyan-400 rounded-2xl font-black text-[11px] uppercase hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-all flex items-center justify-center gap-3 group shadow-[0_0_20px_rgba(34,211,238,0.05)]"

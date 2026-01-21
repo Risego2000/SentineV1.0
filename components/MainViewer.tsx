@@ -20,14 +20,22 @@ export const MainViewer = memo(({ videoRef, canvasRef }: MainViewerProps) => {
     return (
         <main className="flex-1 relative flex flex-col bg-black overflow-hidden h-screen">
             {/* Elementos ocultos pero necesarios */}
-            <video ref={videoRef} playsInline muted loop className="hidden" />
+            {/* Video visible para debug y visualización directa */}
+            <video
+                ref={videoRef}
+                playsInline
+                muted
+                loop
+                className="absolute inset-0 w-full h-full object-contain"
+                style={{ opacity: 0 }} // Mantener oculto pero renderizado para que MediaPipe pueda leerlo
+            />
 
             {/* Capa de Información (HUD) */}
             <NeuralStatusHUD />
 
             {/* Área Central de Visualización */}
-            <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden">
-                <canvas ref={canvasRef} className="max-w-full max-h-full object-contain relative z-20" />
+            <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full">
+                <canvas ref={canvasRef} className="max-w-full max-h-full object-contain relative z-20 pointer-events-none" />
 
                 {/* Estados Condicionales */}
                 {source === 'none' && <EmptyState />}

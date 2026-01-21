@@ -22,8 +22,8 @@ export const EngineSettings = () => {
                                 key={key}
                                 onClick={() => setPreset(key)}
                                 className={`p-2 rounded-xl border transition-all text-left flex flex-col gap-0.5 ${currentPreset === key
-                                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-500'
-                                        : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10'
+                                    ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-500' // Changed to Cyan
+                                    : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10'
                                     }`}
                             >
                                 <span className="text-[9px] font-black uppercase">{data.label}</span>

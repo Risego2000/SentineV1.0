@@ -41,6 +41,7 @@ export const AIService = {
          IMPORTANTE: Los valores numéricos DEBEN tener un máximo de 3 posiciones decimales (ej: 0.123).
          LIMITA el análisis a un máximo de 10 zonas críticas para garantizar estabilidad técnica.
       2. Basado EXCLUSIVAMENTE en la geometría que has creado, genera un texto breve (máximo 3 puntos) con las reglas de protocolo de seguridad (directivas) que Sentinel debe auditar.
+         IMPORTANTE: El texto DEBE estar en ESPAÑOL.
       
       RETORNA UN ÚNICO OBJETO JSON con este formato:
       {
@@ -149,10 +150,13 @@ export const AIService = {
                       TELEMETRÍA CINEMÁTICA: Velocidad relativa ${kinematicData.velocity}, Dirección ${kinematicData.heading}.
                       PROTOCOLOS VIGENTES: ${directives}.
                       
-                      TAREA: 
-                      1. Examina la imagen y la trayectoria para detectar conductas infractoras (giros prohibidos, exceso de velocidad, invasión de zona).
-                      2. Dictamina si existe infracción basado en la conexión entre la geometría de la vía y la cinemática del vehículo.
-                      3. Genera un reporte JSON técnico.` }
+                      TAREA FRENSE:
+                      1. Examina la imagen y la trayectoria para detectar conductas infractoras.
+                      2. VALIDA ESTRICTAMENTE si la conducta viola los "PROTOCOLOS VIGENTES" listados arriba.
+                      3. SI DETECTAS INFRACCIÓN: Cita explícitamente qué protocolo fue vulnerado en el campo "reasoning".
+                      4. Dictamina (infraction: true/false) basado en la conexión entre geometría, cinemática y protocolos.
+                      3. Genera un reporte JSON técnico.
+                      IMPORTANTE: Todo el texto (descripción, razonamiento, categoría) DEBE estar en ESPAÑOL.` }
                 ]
             },
             config: {

@@ -12,11 +12,11 @@ export const SystemStatus = () => {
             </h3>
             <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
                 <div className="grid grid-cols-2 gap-3">
-                    {/* NÚCLEO NEURONAL GOOGLE */}
+                    {/* NÚCLEO NEURONAL YOLO */}
                     <div className="col-span-2 p-3 bg-black/40 rounded-xl border border-white/5 space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                Núcleo Neuronal Google
+                                Núcleo Detección
                             </span>
                             <div
                                 className={`w-1.5 h-1.5 rounded-full ${systemStatus.neural === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-bounce'
@@ -25,7 +25,7 @@ export const SystemStatus = () => {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-mono text-cyan-400 font-bold italic">
-                                MEDIAPIPE_X86_64
+                                EFFICIENTDET_LITE0
                             </span>
                             <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 tracking-tighter">
                                 {statusLabel}
@@ -37,31 +37,31 @@ export const SystemStatus = () => {
                     <div className="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
                         <div className="flex items-center justify-between">
                             <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                IA Forense
+                                Auditoría IA
                             </span>
                             <div
-                                className={`w-1.5 h-1.5 rounded-full ${systemStatus.forensic === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-slate-700'
+                                className={`w-1.5 h-1.5 rounded-full ${systemStatus.forensic === 'ready' ? 'bg-purple-500 animate-pulse' : 'bg-slate-700'
                                     }`}
                             />
                         </div>
                         <span className="text-[9px] font-mono text-white italic block truncate">
-                            {systemStatus.forensic === 'ready' ? 'FLASH_ACTIVO' : 'DESCONECTADO'}
+                            GEMINI 2.0 FLASH
                         </span>
                     </div>
 
-                    {/* MOTOR VECTORIAL (ESPACIAL) */}
+                    {/* Módulos Adicionales (Vectorial + Audio) */}
                     <div className="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
                         <div className="flex items-center justify-between">
                             <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                Motor Vect
+                                subsistemas
                             </span>
-                            <div
-                                className={`w-1.5 h-1.5 rounded-full ${systemStatus.vector === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-slate-700'
-                                    }`}
-                            />
+                            <div className="flex gap-1">
+                                <div title="Motor Vectorial" className={`w-1.5 h-1.5 rounded-full ${systemStatus.vector === 'ready' ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                                <div title="Módulo Audio" className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+                            </div>
                         </div>
                         <span className="text-[9px] font-mono text-white italic block truncate">
-                            {systemStatus.vector === 'ready' ? 'VECT_ACTIVO' : 'ESPERANDO'}
+                            VECTOR: ON
                         </span>
                     </div>
                 </div>
