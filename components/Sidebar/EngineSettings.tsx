@@ -11,7 +11,7 @@ export const EngineSettings = () => {
             <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <Zap size={14} className="text-amber-500" /> Configuración del Motor
             </h3>
-            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
                 <div className="space-y-2">
                     <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2">
                         Presets de Análisis
@@ -35,7 +35,7 @@ export const EngineSettings = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5">
+                <div className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/10">
                     <span className="text-[9px] font-black text-slate-500 uppercase">
                         Análisis Cinemático (Pose)
                     </span>

@@ -22,6 +22,7 @@ interface SentinelContextType {
     // State
     source: 'none' | 'live' | 'upload';
     isPlaying: boolean;
+    isEditingGeometry: boolean;
     directives: string;
     geometry: GeometryLine[];
     selectedLog: InfractionLog | null;
@@ -43,6 +44,7 @@ interface SentinelContextType {
     // Actions
     setSource: (s: 'none' | 'live' | 'upload') => void;
     setIsPlaying: (p: boolean) => void;
+    setIsEditingGeometry: (e: boolean) => void;
     setDirectives: (d: string) => void;
     setGeometry: (g: GeometryLine[]) => void;
     setSelectedLog: (l: InfractionLog | null) => void;
@@ -82,6 +84,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset].config);
     const [fps, setFps] = useState(0);
     const [latency, setLatency] = useState(0);
+    const [isEditingGeometry, setIsEditingGeometry] = useState(false);
 
     const hasApiKey = !!((process.env.GEMINI_API_KEY) || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY);
 
@@ -279,6 +282,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const value = {
         source, setSource,
         isPlaying, setIsPlaying,
+        isEditingGeometry, setIsEditingGeometry,
         directives, setDirectives,
         geometry, setGeometry,
         selectedLog, setSelectedLog,

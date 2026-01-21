@@ -35,18 +35,30 @@ export interface GeometryResponse {
 export const AIService = {
     async generateGeometry(directives: string, instruction?: string): Promise<GeometryResponse> {
         const ai = getAIClient();
-        const prompt = `INSTRUCCIÓN ACTUAL: "${directives}". PETICIÓN ADICIONAL: "${instruction || 'Analiza la escena'}". 
-      Eres un experto en seguridad vial. Analiza la geometría de la vía y:
-      1. Genera JSON con líneas (x1,y1,x2,y2 0-1), etiqueta y tipo ('forbidden','lane_divider','stop_line').
-         IMPORTANTE: Los valores numéricos DEBEN tener un máximo de 3 posiciones decimales (ej: 0.123).
-         LIMITA el análisis a un máximo de 10 zonas críticas para garantizar estabilidad técnica.
-      2. Basado EXCLUSIVAMENTE en la geometría que has creado, genera un texto breve (máximo 3 puntos) con las reglas de protocolo de seguridad (directivas) que Sentinel debe auditar.
-         IMPORTANTE: El texto DEBE estar en ESPAÑOL.
+        const prompt = `DIRECTIVAS DE INFRACCIÓN: "${directives}". PETICIÓN ADICIONAL: "${instruction || 'Generación automática de geometría'}". 
       
-      RETORNA UN ÚNICO OBJETO JSON con este formato:
+      Eres el motor geométrico de Sentinel AI. Tu misión CRÍTICA es crear una geometría de detección precisa basada en las directivas de infracción proporcionadas.
+      
+      ANÁLISIS DE ESCENA Y GENERACIÓN AUTOMÁTICA:
+      1. Lee las DIRECTIVAS DE INFRACCIÓN. Identifica qué comportamientos se deben castigar (ej: giro prohibido, cruce de línea, exceso velocidad en zona).
+      2. Crea AUTOMÁTICAMENTE líneas geométricas (horizontales, verticales u oblicuas) que intercepten a los vehículos que cometan dichas infracciones.
+         - Si se prohíbe el giro a la izquierda: Coloca una línea OBLICUA/VERTICAL en la trayectoria de ese giro.
+         - Si hay que respetar una línea de detención: Coloca una línea HORIZONTAL donde debe detenerse.
+         - Si se prohíbe el cambio de carril: Coloca líneas LONGITUDINALES (verticales/oblicuas) entre carriles.
+      
+      REGLAS DE GENERACIÓN DE JSON:
+      - Genera un JSON con un array "lines".
+      - Coordenadas (x1, y1, x2, y2) normalizadas entre 0 y 1. Máximo 4 decimales.
+      - "label": Nombre corto y técnico de la zona (ej: "ZONA_GIRO_PROHIBIDO", "LINEA_STOP_1").
+      - "type": Usa 'forbidden' para áreas donde entrar es infracción directa, 'stop_line' para líneas de detención, 'lane_divider' para separación.
+      
+      LIMITACIONES TÉCNICAS:
+      - Genera un máximo de 12 líneas esenciales para cubrir todas las directivas.
+      
+      RETORNA ÚNICAMENTE EL JSON.
       {
         "lines": [...],
-        "suggestedDirectives": "- Texto de regla 1\\n- Texto de regla 2..."
+        "suggestedDirectives": "Resumen conciso y técnico de las reglas generadas (en Español)."
       }`;
 
         const response = await ai.models.generateContent({

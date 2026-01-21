@@ -26,7 +26,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                 </button>
             </div>
 
-            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
                 <div className="relative group">
                     <textarea
                         value={directives}
@@ -39,7 +39,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                                 );
                             }
                         }}
-                        className="w-full h-32 bg-black/40 border border-white/5 rounded-xl p-4 text-[11px] font-mono text-cyan-300 outline-none resize-none shadow-inner focus:border-cyan-500/50 transition-all uppercase"
+                        className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-[11px] font-mono text-cyan-300 outline-none resize-none shadow-inner focus:border-cyan-500/50 transition-all uppercase"
                         placeholder="Ingrese directivas del sistema..."
                     />
                     <div className="absolute bottom-3 right-3 opacity-20 pointer-events-none font-mono text-[8px] text-cyan-500">

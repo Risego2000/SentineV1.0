@@ -6,6 +6,7 @@ import { NeuralStatusHUD } from './MainViewer/NeuralStatusHUD';
 import { ControlBar } from './MainViewer/ControlBar';
 import { HeaderActions } from './MainViewer/HeaderActions';
 import { ForensicAnalysisOverlay } from './MainViewer/ForensicAnalysisOverlay';
+import { GeometryEditor } from './MainViewer/GeometryEditor';
 
 interface MainViewerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -19,7 +20,7 @@ interface MainViewerProps {
  * Estructura optimizada para renderizado fluido.
  */
 export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainViewerProps) => {
-    const { source, isAnalyzing } = useSentinel();
+    const { source, isAnalyzing, isEditingGeometry, setIsEditingGeometry } = useSentinel();
 
     return (
         <main className="flex-1 relative flex flex-col bg-black overflow-hidden h-screen">
@@ -36,7 +37,13 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
 
             {/* Capa de Información (HUD) y Acciones */}
             <NeuralStatusHUD />
-            <HeaderActions onLive={onLive} onUpload={onUpload} activeMode={source === 'upload' ? 'video' : source} />
+            <HeaderActions
+                onLive={onLive}
+                onUpload={onUpload}
+                activeMode={source === 'upload' ? 'video' : source}
+                isEditing={isEditingGeometry}
+                onEdit={() => setIsEditingGeometry(!isEditingGeometry)}
+            />
 
             {/* Overlay de Análisis Forense */}
             <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
@@ -44,6 +51,7 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
             {/* Área Central de Visualización */}
             <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full">
                 <canvas ref={canvasRef} className="max-w-full max-h-full object-contain relative z-20 pointer-events-none" />
+                <GeometryEditor canvasRef={canvasRef} />
 
                 {/* Estados Condicionales */}
                 {source === 'none' && <EmptyState />}

@@ -16,7 +16,7 @@ interface SidebarProps {
 export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
     return (
         <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0 h-screen overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-cyan-950/10 shrink-0">
+            <div className="p-6 border-b border-white/10 flex items-center gap-4 bg-cyan-950/10 shrink-0">
                 <ShieldCheck className="text-cyan-500 w-10 h-10" />
                 <div className="flex flex-col">
                     <span className="text-xl font-black italic text-white uppercase leading-none">SENTINEL</span>

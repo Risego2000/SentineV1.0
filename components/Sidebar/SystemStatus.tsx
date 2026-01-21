@@ -10,10 +10,10 @@ export const SystemStatus = () => {
             <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <Cpu size={14} className="text-cyan-500" /> Núcleo Operativo
             </h3>
-            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
+            <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4">
                 <div className="grid grid-cols-2 gap-3">
                     {/* NÚCLEO NEURONAL YOLO */}
-                    <div className="col-span-2 p-3 bg-black/40 rounded-xl border border-white/5 space-y-2">
+                    <div className="col-span-2 p-3 bg-black/40 rounded-xl border border-white/10 space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                                 Núcleo Detección
