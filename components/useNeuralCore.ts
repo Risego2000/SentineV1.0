@@ -105,17 +105,21 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
                     const modelBuffer = await modelResp.arrayBuffer();
 
                     onLog('CORE', 'Inicializando Sesión de Inferencia WASM...');
-                    (window as any).ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
+                    (window as any).ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
+                    (window as any).ort.env.wasm.proxy = true;
 
+                    onLog('CORE', 'Reservando Memoria Gráfica para Tensores...');
                     yoloSessionRef.current = await (window as any).ort.InferenceSession.create(modelBuffer, {
                         executionProviders: ['wasm'],
                         graphOptimizationLevel: 'all'
                     });
+                    onLog('CORE', 'Configurando NMS (Non-Maximum Suppression)...');
                 }
                 setStatusLabel('CALIBRADO_YOLO11');
-                onLog('AI', 'Motor Neuronal (YOLOv11) Calibrado.');
+                onLog('AI', 'Motor Neuronal (YOLOv11) Calibrado y Listo.');
+                onLog('INFO', 'Sistema en espera de flujo de video...');
+                setStatus('ready');
             }
-            setStatus('ready');
 
         } catch (e: any) {
             console.error(e);

@@ -50,6 +50,12 @@ export const App = () => {
 
     // --- WORKER SETUP ---
     useEffect(() => {
+        // Initial system logs
+        addLog('CORE', 'SISTEMA SENTINEL V16 [INICIALIZANDO]');
+        addLog('CORE', 'Sincronizando reloj de sistema con servidor forense...');
+        setTimeout(() => addLog('INFO', 'Conectando con Unidad de Inferencia AGI...'), 1000);
+        setTimeout(() => addLog('AI', 'Unidad Forense: Conexión Gemini Establecida.'), 2000);
+
         workerRef.current = new Worker(new URL('./components/tracking.worker.ts', import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (e) => {
@@ -174,7 +180,8 @@ export const App = () => {
                     detectPose(v)
                 ]).then(([detections, poses]) => {
                     if (workerRef.current) {
-                        workerRef.current.postMessage({ type: 'UPDATE', data: { detections } });
+                        const flattened = detections.map(d => ({ ...d.box, score: d.score, label: d.label }));
+                        workerRef.current.postMessage({ type: 'UPDATE', data: { detections: flattened } });
                     }
                     if (statusMsg !== "GENERANDO VECTORES...") {
                         poses.forEach(p => {
