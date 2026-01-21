@@ -141,6 +141,12 @@ export const Sidebar = ({
                             <textarea
                                 value={directives}
                                 onChange={e => setDirectives(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        generateGeometry('ANÁLISIS DE REVISIÓN: Actualiza la geometría basada en las nuevas directivas del protocolo de seguridad.');
+                                    }
+                                }}
                                 className="w-full h-32 bg-black/40 border border-white/5 rounded-xl p-4 text-[11px] font-mono text-cyan-300 outline-none resize-none shadow-inner focus:border-cyan-500/50 transition-all"
                                 placeholder="Ingrese directivas del sistema..."
                             />
