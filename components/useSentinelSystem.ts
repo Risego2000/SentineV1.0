@@ -21,6 +21,14 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         }, ...prev].slice(0, MAX_LOGS));
     }, []);
 
+    useEffect(() => {
+        if (hasApiKey) {
+            addLog('AI', 'Unidad Forense: Conexión Gemini AGI validada.');
+        } else {
+            addLog('ERROR', 'Unidad Forense: Sin acceso a Núcleo Forense (Falta API KEY).');
+        }
+    }, [hasApiKey, addLog]);
+
     const generateGeometry = useCallback(async (directives: string, instruction?: string) => {
         if (!hasApiKey) return [];
         setStatusMsg("GENERANDO VECTORES...");

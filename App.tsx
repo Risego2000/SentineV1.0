@@ -50,31 +50,33 @@ export const App = () => {
 
     // --- WORKER SETUP ---
     useEffect(() => {
-        // Initial system logs
-        addLog('CORE', 'SISTEMA SENTINEL V16 [INICIALIZANDO]');
-        addLog('CORE', 'Sincronizando reloj de sistema con servidor forense...');
-        setTimeout(() => addLog('INFO', 'Conectando con Unidad de Inferencia AGI...'), 1000);
-        setTimeout(() => addLog('AI', 'Unidad Forense: Conexión Gemini Establecida.'), 2000);
+        addLog('CORE', 'SISTEMA SENTINEL V16: Iniciando carga de subsistemas...');
 
-        workerRef.current = new Worker(new URL('./components/tracking.worker.ts', import.meta.url), { type: 'module' });
+        try {
+            workerRef.current = new Worker(new URL('./components/tracking.worker.ts', import.meta.url), { type: 'module' });
+            workerRef.current.onmessage = (e) => {
+                const { type, tracks } = e.data;
+                if (type === 'INIT_COMPLETE') {
+                    addLog('CORE', 'Motor Vectorial de Seguimiento: Worker en línea.');
+                }
+                if (type === 'UPDATE_COMPLETE') {
+                    // Sync tracks from worker to main thread for rendering
+                    // Note: We need to handle the state/history. 
+                    // The worker sends the *current* state of all tracks.
+                    // We just swap the ref.
+                    // However, we need to check audits *here* or inside worker?
+                    // If we check here, we iterate the new tracks.
 
-        workerRef.current.onmessage = (e) => {
-            const { type, tracks } = e.data;
-            if (type === 'UPDATE_COMPLETE') {
-                // Sync tracks from worker to main thread for rendering
-                // Note: We need to handle the state/history. 
-                // The worker sends the *current* state of all tracks.
-                // We just swap the ref.
-                // However, we need to check audits *here* or inside worker?
-                // If we check here, we iterate the new tracks.
+                    // Let's do the Geometry Check here for now to keep Worker simple, 
+                    // or move it later. The prompt asked for optimization.
+                    // Tracker is the heavy algorithmic part (O(n^2) or matching).
 
-                // Let's do the Geometry Check here for now to keep Worker simple, 
-                // or move it later. The prompt asked for optimization.
-                // Tracker is the heavy algorithmic part (O(n^2) or matching).
-
-                processTrackResults(tracks);
-            }
-        };
+                    processTrackResults(tracks);
+                }
+            };
+        } catch (e) {
+            addLog('ERROR', 'Fallo al inicializar Motor de Seguimiento (Worker).');
+        }
 
         workerRef.current.postMessage({ type: 'INIT' });
 
