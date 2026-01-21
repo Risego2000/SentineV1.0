@@ -40,11 +40,23 @@ export const AIService = {
       Eres el motor geométrico de Sentinel AI. Tu misión CRÍTICA es crear una geometría de detección precisa basada en las directivas de infracción proporcionadas.
       
       ANÁLISIS DE ESCENA Y GENERACIÓN AUTOMÁTICA:
-      1. Lee las DIRECTIVAS DE INFRACCIÓN. Identifica qué comportamientos se deben castigar (ej: giro prohibido, cruce de línea, exceso velocidad en zona).
-      2. Crea AUTOMÁTICAMENTE líneas geométricas (horizontales, verticales u oblicuas) que intercepten a los vehículos que cometan dichas infracciones.
-         - Si se prohíbe el giro a la izquierda: Coloca una línea OBLICUA/VERTICAL en la trayectoria de ese giro.
-         - Si hay que respetar una línea de detención: Coloca una línea HORIZONTAL donde debe detenerse.
-         - Si se prohíbe el cambio de carril: Coloca líneas LONGITUDINALES (verticales/oblicuas) entre carriles.
+      1. Lee las DIRECTIVAS DE INFRACCIÓN. Identifica qué comportamientos se deben castigar.
+      2. Crea AUTOMÁTICAMENTE líneas geométricas (horizontales, verticales u oblicuas) para interceptar infracciones VISUALES:
+      
+         A. CRUCE DE LÍNEAS / GIROS:
+            - "Cruce Línea Continua": Genera 'lane_divider' estrictos a lo largo de las divisiones de carril visibles.
+            - "Giro Prohibido": Genera barreras 'forbidden' oblicuas/curvas que bloqueen la trayectoria del giro ilegal.
+            - "Sentido Contrario": Genera líneas 'lane_divider' oblicuas que crucen el carril para detectar vectores opuestos.
+
+         B. INTERSECCIONES Y PRIORIDAD:
+            - "Saltarse STOP" / "Semáforo Rojo": Genera una 'stop_line' HORIZONTAL precisa justo antes de la intersección.
+            - "Saltarse Ceda el Paso": Genera una línea de 'stop_line' (o 'yield_line') en el punto de incorporación.
+            - "Bloqueo Intersección (Yellow Box)": Genera un polígono (o varias líneas 'forbidden') cruzando el centro de la intersección (caja amarilla).
+
+         C. ZONAS PROTEGIDAS:
+            - "Invasión Paso Peatones": Genera líneas 'forbidden' rodeando o cruzando el paso de cebra.
+            - "Estacionamiento Doble Fila": Genera líneas 'forbidden' longitudinales paralelas al bordillo (donde aparcarían ilegalmente).
+            - "Invasión Arcén": Genera líneas 'forbidden' delimitando el arcén.
       
       REGLAS DE GENERACIÓN DE JSON:
       - Genera un JSON con un array "lines".
@@ -53,7 +65,7 @@ export const AIService = {
       - "type": Usa 'forbidden' para áreas donde entrar es infracción directa, 'stop_line' para líneas de detención, 'lane_divider' para separación.
       
       LIMITACIONES TÉCNICAS:
-      - Genera un máximo de 12 líneas esenciales para cubrir todas las directivas.
+      - Genera un máximo de 15 líneas esenciales para cubrir todas las directivas.
       
       RETORNA ÚNICAMENTE EL JSON.
       {
