@@ -364,6 +364,7 @@ export const App = () => {
                 isDetecting={isDetectingRef.current} statusMsg={statusMsg}
                 systemStatus={{ neural: neuralStatus, forensic: hasApiKey ? 'ready' : 'error', bionics: source !== 'none' ? 'ready' : 'pending' }}
                 statusLabel={statusLabel} isPlaying={isPlaying} setIsPlaying={setIsPlaying} isAnalyzing={isAnalyzing} modelLoaded={neuralStatus === 'ready'}
+                startLiveFeed={startLiveFeed} onUploadClick={handleFileSelect} generateGeometry={() => handleGenerateGeometry()}
             />
 
             <RightSidebar logs={logs} systemLogs={systemLogs} setSelectedLog={setSelectedLog} />

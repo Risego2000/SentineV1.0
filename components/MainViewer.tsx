@@ -19,11 +19,15 @@ interface MainViewerProps {
     setIsPlaying: (s: boolean) => void;
     isAnalyzing: boolean;
     modelLoaded: boolean;
+    startLiveFeed: () => void;
+    onUploadClick: () => void;
+    generateGeometry: () => void;
 }
 
 export const MainViewer = ({
     videoRef, canvasRef, source, isDetecting, statusMsg, systemStatus, statusLabel,
-    isPlaying, setIsPlaying, isAnalyzing, modelLoaded
+    isPlaying, setIsPlaying, isAnalyzing, modelLoaded,
+    startLiveFeed, onUploadClick, generateGeometry
 }: MainViewerProps) => {
 
     return (
@@ -51,13 +55,16 @@ export const MainViewer = ({
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 w-full max-w-2xl">
-                            <div className={`p-6 bg-slate-900/60 border ${systemStatus.neural === 'ready' ? 'border-green-500/30' : (systemStatus.neural === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
+                            <button
+                                onClick={() => !modelLoaded && generateGeometry()}
+                                className={`p-6 bg-slate-900/60 border ${systemStatus.neural === 'ready' ? 'border-green-500/30' : (systemStatus.neural === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg hover:bg-slate-800/80 group text-left`}
+                            >
                                 <Cpu size={24} className={systemStatus.neural === 'ready' ? "text-green-500" : (systemStatus.neural === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Núcleo Neuronal</span>
                                     <span className="text-sm font-mono text-white italic">{statusLabel}</span>
                                 </div>
-                            </div>
+                            </button>
 
                             <div className={`p-6 bg-slate-900/60 border ${systemStatus.forensic === 'ready' ? 'border-green-500/30' : (systemStatus.forensic === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
                                 <BrainCircuit size={24} className={systemStatus.forensic === 'ready' ? "text-green-500" : (systemStatus.forensic === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
@@ -67,21 +74,27 @@ export const MainViewer = ({
                                 </div>
                             </div>
 
-                            <div className={`p-6 bg-slate-900/60 border ${systemStatus.bionics === 'ready' ? 'border-green-500/30' : (systemStatus.bionics === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
+                            <button
+                                onClick={startLiveFeed}
+                                className={`p-6 bg-slate-900/60 border ${systemStatus.bionics === 'ready' ? 'border-green-500/30' : (systemStatus.bionics === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg hover:bg-slate-800/80 group text-left`}
+                            >
                                 <Video size={24} className={systemStatus.bionics === 'ready' ? "text-green-500" : (systemStatus.bionics === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Entrada Biónica</span>
                                     <span className="text-sm font-mono text-white italic">{systemStatus.bionics === 'ready' ? 'ÓPTICA_ESTABLE' : (systemStatus.bionics === 'error' ? 'DENEGADO' : 'ESPERANDO_DISPOSITIVO')}</span>
                                 </div>
-                            </div>
+                            </button>
 
-                            <div className="p-6 bg-slate-900/60 border border-green-500/30 rounded-3xl flex items-center gap-4 transition-all shadow-lg">
+                            <button
+                                onClick={generateGeometry}
+                                className="p-6 bg-slate-900/60 border border-green-500/30 rounded-3xl flex items-center gap-4 transition-all shadow-lg hover:bg-slate-800/80 group text-left"
+                            >
                                 <Layers size={24} className="text-green-500" />
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Motor Vectorial</span>
                                     <span className="text-sm font-mono text-white italic">GEOMETRÍA_LISTA</span>
                                 </div>
-                            </div>
+                            </button>
                         </div>
 
                         <div className="flex flex-col items-center gap-2">

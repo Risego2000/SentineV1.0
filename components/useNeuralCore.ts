@@ -106,7 +106,7 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
 
                     onLog('CORE', 'Inicializando Sesión de Inferencia WASM...');
                     (window as any).ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
-                    (window as any).ort.env.wasm.proxy = true;
+                    (window as any).ort.env.wasm.proxy = false; // Disable proxy to prevent buffer detachment
 
                     onLog('CORE', 'Reservando Memoria Gráfica para Tensores...');
                     yoloSessionRef.current = await (window as any).ort.InferenceSession.create(modelBuffer, {
@@ -138,6 +138,10 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
     // --- HELPERS ---
     const preprocessYolo = (source: HTMLVideoElement): Float32Array => {
         const ctx = ctxCacheRef.current!;
+        // Re-initialize cache if detached or missing
+        if (!float32CacheRef.current || float32CacheRef.current.length === 0) {
+            float32CacheRef.current = new Float32Array(3 * 640 * 640);
+        }
         const cache = float32CacheRef.current!;
         ctx.clearRect(0, 0, 640, 640);
         ctx.drawImage(source, 0, 0, 640, 640);
@@ -157,8 +161,8 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
 
         // ... (Existing Detection Logics)
         if (selectedModel === 'mediapipe' && mediaPipeRef.current) {
-            let ts = Date.now();
-            if (ts <= objTimestampRef.current) ts = objTimestampRef.current + 1;
+            let ts = performance.now();
+            if (ts <= objTimestampRef.current) ts = objTimestampRef.current + 0.01;
             objTimestampRef.current = ts;
             try {
                 const result = mediaPipeRef.current.detectForVideo(source, ts);
@@ -216,8 +220,8 @@ export const useNeuralCore = ({ selectedModel, onLog, confidenceThreshold }: Use
     // --- DETECT POSE ---
     const detectPose = useCallback(async (source: HTMLVideoElement): Promise<PoseResult[]> => {
         if (!poseLandmarkerRef.current) return [];
-        let ts = Date.now();
-        if (ts <= poseTimestampRef.current) ts = poseTimestampRef.current + 1;
+        let ts = performance.now();
+        if (ts <= poseTimestampRef.current) ts = poseTimestampRef.current + 0.01;
         poseTimestampRef.current = ts;
         try {
             const result = poseLandmarkerRef.current.detectForVideo(source, ts);
