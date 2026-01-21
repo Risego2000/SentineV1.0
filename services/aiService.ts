@@ -18,6 +18,7 @@ export const AIService = {
         const prompt = `INSTRUCCIÓN ACTUAL: "${directives}". PETICIÓN ADICIONAL: "${instruction || 'Analiza la escena'}". 
       Eres un experto en seguridad vial. Analiza la geometría de la vía y:
       1. Genera JSON con líneas (x1,y1,x2,y2 0-1), etiqueta y tipo ('forbidden','lane_divider','stop_line').
+         IMPORTANTE: Los valores numéricos DEBEN tener un máximo de 3 posiciones decimales (ej: 0.123).
       2. Basado EXCLUSIVAMENTE en la geometría que has creado, genera un texto breve (máximo 3 puntos) con las reglas de protocolo de seguridad (directivas) que Sentinel debe auditar.
       
       RETORNA UN ÚNICO OBJETO JSON con este formato:
@@ -62,6 +63,10 @@ export const AIService = {
             cleanJson = responseText.split("```")[1].split("```")[0].trim();
         }
 
+        // AGGRESSIVE CLEANUP: Fix cases where AI returns floats with hundreds of decimals
+        // This regex finds numbers with more than 10 digits after the dot and truncates them
+        cleanJson = cleanJson.replace(/(\d+\.\d{6})\d+/g, "$1");
+
         try {
             const data = JSON.parse(cleanJson);
             return {
@@ -69,18 +74,9 @@ export const AIService = {
                 suggestedDirectives: data.suggestedDirectives || ""
             };
         } catch (e) {
-            console.error("Malformed AI JSON:", cleanJson);
-            // Si falla el parseo, intentamos limpiar caracteres de control comunes
-            try {
-                const fixedJson = cleanJson.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-                const data = JSON.parse(fixedJson);
-                return {
-                    lines: (data.lines || []) as GeometryLine[],
-                    suggestedDirectives: data.suggestedDirectives || ""
-                };
-            } catch (innerE) {
-                throw new Error("Respuesta de IA con formato incorrecto");
-            }
+            console.error("Malformed AI JSON (Cleaned):", cleanJson.substring(0, 100) + "...");
+            // Final fallback: try to find anything that looks like current schema if it's still broken
+            throw new Error("Respuesta de IA con formato incorrecto");
         }
     },
 

@@ -124,8 +124,8 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
                     if (!d.categories[0]) return;
 
                     const label = d.categories[0].categoryName.toLowerCase();
-                    // Umbral diferenciado para peatones (más estricto para evitar errores con coches)
-                    const minConf = label === 'person' ? Math.max(confidenceThreshold, 0.45) : confidenceThreshold;
+                    // Umbral diferenciado para peatones (EXTREMADAMENTE estricto para evitar errores con coches)
+                    const minConf = label === 'person' ? Math.max(confidenceThreshold, 0.60) : confidenceThreshold;
 
                     if (d.categories[0].score < minConf) return;
                     if (!RELEVANT_CLASSES.includes(label)) return;
