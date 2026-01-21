@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { SystemStatus } from './Sidebar/SystemStatus';
 import { EngineSettings } from './Sidebar/EngineSettings';
 import { SecurityProtocol } from './Sidebar/SecurityProtocol';
+import { ProtocolSelector } from './Sidebar/ProtocolSelector';
 
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
                 <SystemStatus />
                 <EngineSettings />
                 <SecurityProtocol toggleListening={toggleListening} />
+                <ProtocolSelector />
             </div>
 
 
