@@ -147,7 +147,12 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
     const onFileChange = useCallback((file: File, videoRef: React.RefObject<HTMLVideoElement | null>) => {
         if (file && videoRef.current) {
+            // REINICIO TÁCTICO TOTAL
+            setStats({ det: 0, inf: 0 });
+            setGeometry([]);
+            setDirectives("");
             addLog('INFO', `Sistema de Archivos: Cargando video "${file.name}"...`);
+
             const url = URL.createObjectURL(file);
             videoRef.current.src = url;
             videoRef.current.currentTime = 0;
@@ -167,7 +172,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
             addLog('CORE', 'Subsector de Datos: Transmisión cargada. Iniciando análisis espacial automático...');
             setTimeout(() => setStatusMsg(null), 2000);
         }
-    }, [addLog, setStatusMsg, generateGeometry]);
+    }, [addLog, setStatusMsg, generateGeometry, setStats, setGeometry, setDirectives]);
 
     // --- PROTOCOL SYNC ---
     useEffect(() => {
