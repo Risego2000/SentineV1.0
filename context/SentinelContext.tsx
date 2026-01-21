@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import {
     GeometryLine,
     InfractionLog,
@@ -163,6 +163,15 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
             setTimeout(() => setStatusMsg(null), 2000);
         }
     }, [addLog, setStatusMsg]);
+
+    // --- PROTOCOL SYNC ---
+    useEffect(() => {
+        if (directives) {
+            addLog('CORE', 'Unidad Forense: Protocolos de seguridad sincronizados y actualizados.');
+            setStatusMsg("REGLAS ACTUALIZADAS");
+            setTimeout(() => setStatusMsg(null), 1500);
+        }
+    }, [directives, addLog, setStatusMsg]);
 
     const systemStatus: SystemStatus = {
         neural: neuralStatus === 'ready' ? 'ready' : neuralStatus === 'error' ? 'error' : 'loading',
