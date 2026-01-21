@@ -59,7 +59,8 @@ export const TacticalOverlay = ({ videoRef, canvasRef }: TacticalOverlayProps) =
 
                             ctx.fillStyle = ctx.strokeStyle;
                             ctx.font = 'bold 10px "Share Tech Mono", monospace';
-                            ctx.fillText(line.label.toUpperCase(), lx1, ly1 - 8);
+                            const lineLabel = (line.label || 'ZONA').toUpperCase();
+                            ctx.fillText(lineLabel, lx1, ly1 - 8);
                         });
 
                         // 2. Draw Active Tracks
