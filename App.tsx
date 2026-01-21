@@ -9,31 +9,16 @@ import './index.css';
 
 const SentinelApp = () => {
     const {
-        source,
-        isPlaying,
-        setIsPlaying,
         directives,
         setDirectives,
         selectedLog,
         setSelectedLog,
-        isListening,
-        isPoseEnabled,
-        setIsPoseEnabled,
-        currentPreset,
-        setPreset,
-        stats,
-        logs,
-        systemLogs,
-        statusMsg,
-        isAnalyzing,
-        isDetecting,
-        systemStatus,
-        statusLabel,
-        addLog,
         generateGeometry,
         startLiveFeed,
         onFileChange,
-        hasApiKey
+        isPlaying,
+        setIsPlaying,
+        addLog
     } = useSentinel();
 
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -77,7 +62,7 @@ const SentinelApp = () => {
         recognition.start();
     };
 
-    // Video sync
+    // Video sync effect
     React.useEffect(() => {
         if (videoRef.current) {
             if (isPlaying) videoRef.current.play().catch(() => { });
@@ -88,47 +73,21 @@ const SentinelApp = () => {
     return (
         <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
             <Sidebar
-                stats={stats}
-                currentPreset={currentPreset}
-                setPreset={setPreset}
-                directives={directives}
-                setDirectives={setDirectives}
                 toggleListening={toggleListening}
-                isListening={isListening}
-                generateGeometry={() => generateGeometry()}
                 startLiveFeed={handleStartLive}
                 onUploadClick={handleFileSelect}
-                isPoseEnabled={isPoseEnabled}
-                togglePose={() => setIsPoseEnabled(!isPoseEnabled)}
-                systemStatus={systemStatus}
-                statusLabel={statusLabel}
             />
 
             <MainViewer
                 videoRef={videoRef}
                 canvasRef={canvasRef}
-                source={source}
-                isDetecting={isDetecting}
-                statusMsg={statusMsg}
-                systemStatus={systemStatus}
-                statusLabel={statusLabel}
-                isPlaying={isPlaying}
-                setIsPlaying={setIsPlaying}
-                isAnalyzing={isAnalyzing}
-                modelLoaded={systemStatus.neural === 'ready'}
                 startLiveFeed={handleStartLive}
                 onUploadClick={handleFileSelect}
-                generateGeometry={() => generateGeometry()}
             />
 
             <TacticalOverlay videoRef={videoRef} canvasRef={canvasRef} />
 
-            <RightSidebar
-                logs={logs}
-                systemLogs={systemLogs}
-                setSelectedLog={setSelectedLog}
-                stats={stats}
-            />
+            <RightSidebar />
 
             <input id="file-up" type="file" className="hidden" accept="video/*" onChange={handleFileInput} />
             {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}

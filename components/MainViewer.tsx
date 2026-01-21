@@ -1,29 +1,29 @@
-import React, { useRef, useEffect } from 'react';
-import { Activity, BrainCircuit, Cpu, Video, Layers, Waves, Play, Pause } from 'lucide-react';
-import { SystemStatus } from '../types';
+import React from 'react';
+import { Activity, BrainCircuit, Waves, Play, Pause } from 'lucide-react';
+import { useSentinel } from '../context/SentinelContext';
 
 interface MainViewerProps {
-    videoRef: React.RefObject<HTMLVideoElement>;
-    canvasRef: React.RefObject<HTMLCanvasElement>;
-    source: 'none' | 'live' | 'upload';
-    isDetecting: boolean;
-    statusMsg: string | null;
-    systemStatus: SystemStatus;
-    statusLabel: string;
-    isPlaying: boolean;
-    setIsPlaying: (s: boolean) => void;
-    isAnalyzing: boolean;
-    modelLoaded: boolean;
+    videoRef: React.RefObject<HTMLVideoElement | null>;
+    canvasRef: React.RefObject<HTMLCanvasElement | null>;
     startLiveFeed: () => void;
     onUploadClick: () => void;
-    generateGeometry: (instruction?: string) => void;
 }
 
 export const MainViewer = ({
-    videoRef, canvasRef, source, isDetecting, statusMsg, systemStatus, statusLabel,
-    isPlaying, setIsPlaying, isAnalyzing, modelLoaded,
-    startLiveFeed, onUploadClick, generateGeometry
+    videoRef, canvasRef, startLiveFeed, onUploadClick
 }: MainViewerProps) => {
+    const {
+        source,
+        isDetecting,
+        statusMsg,
+        systemStatus,
+        statusLabel,
+        isPlaying,
+        setIsPlaying,
+        isAnalyzing,
+    } = useSentinel();
+
+    const modelLoaded = systemStatus.neural === 'ready';
 
     return (
         <main className="flex-1 relative flex flex-col bg-black overflow-hidden">
@@ -48,7 +48,6 @@ export const MainViewer = ({
                             <div className="w-56 h-56 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin absolute" />
                             <BrainCircuit className="w-20 h-20 text-cyan-500 animate-pulse absolute" />
                         </div>
-
 
                         <div className="flex flex-col items-center gap-2">
                             <span className="text-cyan-500/30 font-mono text-[9px] tracking-[0.5em] uppercase">Protocolo de Seguridad: SENTINEL.V16_ALFA</span>

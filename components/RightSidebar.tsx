@@ -1,15 +1,9 @@
 import React from 'react';
-import { Terminal, AlertTriangle, CheckCircle, Info, Cpu, FileText } from 'lucide-react';
-import { SystemLog, InfractionLog } from '../types';
+import { Terminal, Cpu, FileText } from 'lucide-react';
+import { useSentinel } from '../context/SentinelContext';
 
-interface RightSidebarProps {
-    logs: InfractionLog[];
-    systemLogs: SystemLog[];
-    setSelectedLog: (log: InfractionLog | null) => void;
-    stats: { det: number; inf: number };
-}
-
-export const RightSidebar = ({ logs, systemLogs, setSelectedLog, stats }: RightSidebarProps) => {
+export const RightSidebar = () => {
+    const { logs, systemLogs, setSelectedLog, stats } = useSentinel();
     return (
         <aside className="w-80 border-l border-white/10 flex flex-col bg-[#020617]/95 z-50 h-full shrink-0">
 

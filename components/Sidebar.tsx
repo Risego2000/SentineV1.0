@@ -1,33 +1,33 @@
+import React from 'react';
 import { ShieldCheck, Target, Mic, Sparkles, Upload, Signal, Zap, Cpu } from 'lucide-react';
-import { SystemLog, InfractionLog, SystemStatus } from '../types';
+import { useSentinel } from '../context/SentinelContext';
 import { DETECTION_PRESETS, PresetType } from '../constants';
 
 interface SidebarProps {
-    stats: { det: number; inf: number };
-    currentPreset: PresetType;
-    setPreset: (p: PresetType) => void;
-    directives: string;
-    setDirectives: (d: string) => void;
     toggleListening: () => void;
-    isListening: boolean;
-    generateGeometry: (instruction?: string) => void;
     startLiveFeed: () => void;
     onUploadClick: () => void;
-    isPoseEnabled: boolean;
-    togglePose: () => void;
-    systemStatus: SystemStatus;
-    statusLabel: string;
 }
 
 export const Sidebar = ({
-    stats,
-    currentPreset, setPreset,
-    directives, setDirectives,
-    toggleListening, isListening, generateGeometry,
+    toggleListening,
     startLiveFeed, onUploadClick,
-    isPoseEnabled, togglePose,
-    systemStatus, statusLabel
 }: SidebarProps) => {
+    const {
+        stats,
+        currentPreset,
+        setPreset,
+        directives,
+        setDirectives,
+        isListening,
+        generateGeometry,
+        isPoseEnabled,
+        setIsPoseEnabled,
+        systemStatus,
+        statusLabel
+    } = useSentinel();
+
+    const togglePose = () => setIsPoseEnabled(!isPoseEnabled);
     return (
         <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0">
             <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-cyan-950/10">
