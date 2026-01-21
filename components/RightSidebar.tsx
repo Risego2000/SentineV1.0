@@ -10,16 +10,16 @@ interface RightSidebarProps {
 
 export const RightSidebar = ({ logs, systemLogs, setSelectedLog }: RightSidebarProps) => {
     return (
-        <aside className="w-80 border-l border-white/5 flex flex-col bg-[#020617]/95 z-50 h-full">
+        <aside className="w-80 border-l border-white/10 flex flex-col bg-[#020617]/95 z-50 h-full shrink-0">
 
             {/* Header Logs Sanciones */}
-            <div className="p-4 border-b border-white/5 flex items-center gap-2 bg-red-950/20 shrink-0">
+            <div className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0">
                 <FileText className="text-red-400" size={18} />
                 <span className="text-sm font-bold text-red-100 uppercase tracking-wider">Infracciones Detectadas (Resultados)</span>
             </div>
 
             {/* Lista Infracciones */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/5 min-h-0">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/10 min-h-0">
                 {logs.length === 0 ? (
                     <div className="p-6 text-center border border-dashed border-white/10 rounded-xl">
                         <span className="text-xs text-slate-500 italic block">Sin infracciones registradas</span>
@@ -47,7 +47,7 @@ export const RightSidebar = ({ logs, systemLogs, setSelectedLog }: RightSidebarP
             </div>
 
             {/* Header System Logs */}
-            <div className="p-3 border-b border-white/5 flex items-center gap-2 bg-black/40 border-t border-white/10 shrink-0">
+            <div className="p-3 border-b border-white/10 flex items-center gap-2 bg-black/40 border-t border-white/10 shrink-0">
                 <Terminal className="text-slate-400" size={16} />
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Log de Aplicación Monitorizado</span>
             </div>
@@ -55,7 +55,7 @@ export const RightSidebar = ({ logs, systemLogs, setSelectedLog }: RightSidebarP
             {/* System Terminal */}
             <div className="flex-1 bg-[#050b14] p-4 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-2 min-h-0 shadow-inner">
                 {systemLogs.map((log) => (
-                    <div key={log.id} className="flex gap-3 leading-relaxed border-b border-white/5 pb-1 last:border-0 border-dashed border-white/5">
+                    <div key={log.id} className="flex gap-3 leading-relaxed border-b border-white/10 pb-1 last:border-0 border-dashed border-white/10">
                         <span className="text-slate-600 shrink-0 select-none">[{log.timestamp}]</span>
                         <div className="flex flex-col">
                             <span className={`font-bold text-[10px] uppercase tracking-wide mb-0.5 ${log.type === 'ERROR' ? 'text-red-400' :

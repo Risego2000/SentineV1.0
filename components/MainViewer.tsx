@@ -51,35 +51,35 @@ export const MainViewer = ({
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 w-full max-w-2xl">
-                            <div className={`p-6 bg-black/40 border ${systemStatus.neural === 'ready' ? 'border-green-500/30' : (systemStatus.neural === 'error' ? 'border-red-500/30' : 'border-white/5')} rounded-3xl flex items-center gap-4 transition-all`}>
-                                <Cpu className={systemStatus.neural === 'ready' ? "text-green-500" : (systemStatus.neural === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
+                            <div className={`p-6 bg-slate-900/60 border ${systemStatus.neural === 'ready' ? 'border-green-500/30' : (systemStatus.neural === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
+                                <Cpu size={24} className={systemStatus.neural === 'ready' ? "text-green-500" : (systemStatus.neural === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Núcleo Neuronal</span>
-                                    <span className="text-xs font-mono text-white italic">{statusLabel}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Núcleo Neuronal</span>
+                                    <span className="text-sm font-mono text-white italic">{statusLabel}</span>
                                 </div>
                             </div>
 
-                            <div className={`p-6 bg-black/40 border ${systemStatus.forensic === 'ready' ? 'border-green-500/30' : (systemStatus.forensic === 'error' ? 'border-red-500/30' : 'border-white/5')} rounded-3xl flex items-center gap-4 transition-all`}>
-                                <BrainCircuit className={systemStatus.forensic === 'ready' ? "text-green-500" : (systemStatus.forensic === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
+                            <div className={`p-6 bg-slate-900/60 border ${systemStatus.forensic === 'ready' ? 'border-green-500/30' : (systemStatus.forensic === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
+                                <BrainCircuit size={24} className={systemStatus.forensic === 'ready' ? "text-green-500" : (systemStatus.forensic === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">IA Forense</span>
-                                    <span className="text-xs font-mono text-white italic">{systemStatus.forensic === 'ready' ? 'GEMINI_CONECTADO' : (systemStatus.forensic === 'error' ? 'DESCONECTADO' : 'ESTABLECIENDO...')}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">IA Forense</span>
+                                    <span className="text-sm font-mono text-white italic">{systemStatus.forensic === 'ready' ? 'GEMINI_CONECTADO' : (systemStatus.forensic === 'error' ? 'DESCONECTADO' : 'ESTABLECIENDO...')}</span>
                                 </div>
                             </div>
 
-                            <div className={`p-6 bg-black/40 border ${systemStatus.bionics === 'ready' ? 'border-green-500/30' : (systemStatus.bionics === 'error' ? 'border-red-500/30' : 'border-white/5')} rounded-3xl flex items-center gap-4 transition-all`}>
-                                <Video className={systemStatus.bionics === 'ready' ? "text-green-500" : (systemStatus.bionics === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
+                            <div className={`p-6 bg-slate-900/60 border ${systemStatus.bionics === 'ready' ? 'border-green-500/30' : (systemStatus.bionics === 'error' ? 'border-red-500/30' : 'border-white/10')} rounded-3xl flex items-center gap-4 transition-all shadow-lg`}>
+                                <Video size={24} className={systemStatus.bionics === 'ready' ? "text-green-500" : (systemStatus.bionics === 'error' ? "text-red-500" : "text-cyan-500 animate-pulse")} />
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Entrada Biónica</span>
-                                    <span className="text-xs font-mono text-white italic">{systemStatus.bionics === 'ready' ? 'ÓPTICA_ESTABLE' : (systemStatus.bionics === 'error' ? 'DENEGADO' : 'ESPERANDO_DISPOSITIVO')}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Entrada Biónica</span>
+                                    <span className="text-sm font-mono text-white italic">{systemStatus.bionics === 'ready' ? 'ÓPTICA_ESTABLE' : (systemStatus.bionics === 'error' ? 'DENEGADO' : 'ESPERANDO_DISPOSITIVO')}</span>
                                 </div>
                             </div>
 
-                            <div className="p-6 bg-black/40 border border-green-500/30 rounded-3xl flex items-center gap-4 transition-all">
-                                <Layers className="text-green-500" />
+                            <div className="p-6 bg-slate-900/60 border border-green-500/30 rounded-3xl flex items-center gap-4 transition-all shadow-lg">
+                                <Layers size={24} className="text-green-500" />
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Motor Vectorial</span>
-                                    <span className="text-xs font-mono text-white italic">GEOMETRÍA_LISTA</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Motor Vectorial</span>
+                                    <span className="text-sm font-mono text-white italic">GEOMETRÍA_LISTA</span>
                                 </div>
                             </div>
                         </div>

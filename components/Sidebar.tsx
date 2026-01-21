@@ -21,12 +21,12 @@ export const Sidebar = ({
     startLiveFeed, onUploadClick
 }: SidebarProps) => {
     return (
-        <aside className="w-80 border-r border-white/5 flex flex-col bg-[#020617]/95 z-50">
+        <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0">
             <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-cyan-950/10">
                 <ShieldCheck className="text-cyan-500 w-10 h-10" />
                 <div className="flex flex-col">
                     <span className="text-xl font-black italic text-white uppercase leading-none">SENTINEL</span>
-                    <span className="text-[7px] font-black tracking-[0.4em] text-cyan-500/60 uppercase">Trajectory_Audit_V15</span>
+                    <span className="text-[9px] font-black tracking-[0.4em] text-cyan-500/60 uppercase">Trajectory_Audit_V15</span>
                 </div>
             </div>
 
@@ -42,10 +42,10 @@ export const Sidebar = ({
                     </div>
 
                     <div className="flex gap-2 p-1 bg-slate-900/60 rounded-xl border border-white/10">
-                        <button onClick={() => setSelectedModel(selectedModel === 'yolo' ? null : 'yolo')} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${selectedModel === 'yolo' ? 'bg-cyan-600 text-black' : 'text-slate-500 hover:text-white'}`}>
+                        <button onClick={() => setSelectedModel(selectedModel === 'yolo' ? null : 'yolo')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${selectedModel === 'yolo' ? 'bg-cyan-600 text-black' : 'text-slate-500 hover:text-white'}`}>
                             Sentinel Core (YOLO)
                         </button>
-                        <button onClick={() => setSelectedModel(selectedModel === 'mediapipe' ? null : 'mediapipe')} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${selectedModel === 'mediapipe' ? 'bg-green-600 text-black' : 'text-slate-500 hover:text-white'}`}>
+                        <button onClick={() => setSelectedModel(selectedModel === 'mediapipe' ? null : 'mediapipe')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${selectedModel === 'mediapipe' ? 'bg-green-600 text-black' : 'text-slate-500 hover:text-white'}`}>
                             Google Core (MediaPipe)
                         </button>
                     </div>
@@ -58,11 +58,11 @@ export const Sidebar = ({
                         <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Radar Status</h3>
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                                <span className="text-[8px] text-slate-500 block uppercase mb-1">Detecciones</span>
+                                <span className="text-[10px] text-slate-500 block uppercase mb-1">Detecciones</span>
                                 <span className="text-xl font-black text-white">{stats.det}</span>
                             </div>
                             <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                                <span className="text-[8px] text-slate-500 block uppercase mb-1">Sanciones</span>
+                                <span className="text-[10px] text-slate-500 block uppercase mb-1">Sanciones</span>
                                 <span className="text-xl font-black text-red-500">{stats.inf}</span>
                             </div>
                         </div>
