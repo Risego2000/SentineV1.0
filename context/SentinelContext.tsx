@@ -155,14 +155,19 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
             videoRef.current.onloadeddata = () => {
                 addLog('INFO', `Procesador Cápsula: Video "${file.name}" sincronizado.`);
                 setStatusMsg("SISTEMA_LISTO");
+
+                // DISPARO AUTOMÁTICO DE ANÁLISIS DE VÍA
+                setTimeout(() => {
+                    generateGeometry("Analiza la escena y define la geometría de la vía automáticamente.");
+                }, 1000);
             };
             setIsPlaying(false);
             setSource('upload');
             setStatusMsg("VIDEO CARGADO");
-            addLog('CORE', 'Subsector de Datos: Transmisión cargada. Esperando comando táctico.');
+            addLog('CORE', 'Subsector de Datos: Transmisión cargada. Iniciando análisis espacial automático...');
             setTimeout(() => setStatusMsg(null), 2000);
         }
-    }, [addLog, setStatusMsg]);
+    }, [addLog, setStatusMsg, generateGeometry]);
 
     // --- PROTOCOL SYNC ---
     useEffect(() => {
