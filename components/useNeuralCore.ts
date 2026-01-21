@@ -121,8 +121,13 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
             const mpResult = mediaPipeRef.current.detectForVideo(source, mpts);
             if (mpResult.detections) {
                 mpResult.detections.forEach(d => {
-                    if (!d.categories[0] || d.categories[0].score < confidenceThreshold) return;
+                    if (!d.categories[0]) return;
+
                     const label = d.categories[0].categoryName.toLowerCase();
+                    // Umbral diferenciado para peatones (más estricto para evitar errores con coches)
+                    const minConf = label === 'person' ? Math.max(confidenceThreshold, 0.45) : confidenceThreshold;
+
+                    if (d.categories[0].score < minConf) return;
                     if (!RELEVANT_CLASSES.includes(label)) return;
 
                     const b = d.boundingBox!;

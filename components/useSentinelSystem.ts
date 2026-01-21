@@ -1,14 +1,13 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
-import { GeometryLine, InfractionLog, SystemLog, Track } from '../types';
-import { GoogleGenAI, Type } from "@google/genai";
-import { lineIntersect } from '../utils';
+import { useCallback, useState, useEffect } from 'react';
+import { GeometryLine, InfractionLog, SystemLog, Track, AppStats } from '../types';
+import { AIService } from '../services/aiService';
 
 const MAX_LOGS = 50;
 
 export const useSentinelSystem = (hasApiKey: boolean) => {
     const [logs, setLogs] = useState<InfractionLog[]>([]);
     const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
-    const [stats, setStats] = useState({ det: 0, inf: 0 });
+    const [stats, setStats] = useState<AppStats>({ det: 0, inf: 0 });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -30,47 +29,24 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
     }, [hasApiKey, addLog]);
 
     const generateGeometry = useCallback(async (directives: string, instruction?: string) => {
-        if (!hasApiKey) return [];
+        if (!hasApiKey) return { lines: [], suggestedDirectives: "" };
         setStatusMsg("GENERANDO VECTORES...");
         setIsAnalyzing(true);
 
         try {
-            addLog('AI', 'Conectando con Gemini 1.5 Flash (Neural-V) para análisis espacial...');
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY });
-            const prompt = `INSTRUCCIÓN: "${directives} ${instruction || ''}". 
-      Genera JSON con líneas (x1,y1,x2,y2 0-1), etiqueta y tipo ('forbidden','lane_divider','stop_line').`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash', // More stable and faster for vector generation
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                id: { type: Type.STRING },
-                                x1: { type: Type.NUMBER }, y1: { type: Type.NUMBER },
-                                x2: { type: Type.NUMBER }, y2: { type: Type.NUMBER },
-                                label: { type: Type.STRING },
-                                type: { type: Type.STRING }
-                            }
-                        }
-                    }
-                }
-            });
+            addLog('AI', 'Conectando con Gemini 2.0 Flash (Neural-V2) para análisis espacial...');
+            const result = await AIService.generateGeometry(directives, instruction);
             setStatusMsg("ZONAS ACTUALIZADAS");
-            return JSON.parse(response.text.trim()) as GeometryLine[];
+            return result;
         } catch (e) {
             setStatusMsg("ERROR AI GEOM");
             console.error(e);
-            return [];
+            return { lines: [], suggestedDirectives: "" };
         } finally {
             setIsAnalyzing(false);
             setTimeout(() => setStatusMsg(null), 2000);
         }
-    }, [hasApiKey]);
+    }, [hasApiKey, addLog]);
 
     const runAudit = useCallback(async (track: Track, line: GeometryLine, directives: string) => {
         if (!hasApiKey || track.snapshots.length === 0) return;
@@ -78,40 +54,17 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
 
         try {
             addLog('AI', `Gemini 2.0 Flash: Auditando evento en "${line.label}"...`);
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.0-flash', // Updated to stable 2.0 Flash
-                contents: {
-                    parts: [
-                        { inlineData: { mimeType: 'image/jpeg', data: track.snapshots[0] } },
-                        { text: `AUDITORÍA SENTINEL: Vehículo cruzó "${line.label}". Reglas: ${directives}. Evalúa infracción y genera reporte JSON.` }
-                    ]
-                },
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.OBJECT,
-                        properties: {
-                            infraction: { type: Type.BOOLEAN },
-                            plate: { type: Type.STRING },
-                            description: { type: Type.STRING },
-                            severity: { type: Type.STRING },
-                            legalArticle: { type: Type.STRING },
-                            ruleCategory: { type: Type.STRING },
-                            reasoning: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            telemetry: { type: Type.OBJECT, properties: { speedEstimated: { type: Type.STRING } } }
-                        }
-                    }
-                }
-            });
-            const audit = JSON.parse(response.text.trim());
+            const audit = await AIService.runAudit(track, line, directives);
+
             if (audit.infraction) {
                 addLog('WARN', `Unidad Forense: INFRACCIÓN CONFIRMADA [${audit.severity}] - ${audit.ruleCategory}`);
                 setStats(prev => ({ ...prev, inf: prev.inf + 1 }));
                 setLogs(prev => [{
-                    ...audit, id: Date.now(),
+                    ...audit,
+                    id: Date.now(),
                     image: `data:image/jpeg;base64,${track.snapshots[0]}`,
-                    time: new Date().toLocaleTimeString(), date: new Date().toLocaleDateString()
+                    time: new Date().toLocaleTimeString(),
+                    date: new Date().toLocaleDateString()
                 }, ...prev]);
                 track.isInfractor = true;
             } else {
@@ -123,7 +76,7 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         } finally {
             setIsAnalyzing(false);
         }
-    }, [hasApiKey]);
+    }, [hasApiKey, addLog]);
 
     return {
         logs, systemLogs, stats, addLog,

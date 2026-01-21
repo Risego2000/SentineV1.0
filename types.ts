@@ -1,8 +1,15 @@
+export type EntityType = 'forbidden' | 'lane_divider' | 'stop_line';
+export type LogType = 'INFO' | 'WARN' | 'ERROR' | 'AI' | 'CORE';
+export type SeverityType = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
 export interface GeometryLine {
     id: string;
-    x1: number; y1: number; x2: number; y2: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
     label: string;
-    type: 'forbidden' | 'lane_divider' | 'stop_line';
+    type: EntityType;
 }
 
 export interface EngineConfig {
@@ -13,50 +20,65 @@ export interface EngineConfig {
     predictionLookahead: number;
 }
 
-export interface TrackBBox { x: number; y: number; w: number; h: number; }
+export interface TrackBBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
 
 export interface Track {
     id: number;
     label: string;
-    points: { x: number; y: number; time: number }[];
-    lastSeen: number;
     color: string;
+    score: number;
+    missedFrames: number;
+    isCoasting: boolean;
+    hits: number;
+    tail: { x: number; y: number }[];
+    bbox: TrackBBox;
+    velocity: number;
+    heading: number;
+    processedLines: string[];
     snapshots: string[];
-    velocity: { x: number; y: number; w: number; h: number };
-    predictedTrajectory: { x: number; y: number }[];
-    crossedLine: boolean;
-    currentBBox: TrackBBox;
-    lastDetection?: TrackBBox;
-    framesSinceSeen: number;
     isInfractor?: boolean;
-    isPotentialInfractor?: boolean;
+    crossedLine?: boolean;
+    kf: any; // AdvancedKalman instance
 }
 
 export interface InfractionLog {
     id: number;
     plate: string;
     description: string;
-    severity: string;
+    severity: SeverityType;
     image: string;
     time: string;
     date: string;
     reasoning?: string[];
     legalArticle?: string;
     ruleCategory?: string;
-    telemetry: { speedEstimated: string };
+    telemetry: {
+        speedEstimated: string;
+    };
+    infraction: boolean;
 }
 
 export interface SystemLog {
     id: string;
     timestamp: string;
-    type: 'INFO' | 'WARN' | 'ERROR' | 'AI' | 'CORE';
+    type: LogType;
     content: string;
 }
 
 export interface SystemStatus {
-    neural: string;
-    forensic: string;
-    bionics: string;
-    vector?: string;
-    mediapipeReady?: boolean;
+    neural: 'loading' | 'ready' | 'error';
+    forensic: 'ready' | 'error' | 'pending';
+    bionics: 'ready' | 'pending';
+    vector: 'ready' | 'pending';
+    mediapipeReady: boolean;
+}
+
+export interface AppStats {
+    det: number;
+    inf: number;
 }
