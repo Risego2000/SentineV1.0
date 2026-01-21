@@ -1,0 +1,8 @@
+{
+  "description": "SENTINEL.AI V15: Sistema forense de auditoría de tráfico con YOLOv8 (ONNX) y Gemini 3 Flash.",
+  "name": "SENTINEL.AI V15",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
