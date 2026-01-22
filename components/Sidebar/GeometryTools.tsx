@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PenTool, Box, Divide, Scale, Save, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
+import { GEOMETRY_PRESETS } from '../../constants';
 
 const PRESETS = [
     { id: 'm113_highway', label: 'Carretera M-113', icon: Divide, help: "Aplica geometría para autovías y carreteras con divisorias." },
@@ -24,7 +25,8 @@ export const GeometryTools = () => {
         setDirectives,
         calibration,
         setCalibration,
-        videoRef
+        videoRef,
+        addLog
     } = useSentinel();
     const { helpProps } = useHelp();
 
@@ -33,6 +35,15 @@ export const GeometryTools = () => {
     };
 
     const loadPreset = (id: string) => {
+        addLog('CORE', `Cargando preset geográfico: ${id.toUpperCase()}`);
+
+        // 1. CARGA INSTANTÁNEA (Líneas predefinidas)
+        if (GEOMETRY_PRESETS[id]) {
+            setGeometry(GEOMETRY_PRESETS[id]);
+            addLog('CORE', `Geometría táctica de '${id}' aplicada.`);
+        }
+
+        // 2. REFINAMIENTO IA (Prompt contextual)
         const prompts: Record<string, string> = {
             m113_highway: "ESCENA CARRETERA M-113: Traza carriles principales, línea de arcén prohibido y divisorias de velocidad.",
             calle_real_cross: "CRUCE URBANO CALLE REAL: Configura pasos de cebra, líneas de stop y zonas de giro prohibido.",

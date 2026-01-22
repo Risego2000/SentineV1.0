@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Zap, TrendingUp, AlertOctagon } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 export const PredictiveAnalytics = () => {
     const { stats, tracks } = useSentinel();
+    const { helpProps } = useHelp();
     const [congestionLevel, setCongestionLevel] = useState(0);
     const [prediction, setPrediction] = useState('ESTABLE');
     const [anomalies, setAnomalies] = useState<string[]>([]);
@@ -39,7 +41,9 @@ export const PredictiveAnalytics = () => {
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between"
+                {...helpProps("Panel de analítica predictiva. Calcula densidades y detecta patrones anómalos en el flujo.")}
+            >
                 <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                     <TrendingUp size={14} className="text-cyan-500" /> Analítica Predictiva
                 </h3>
@@ -49,7 +53,7 @@ export const PredictiveAnalytics = () => {
             <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
 
                 {/* Congestion Meter */}
-                <div className="space-y-2">
+                <div className="space-y-2" {...helpProps("Nivel de saturación de la vía basado en el recuento de vehículos activos.")}>
                     <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400">
                         <span>Nivel de Congestión</span>
                         <span className={congestionLevel > 70 ? 'text-red-500' : 'text-cyan-500'}>{congestionLevel}%</span>
@@ -61,7 +65,9 @@ export const PredictiveAnalytics = () => {
                             style={{ width: `${congestionLevel}%` }}
                         />
                     </div>
-                    <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5">
+                    <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5"
+                        {...helpProps("Predicción del estado del tráfico en los próximos 5 minutos mediante análisis de vectores.")}
+                    >
                         <span className="text-[9px] text-slate-500 uppercase">Predicción (t+5m)</span>
                         <span className={`text-[9px] font-black uppercase ${prediction.includes('SATURACIÓN') ? 'text-red-500 animate-pulse' : 'text-emerald-400'
                             }`}>
@@ -71,7 +77,7 @@ export const PredictiveAnalytics = () => {
                 </div>
 
                 {/* Anomalies List */}
-                <div className="space-y-2">
+                <div className="space-y-2" {...helpProps("Detección de comportamientos cinemáticos fuera de norma (velocidad, dirección, permanencia).")}>
                     <h4 className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-2">
                         <AlertOctagon size={12} className="text-amber-500" /> Alertas de Comportamiento
                     </h4>
@@ -93,11 +99,15 @@ export const PredictiveAnalytics = () => {
 
                 {/* Early Warning Stats */}
                 <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center">
+                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center"
+                        {...helpProps("Puntuación de riesgo acumulado en la zona actual de análisis.")}
+                    >
                         <span className="block text-[8px] text-slate-500 uppercase mb-1">Risk Score</span>
                         <span className="text-lg font-black text-cyan-400">0.04</span>
                     </div>
-                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center">
+                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center"
+                        {...helpProps("Predicción de tiempo estimado para un evento de colisión basado en trayectorias actuales.")}
+                    >
                         <span className="block text-[8px] text-slate-500 uppercase mb-1">Time-To-Col</span>
                         <span className="text-lg font-black text-emerald-400">∞</span>
                     </div>

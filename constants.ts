@@ -112,3 +112,36 @@ export const KINEMATIC_PRESETS = {
 };
 
 export type KinematicPresetType = keyof typeof KINEMATIC_PRESETS;
+
+/**
+ * SISTEMA 4: BIBLIOTECA GEOMÉTRICA (Entorno Daganzo)
+ * Presets de líneas y zonas para despliegue rápido.
+ */
+export const GEOMETRY_PRESETS: Record<string, any[]> = {
+    m113_highway: [
+        { id: 'm113_lane_1', x1: 0.35, y1: 0.2, x2: 0.2, y2: 0.9, label: 'Carril Izquierdo', type: 'lane_divider' },
+        { id: 'm113_lane_2', x1: 0.65, y1: 0.2, x2: 0.8, y2: 0.9, label: 'Carril Derecho', type: 'lane_divider' },
+        { id: 'm113_shoulder', x1: 0.8, y1: 0.2, x2: 0.95, y2: 0.9, label: 'Arcén Prohibido', type: 'forbidden' }
+    ],
+    calle_real_cross: [
+        { id: 'cr_stop', x1: 0.2, y1: 0.7, x2: 0.8, y2: 0.7, label: 'Línea de STOP', type: 'stop_line' },
+        { id: 'cr_zebra', x1: 0.2, y1: 0.85, x2: 0.8, y2: 0.85, label: 'Paso de Peatones', type: 'pedestrian' },
+        {
+            id: 'cr_box', id_area: 'box', type: 'box_junction', label: 'Área de Intersección', points: [
+                { x: 0.3, y: 0.4 }, { x: 0.7, y: 0.4 }, { x: 0.8, y: 0.6 }, { x: 0.2, y: 0.6 }
+            ]
+        }
+    ],
+    daganzo_roundabout: [
+        { id: 'rot_entry', x1: 0.4, y1: 0.8, x2: 0.6, y2: 0.8, label: 'Ceda el Paso Entrada', type: 'stop_line' },
+        {
+            id: 'rot_center', type: 'box_junction', label: 'Isleta Central', points: [
+                { x: 0.4, y: 0.4 }, { x: 0.6, y: 0.4 }, { x: 0.6, y: 0.6 }, { x: 0.4, y: 0.6 }
+            ]
+        }
+    ],
+    urban_bus: [
+        { id: 'bus_lane_limit', x1: 0.7, y1: 0.1, x2: 0.7, y2: 0.9, label: 'Línea Carril BUS', type: 'forbidden' },
+        { id: 'bus_zone', x1: 0.8, y1: 0.5, x2: 0.95, y2: 0.5, label: 'Parada BUS', type: 'bus_lane' }
+    ]
+};

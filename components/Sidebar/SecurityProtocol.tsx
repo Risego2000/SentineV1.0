@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Target, Mic, AlertOctagon, AlertTriangle, Info, Terminal } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 type RuleType = 'CRITICAL' | 'WARNING' | 'INFO';
 
@@ -11,7 +12,8 @@ interface ParsedRule {
 }
 
 export const SecurityProtocol = () => {
-    const { directives, setDirectives, isListening, setIsListening, generateGeometry } = useSentinel();
+    const { directives, setDirectives, isListening, setIsListening, generateGeometry, addLog } = useSentinel();
+    const { helpProps } = useHelp();
 
     // Parseo inteligente de directivas para visualización
     const parsedRules: ParsedRule[] = useMemo(() => {
@@ -28,18 +30,27 @@ export const SecurityProtocol = () => {
             });
     }, [directives]);
 
+    const handleMicToggle = () => {
+        const newState = !isListening;
+        setIsListening(newState);
+        addLog('AI', newState ? 'Micrófono activado: Iniciando escucha de directivas biónicas.' : 'Micrófono desactivado.');
+    };
+
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between"
+                {...helpProps("Panel de protocolos de seguridad biónicos. Define aquí las reglas de tráfico.")}
+            >
                 <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                     <Target size={14} className="text-cyan-500" /> Protocolo de Seguridad
                 </h3>
                 <button
-                    onClick={() => setIsListening(!isListening)}
+                    onClick={handleMicToggle}
                     className={`p-2 rounded-xl transition-all ${isListening
                         ? 'bg-red-500 text-white animate-pulse'
                         : 'bg-slate-800 text-cyan-500 hover:bg-slate-700'
                         }`}
+                    {...helpProps(isListening ? "Detener escucha activa." : "Activar escucha por voz para dictar protocolos.")}
                 >
                     <Mic size={14} />
                 </button>
