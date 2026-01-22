@@ -64,24 +64,24 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
     };
 
     return (
-        <div className="absolute bottom-[85px] left-6 right-80 z-40">
+        <div className="absolute bottom-[112px] left-10 right-10 z-40 bg-gradient-to-t from-black/20 to-transparent pt-4 pb-2">
             {/* Header del Timeline: Código de Tiempo */}
-            <div className="flex justify-between items-end mb-2 px-1">
+            <div className="flex justify-between items-end mb-3">
                 <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-cyan-500/50 uppercase tracking-[0.2em]">Live Vector Tracking</span>
+                    <span className="text-[10px] font-black text-cyan-500/40 uppercase tracking-[0.3em]">Live Vector Tracking</span>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-black text-white font-mono tracking-tighter shadow-cyan-500/20 drop-shadow-md">
+                        <span className="text-xl font-black text-white font-mono tracking-tighter shadow-cyan-500/20 drop-shadow-lg">
                             {formatTime(progress * duration / 100)}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-500 font-mono">
+                        <span className="text-xs font-bold text-slate-500 font-mono opacity-50">
                             / {formatTime(duration)}
                         </span>
                     </div>
                 </div>
 
                 <div className="text-right">
-                    <span className="text-[9px] font-black text-red-500/50 uppercase tracking-[0.2em]">Incidents Detected</span>
-                    <div className="text-xs font-black text-red-500 font-mono tracking-widest">
+                    <span className="text-[10px] font-black text-red-500/40 uppercase tracking-[0.3em]">Incidents Detected</span>
+                    <div className="text-xl font-black text-red-500 font-mono tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]">
                         {incidentLogs.length.toString().padStart(2, '0')}
                     </div>
                 </div>
@@ -89,18 +89,18 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
 
             {/* Contenedor Táctico de la Barra */}
             <div className="relative group">
-                {/* Fondo y Borde Táctico */}
+                {/* Fondo y Borde Táctico (La barra ahora es más delgada y elegante) */}
                 <div
                     ref={timelineRef}
                     onClick={handleTimelineClick}
-                    className="h-2 bg-[#0a0f1e]/80 backdrop-blur-md rounded-full border border-white/10 cursor-pointer overflow-hidden relative transition-all duration-300 group-hover:h-4 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                    className="h-1.5 bg-slate-900/60 backdrop-blur-md rounded-full border border-white/5 cursor-pointer overflow-hidden relative transition-all duration-300 group-hover:h-3 group-hover:border-cyan-500/20"
                 >
                     {/* Barra de Progreso */}
                     <div
-                        className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 relative transition-all ease-linear shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                        className="h-full bg-gradient-to-r from-cyan-600/80 to-cyan-400 relative transition-all ease-linear"
                         style={{ width: `${progress}%` }}
                     >
-                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
+                        <div className="absolute right-0 top-0 bottom-0 w-px bg-white shadow-[0_0_10px_rgba(255,255,255,1)]" />
                     </div>
                 </div>
 
