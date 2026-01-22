@@ -111,8 +111,11 @@ export const useFrameProcessor = () => {
                 await detectPose(v);
             }
 
-            // Sync with context
-            setTracks([...trackerRef.current.tracks]);
+            // Sync with context (THROTTLED para evitar React Render Loop Crash)
+            // Solo actualizamos la UI cada 5 frames (aprox 12fps), suficiente para visualización humana
+            if (frameCountRef.current % 5 === 0) {
+                setTracks([...trackerRef.current.tracks]);
+            }
         } catch (e) {
             console.error("ProcessFrame Error:", e);
         } finally {
