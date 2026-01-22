@@ -53,8 +53,14 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
             addLog('ERROR', 'Unidad Forense: Error de Acceso. API Key no detectada.');
             return;
         }
+
+        // Actualizar estado del track
+        track.auditStatus = 'processing';
+        track.auditTimestamp = Date.now();
+
         if (!track.snapshots || track.snapshots.length === 0) {
             addLog('WARN', `Unidad Forense: Evidencia insuficiente para vehículo ${track.id}.`);
+            track.auditStatus = 'failed';
             return;
         }
         setIsAnalyzing(true);
@@ -67,6 +73,8 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
             if (audit.infraction) {
                 addLog('WARN', `Unidad Forense: INFRACCIÓN CONFIRMADA [${audit.severity}] - ${audit.ruleCategory}`);
                 setStats(prev => ({ ...prev, inf: prev.inf + 1 }));
+
+                // Usar la primera captura (Contexto) para el log visual
                 setLogs(prev => [{
                     ...audit,
                     id: Date.now(),
@@ -74,17 +82,21 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
                     time: new Date().toLocaleTimeString(),
                     date: new Date().toLocaleDateString()
                 }, ...prev]);
+
                 track.isInfractor = true;
             } else {
                 addLog('INFO', `Unidad Forense: Auditoría completada. Sin violación regulatoria.`);
             }
+
+            track.auditStatus = 'completed';
         } catch (e: any) {
             console.error(e);
             addLog('ERROR', `Error Unidad Forense: ${e.message}`);
+            track.auditStatus = 'failed';
         } finally {
             setIsAnalyzing(false);
         }
-    }, [hasApiKey, addLog]);
+    }, [hasApiKey, addLog, setStats, setLogs]);
 
     return {
         logs, systemLogs, stats, addLog,

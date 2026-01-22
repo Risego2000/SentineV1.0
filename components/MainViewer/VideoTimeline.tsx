@@ -46,8 +46,8 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
         setProgress((newTime / videoRef.current.duration) * 100);
     };
 
-    // Filtrar logs
-    const incidentLogs = logs.filter(l => l.type === 'infraction');
+    // Filter only actual infractions for timeline markers
+    const incidentLogs = logs.filter(l => l.infraction === true);
 
     // Formateador de tiempo táctico
     const formatTime = (seconds: number) => {

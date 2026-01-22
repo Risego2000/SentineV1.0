@@ -51,6 +51,8 @@ export interface Track {
     potentialCollision?: boolean;
     futurePos?: { x: number, y: number };
     collisionTargetId?: number;
+    auditStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+    auditTimestamp?: number;
     kf: any; // AdvancedKalman instance
 }
 

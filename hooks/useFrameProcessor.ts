@@ -21,6 +21,47 @@ export const useFrameProcessor = () => {
     const isProcessingRef = useRef(false);
     const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+    const captureSnapshot = useCallback((video: HTMLVideoElement, track: any) => {
+        if (!video || video.readyState < 2) {
+            console.warn('Video no está listo para captura');
+            return false;
+        }
+
+        if (!snapshotCanvasRef.current) {
+            snapshotCanvasRef.current = document.createElement('canvas');
+        }
+        const sC = snapshotCanvasRef.current;
+        const ctxS = sC.getContext('2d');
+        if (!ctxS) return false;
+
+        try {
+            if (!track.snapshots) track.snapshots = [];
+
+            // 1. CAPTURA ESCENA COMPLETA (Contexto)
+            sC.width = 1280; sC.height = 720;
+            ctxS.drawImage(video, 0, 0, 1280, 720);
+            track.snapshots.push(sC.toDataURL('image/jpeg', 0.6).split(',')[1]);
+
+            // 2. CAPTURA ZOOM TÁCTICO (Detalle Matrícula/Vehículo)
+            const zoomPad = 0.5;
+            const videoW = video.videoWidth;
+            const videoH = video.videoHeight;
+            const zX = Math.max(0, track.bbox.x - track.bbox.w * zoomPad / 2) * videoW;
+            const zY = Math.max(0, track.bbox.y - track.bbox.h * zoomPad / 2) * videoH;
+            const zW = Math.min(1, track.bbox.w * (1 + zoomPad)) * videoW;
+            const zH = Math.min(1, track.bbox.h * (1 + zoomPad)) * videoH;
+
+            ctxS.clearRect(0, 0, 1280, 720);
+            ctxS.drawImage(video, zX, zY, zW, zH, 0, 0, 1280, 720);
+            track.snapshots.push(sC.toDataURL('image/jpeg', 0.7).split(',')[1]);
+
+            return true;
+        } catch (error) {
+            console.error('Error capturando snapshot:', error);
+            return false;
+        }
+    }, []);
+
     const processTrackResults = useCallback((activeTracks: any[], v: HTMLVideoElement, canvas: HTMLCanvasElement) => {
         if (!v || !canvas || v.videoWidth === 0) return;
 
@@ -84,40 +125,20 @@ export const useFrameProcessor = () => {
                             }
 
                             if (isInfraction) {
-                                t.processedLines.push(line.id);
-                                t.crossedLine = true;
-                                t.audited = true;
+                                // Intentar capturar evidencia antes de iniciar análisis
+                                const snapshotCaptured = captureSnapshot(v, t);
 
-                                const auditLine = { ...line, label: infractionLabel };
+                                if (snapshotCaptured) {
+                                    t.processedLines.push(line.id);
+                                    t.crossedLine = true;
+                                    t.audited = true;
+                                    t.auditStatus = 'pending';
 
-                                if (!snapshotCanvasRef.current) {
-                                    snapshotCanvasRef.current = document.createElement('canvas');
-                                    snapshotCanvasRef.current.width = 1280;
-                                    snapshotCanvasRef.current.height = 720;
-                                }
-                                const sC = snapshotCanvasRef.current;
-                                const ctxS = sC.getContext('2d');
-                                if (ctxS) {
-                                    if (!t.snapshots) t.snapshots = [];
-
-                                    // 1. CAPTURA ESCENA COMPLETA (Contexto)
-                                    ctxS.drawImage(v, 0, 0, 1280, 720);
-                                    t.snapshots.push(sC.toDataURL('image/jpeg', 0.6).split(',')[1]);
-
-                                    // 2. CAPTURA ZOOM TÁCTICO (Detalle Matrícula/Vehículo)
-                                    // Recortar un área un 50% mayor que el BBox para dar contexto al vehículo
-                                    const zoomPad = 0.5;
-                                    const zX = Math.max(0, t.bbox.x - t.bbox.w * zoomPad / 2) * v.videoWidth;
-                                    const zY = Math.max(0, t.bbox.y - t.bbox.h * zoomPad / 2) * v.videoHeight;
-                                    const zW = Math.min(1, t.bbox.w * (1 + zoomPad)) * v.videoWidth;
-                                    const zH = Math.min(1, t.bbox.h * (1 + zoomPad)) * v.videoHeight;
-
-                                    ctxS.clearRect(0, 0, 1280, 720);
-                                    ctxS.drawImage(v, zX, zY, zW, zH, 0, 0, 1280, 720);
-                                    t.snapshots.push(sC.toDataURL('image/jpeg', 0.7).split(',')[1]);
-
-                                    console.log(`[FORENSIC] Ráfaga de evidencia capturada para ID:${t.id}. Iniciando peritaje IA...`);
+                                    const auditLine = { ...line, label: infractionLabel };
+                                    console.log(`[AUDIT] Iniciando proceso para ID:${t.id}...`);
                                     runAudit(t, auditLine);
+                                } else {
+                                    console.warn(`[AUDIT] No se pudo capturar evidencia para vehículo ${t.id}, reintentando en siguiente frame...`);
                                 }
                             } else {
                                 t.processedLines.push(line.id);
@@ -127,7 +148,7 @@ export const useFrameProcessor = () => {
                 }
             });
         });
-    }, [geometry, runAudit, setStats]);
+    }, [geometry, runAudit, setStats, captureSnapshot]);
 
     const processFrame = useCallback(async (v: HTMLVideoElement, canvas: HTMLCanvasElement) => {
         if (!v || v.paused || v.ended || isProcessingRef.current) return;
