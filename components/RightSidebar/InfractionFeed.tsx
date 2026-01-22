@@ -2,6 +2,8 @@ import React from 'react';
 import { FileText } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
+import { TacticalMetrics } from './TacticalMetrics';
+
 export const InfractionFeed = () => {
     const { logs, setSelectedLog } = useSentinel();
 
@@ -13,6 +15,8 @@ export const InfractionFeed = () => {
                     Infracciones Detectadas
                 </span>
             </div>
+
+            <TacticalMetrics />
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/10 min-h-0">
                 {logs.length === 0 ? (
