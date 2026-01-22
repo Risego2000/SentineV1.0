@@ -47,6 +47,10 @@ export interface Track {
     headingChange?: number;
     isAnomalous?: boolean;
     anomalyLabel?: string;
+    avgVelocity?: number;
+    potentialCollision?: boolean;
+    futurePos?: { x: number, y: number };
+    collisionTargetId?: number;
     kf: any; // AdvancedKalman instance
 }
 

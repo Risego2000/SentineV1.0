@@ -98,12 +98,25 @@ export const useFrameProcessor = () => {
                                 const sC = snapshotCanvasRef.current;
                                 const ctxS = sC.getContext('2d');
                                 if (ctxS) {
-                                    ctxS.drawImage(v, 0, 0, 1280, 720);
                                     if (!t.snapshots) t.snapshots = [];
-                                    const data = sC.toDataURL('image/jpeg', 0.5);
-                                    t.snapshots.push(data.split(',')[1]);
 
-                                    console.log(`[AUDIT] Solicitando informe pericial para ID:${t.id}...`);
+                                    // 1. CAPTURA ESCENA COMPLETA (Contexto)
+                                    ctxS.drawImage(v, 0, 0, 1280, 720);
+                                    t.snapshots.push(sC.toDataURL('image/jpeg', 0.6).split(',')[1]);
+
+                                    // 2. CAPTURA ZOOM TÁCTICO (Detalle Matrícula/Vehículo)
+                                    // Recortar un área un 50% mayor que el BBox para dar contexto al vehículo
+                                    const zoomPad = 0.5;
+                                    const zX = Math.max(0, t.bbox.x - t.bbox.w * zoomPad / 2) * v.videoWidth;
+                                    const zY = Math.max(0, t.bbox.y - t.bbox.h * zoomPad / 2) * v.videoHeight;
+                                    const zW = Math.min(1, t.bbox.w * (1 + zoomPad)) * v.videoWidth;
+                                    const zH = Math.min(1, t.bbox.h * (1 + zoomPad)) * v.videoHeight;
+
+                                    ctxS.clearRect(0, 0, 1280, 720);
+                                    ctxS.drawImage(v, zX, zY, zW, zH, 0, 0, 1280, 720);
+                                    t.snapshots.push(sC.toDataURL('image/jpeg', 0.7).split(',')[1]);
+
+                                    console.log(`[FORENSIC] Ráfaga de evidencia capturada para ID:${t.id}. Iniciando peritaje IA...`);
                                     runAudit(t, auditLine);
                                 }
                             } else {

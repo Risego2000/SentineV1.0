@@ -156,75 +156,71 @@ export const AIService = {
     async runAudit(track: Track, line: GeometryLine, directives: string) {
         const ai = getAIClient();
 
-        // Kinematic summary for the AI
+        // Resumen cinemático para la IA
         const kinematicData = {
-            velocity: track.velocity.toFixed(4),
+            avgVelocity: (track.avgVelocity * 100).toFixed(2), // Escala visual 0-100
+            currentSpeed: (track.velocity * 100).toFixed(2),
+            acceleration: (track.acceleration * 100).toFixed(4),
             heading: (track.heading * 180 / Math.PI).toFixed(2) + "°",
             trajectoryPoints: track.tail.length,
             label: track.label
         };
 
+        // Preparar evidencias (Contexto + Zoom)
+        const evidenceParts = track.snapshots.map((data, index) => ({
+            inlineData: {
+                mimeType: 'image/jpeg',
+                data
+            }
+        }));
+
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash',
             contents: {
                 parts: [
-                    { inlineData: { mimeType: 'image/jpeg', data: track.snapshots[track.snapshots.length - 1] } },
+                    ...evidenceParts,
                     {
-                        text: `SISTEMA SENTINEL - AUDITORÍA FORENSE AVANZADA V1.5
+                        text: `SENTINEL AI - UNIDAD DE AUDITORÍA FORENSE OMNI-V1.6
                       
-                      CONTEXTO OPERATIVO:
+                      EVIDENCIA DISPONIBLE:
+                      - Imag 1: Contexto Escena Completa.
+                      - Imag 2: Zoom Táctico de Alta Resolución (para identificación de placa/detalles).
+                      
+                      DATOS TELEMÉTRICOS (UNIDAD VECTORIAL):
+                      - VEHÍCULO: ${kinematicData.label} (ID: ${track.id})
+                      - VELOCIDAD MEDIA: ${kinematicData.avgVelocity} pts
+                      - ACELERACIÓN ACTUAL: ${kinematicData.acceleration} pts/f
+                      - VECTOR DE RUMBO: ${kinematicData.heading}
+                      
+                      CONFIGURACIÓN GEOMÉTRICA:
                       - ZONA ACTIVADA: "${line.label}" (Tipo: ${line.type})
-                      - VEHÍCULO OBJETIVO: ${kinematicData.label} (Track ID: ${track.id})
-                      - DATOS CINEMÁTICOS: Velocidad ${kinematicData.velocity}, Orientación ${kinematicData.heading}, Puntos Trazados: ${kinematicData.trajectoryPoints}.
-                      - PROTOCOLOS DE SEGURIDAD ACTIVOS:
+                      - PROTOCOLO VIGENTE:
                       ${directives}
                       
-                      MISIÓN DE ANÁLISIS FORENSE:
-                      Actúa como un Perito de Tráfico experto. Tu tarea es validar si la interacción del vehículo con la zona constituye una INFRACCIÓN CONFIRMADA basándote en la evidencia visual y telemétrica.
-
-                      PROCEDIMIENTO DE VALIDACIÓN (Paso a Paso):
-
-                      1. ANÁLISIS VISUAL DE ENTORNO:
-                         - Observa la posición relativa del vehículo respecto a las marcas viales (líneas continuas, pasos de cebra, líneas de stop).
-                         - ¿El vehículo está ocupando físicamente una zona prohibida (isleta, arcén, acera)?
-
-                      2. ANÁLISIS VECTORIAL (Cinemática):
-                         - Si es un STOP/SEMÁFORO: ¿La velocidad es cercana a 0 en la línea de detención? (Si cruza con velocidad alta > Infracción).
-                         - Si es SENTIDO CONTRARIO: ¿El ángulo de movimiento (${kinematicData.heading}) es opuesto al flujo natural de la vía (+- 160-180 grados)?
-                         - Si es GIRO PROHIBIDO: ¿La curva de trayectoria cruza la barrera geométrica hacia la dirección restringida?
-
-                      3. CORRELACIÓN CON PROTOCOLOS:
-                         - Compara la maniobra observada con la lista de "PROTOCOLOS ACTIVOS".
-                         - EJEMPLO: Si el protocolo dice "Prohibido Giro Izquierda" y el vehículo gira a la izquierda -> INFRACCIÓN VERDADERA.
-                         - EJEMPLO: Si el protocolo dice "Estacionamiento Doble Fila" y el vehículo tiene velocidad 0 en carril -> INFRACCIÓN VERDADERA.
-
-                      CRITERIOS DE SENTENCIA:
-                      - Solo marca "infraction: true" si la evidencia es contundente.
-                      - Si es una maniobra dubitativa o leve corrección dentro del carril, marca "false".
+                      MISIÓN DE PERITAJE JUDICIAL:
+                      Actúa como un Perito de Tráfico Avanzado. Analiza la secuencia de imágenes y la telemetría para dictaminar si existe una infracción confirmada.
                       
-                      GENERACIÓN DE REPORTE:
-                      - "description": Describe la maniobra técnica (ej: "Vehículo cruza línea continua invadiendo carril contrario").
-                      - "reasoning": Explica POR QUÉ viola el protocolo específico (ej: "La trayectoria balística confirma giro prohibido a la izquierda en intersección señalizada").
-                      - "ruleCategory": Usa categorías estándar DGT (ej: "SEGURIDAD_VIAL", "PRIORIDAD_PASO").
+                      PROCEDIMIENTO OBLIGATORIO:
+                      1. IDENTIFICACIÓN: Intenta leer la matrícula (plate) en el Zoom de Alta Resolución.
+                      2. ANÁLISIS CINÉTICO: ¿La velocidad y aceleración coinciden con una conducta infractora (ej: no detenerse en STOP)?
+                      3. VALIDACIÓN DE PROTOCOLO: Confronta la maniobra visualizada con las directivas de seguridad.
                       
-                      Idioma de salida: ESPAÑOL TÉCNICO.` }
+                      RETORNA ÚNICAMENTE JSON EN ESTE FORMATO:
+                      {
+                        "infraction": boolean,
+                        "plate": "TEXTO_MATRICULA o DESCONOCIDO",
+                        "description": "Descripción técnica de la maniobra",
+                        "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+                        "ruleCategory": "Categoría DGT",
+                        "reasoning": ["Punto clave 1", "Punto clave 2"],
+                        "telemetry": { "speedEstimated": "Velocidad aprox en reporte" }
+                      }
+                      
+                      Idioma: ESPAÑOL TÉCNICO.` }
                 ]
             },
             config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        infraction: { type: Type.BOOLEAN },
-                        plate: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        severity: { type: Type.STRING },
-                        legalArticle: { type: Type.STRING },
-                        ruleCategory: { type: Type.STRING },
-                        reasoning: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        telemetry: { type: Type.OBJECT, properties: { speedEstimated: { type: Type.STRING } } }
-                    }
-                }
+                responseMimeType: "application/json"
             }
         });
 
