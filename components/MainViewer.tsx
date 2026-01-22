@@ -7,6 +7,7 @@ import { ControlBar } from './MainViewer/ControlBar';
 import { HeaderActions } from './MainViewer/HeaderActions';
 import { ForensicAnalysisOverlay } from './MainViewer/ForensicAnalysisOverlay';
 import { GeometryEditor } from './MainViewer/GeometryEditor';
+import { VideoTimeline } from './MainViewer/VideoTimeline';
 
 interface MainViewerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -69,7 +70,10 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
             </div>
 
             {/* Barra de Control Inferior */}
-            <ControlBar />
+            <div className="relative z-50">
+                <VideoTimeline videoRef={videoRef} />
+                <ControlBar />
+            </div>
         </main>
     );
 });

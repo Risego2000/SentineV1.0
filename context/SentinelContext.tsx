@@ -137,14 +137,12 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     }, [addLog, setStatusMsg]);
 
     const detect = useCallback(async (source: HTMLVideoElement) => {
-        setIsDetecting(true);
+        // PERF: No actualizamos estado isDetecting frame a frame para evitar colapso de React
         try {
             return await mpDetect(source);
         } catch (error) {
             handleError('DETECTION', error);
             return null;
-        } finally {
-            setIsDetecting(false);
         }
     }, [mpDetect, handleError]);
 

@@ -44,6 +44,9 @@ export const useFrameProcessor = () => {
 
             if (!t.processedLines) t.processedLines = [];
 
+            // SINGLE DETECTION RULE: Si ya fue auditado, ignorar.
+            if (t.audited) return;
+
             geometry.forEach(line => {
                 if (!t.processedLines.includes(line.id)) {
                     if (t.tail && t.tail.length >= 2) {
@@ -56,6 +59,10 @@ export const useFrameProcessor = () => {
                         if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
                             t.processedLines.push(line.id);
                             t.crossedLine = true;
+
+                            // Marcar como auditado para evitar múltiples detecciones
+                            t.audited = true;
+
                             if (!snapshotCanvasRef.current) {
                                 snapshotCanvasRef.current = document.createElement('canvas');
                                 snapshotCanvasRef.current.width = 1280;

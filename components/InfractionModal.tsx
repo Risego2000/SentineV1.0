@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { X, Scale } from 'lucide-react';
+import { X, Scale, FileDown } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { InfractionLog } from '../types';
 
 interface InfractionModalProps {
@@ -8,6 +9,82 @@ interface InfractionModalProps {
 }
 
 export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
+    const generatePDF = () => {
+        const doc = new jsPDF();
+
+        // Header Táctico
+        doc.setFillColor(10, 10, 10);
+        doc.rect(0, 0, 210, 300, 'F'); // Fondo Oscuro (simulado, pero mejor blanco para imprimir)
+        // Reset a blanco para impresión real
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, 210, 300, 'F');
+
+        // Encabezado
+        doc.setFontSize(18);
+        doc.setTextColor(0, 0, 0);
+        doc.text("SENTINEL AI - INFORME FORENSE", 20, 20);
+
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`ID EXPEDIENTE: ${log.id}`, 20, 30);
+        doc.text(`FECHA: ${new Date().toLocaleString()}`, 20, 35);
+
+        // Imagen Evidencia
+        try {
+            if (log.image) {
+                // Asumiendo base64 jpeg
+                const imgProps = doc.getImageProperties(`data:image/jpeg;base64,${log.image}`);
+                const ratio = imgProps.width / imgProps.height;
+                const width = 170;
+                const height = width / ratio;
+                doc.addImage(`data:image/jpeg;base64,${log.image}`, 'JPEG', 20, 45, width, height);
+
+                // Detalles debajo de imagen
+                let y = 45 + height + 10;
+
+                doc.setDrawColor(200, 0, 0);
+                doc.setLineWidth(1);
+                doc.line(20, y, 190, y);
+                y += 10;
+
+                doc.setFontSize(14);
+                doc.setTextColor(200, 0, 0);
+                doc.text(`INFRACCIÓN: ${log.ruleCategory}`, 20, y);
+                y += 10;
+
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text(`VEHÍCULO: ${log.plate || 'DESCONOCIDO'}`, 20, y);
+                doc.text(`SEVERIDAD: ${log.severity}`, 100, y);
+                y += 15;
+
+                doc.setFontSize(10);
+                doc.setTextColor(50, 50, 50);
+                doc.text("ANÁLISIS TÁCTICO DE LA IA:", 20, y);
+                y += 7;
+
+                const splitDesc = doc.splitTextToSize(log.description, 170);
+                doc.text(splitDesc, 20, y);
+                y += (splitDesc.length * 5) + 5;
+
+                if (log.reasoning) {
+                    doc.text("EVIDENCIA TÉCNICA:", 20, y);
+                    y += 7;
+                    log.reasoning.forEach(r => {
+                        const splitR = doc.splitTextToSize(`- ${r}`, 160);
+                        doc.text(splitR, 25, y);
+                        y += (splitR.length * 5);
+                    });
+                }
+
+                doc.save(`expediente_sentinel_${log.id}.pdf`);
+            }
+        } catch (e) {
+            console.error("Error al generar PDF", e);
+            alert("Error generando el documento PDF. Verifica el formato de imagen.");
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 backdrop-blur-2xl animate-in fade-in duration-300">
             <div className="bg-[#050914] w-full max-w-5xl h-[85vh] rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
@@ -28,7 +105,17 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                                     {log.reasoning?.map((r, i) => (<div key={i} className="flex gap-3 text-[11px] font-mono text-cyan-200 uppercase"><div className="w-4 h-4 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">{i + 1}</div><span>{r}</span></div>))}
                                 </div>
                             </div>
-                            <button onClick={onClose} className="w-full py-5 bg-red-600 text-white rounded-[25px] font-black uppercase tracking-widest shadow-2xl hover:bg-red-500 active:scale-95">Confirmar Sanción</button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={generatePDF}
+                                    className="w-full py-5 bg-slate-800 text-white rounded-[25px] font-black uppercase tracking-widest shadow-xl hover:bg-slate-700 active:scale-95 text-[10px] flex items-center justify-center gap-2"
+                                >
+                                    <FileDown size={16} /> Expt. Digital
+                                </button>
+                                <button onClick={onClose} className="w-full py-5 bg-red-600 text-white rounded-[25px] font-black uppercase tracking-widest shadow-2xl hover:bg-red-500 active:scale-95 text-[10px]">
+                                    Confirmar Sanción
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
