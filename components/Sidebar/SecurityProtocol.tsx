@@ -81,15 +81,15 @@ export const SecurityProtocol = () => {
                             <div
                                 key={rule.id}
                                 className={`p-4 rounded-xl border-2 flex items-start gap-4 transition-all hover:scale-[1.02] duration-300 ${rule.type === 'CRITICAL'
-                                        ? 'bg-[#0f0505]/95 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-                                        : rule.type === 'WARNING'
-                                            ? 'bg-[#0f0a05]/95 border-amber-500/40'
-                                            : 'bg-[#050a0f]/95 border-cyan-500/30'
+                                    ? 'bg-[#0f0505]/95 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                                    : rule.type === 'WARNING'
+                                        ? 'bg-[#0f0a05]/95 border-amber-500/40'
+                                        : 'bg-[#050a0f]/95 border-cyan-500/30'
                                     }`}
                             >
                                 <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 ${rule.type === 'CRITICAL' ? 'text-red-500 border-red-500/40 bg-red-500/5' :
-                                        rule.type === 'WARNING' ? 'text-amber-500 border-amber-500/40 bg-amber-500/5' :
-                                            'text-cyan-500 border-cyan-500/40 bg-cyan-500/5'
+                                    rule.type === 'WARNING' ? 'text-amber-500 border-amber-500/40 bg-amber-500/5' :
+                                        'text-cyan-500 border-cyan-500/40 bg-cyan-500/5'
                                     }`}>
                                     {rule.type === 'CRITICAL' ? <AlertOctagon size={18} strokeWidth={2.5} /> :
                                         rule.type === 'WARNING' ? <AlertTriangle size={18} strokeWidth={2.5} /> :
@@ -97,15 +97,19 @@ export const SecurityProtocol = () => {
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${rule.type === 'CRITICAL' ? 'text-red-500/90' :
-                                            rule.type === 'WARNING' ? 'text-amber-500/90' :
-                                                'text-cyan-500/90'
+                                        rule.type === 'WARNING' ? 'text-amber-500/90' :
+                                            'text-cyan-500/90'
                                         }`}>
                                         {rule.type === 'CRITICAL' ? 'PROHIBICIÓN ESTRICTA' :
                                             rule.type === 'WARNING' ? 'PRECAUCIÓN OPERATIVA' :
                                                 'DIRECTIVA DE SISTEMA'}
                                     </span>
-                                    <span className="text-[11px] font-bold text-slate-200 uppercase leading-[1.4] tracking-tight">
-                                        {rule.content}
+                                    <span className="text-[11px] font-bold text-slate-200 uppercase leading-relaxed tracking-tight">
+                                        {rule.content.split(/[.,]|\n/).filter(p => p.trim().length > 3).map((part, idx) => (
+                                            <span key={idx} className="block mb-1">
+                                                - {part.trim()}
+                                            </span>
+                                        ))}
                                     </span>
                                 </div>
                             </div>
