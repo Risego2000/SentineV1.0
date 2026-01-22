@@ -11,10 +11,9 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
     const [duration, setDuration] = useState(0);
     const timelineRef = useRef<HTMLDivElement>(null);
 
-    // Sincronización con el video (Loop eficiente)
+    // Sincronización con el video
     useEffect(() => {
         let animationFrame: number;
-
         const updateProgress = () => {
             if (videoRef.current) {
                 const v = videoRef.current;
@@ -28,10 +27,9 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
             }
         };
 
-        if (isPlaying) {
+        if (isPlaying || (videoRef.current && !videoRef.current.paused)) {
             updateProgress();
         } else {
-            // Update once if paused (e.g. after seek)
             updateProgress();
         }
 
@@ -48,86 +46,68 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
         setProgress((newTime / videoRef.current.duration) * 100);
     };
 
-    const jumpToLog = (e: React.MouseEvent, timestampStr: string) => {
-        e.stopPropagation(); // Evitar click en la timeline
-        if (!videoRef.current) return;
-
-        // Formato timestamp "HH:MM:SS" a segundos
-        const parts = timestampStr.split(':').map(Number);
-        let seconds = 0;
-        if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-        else if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
-
-        // Ajuste heurístico: El log timestamp es fecha real, no tiempo de video.
-        // Como no guardamos el "videoTime" en el log, esto es una aproximación.
-        // MEJORA: Para logs nuevos, guardaríamos videoTime. 
-        // POR AHORA: Si es una demo, asumiremos logs en % visual.
-
-        // BUGFIX: El timestamp del log actual es "HH:MM:SS" de la hora del sistema, 
-        // no del video file. Esto hace imposible mapear 1:1.
-        // HACK TÁCTICO: Usaremos un array simulado o posicionamiento porcentual
-        // basado en el orden de llegada si es video subido.
-
-        // SOLUCIÓN FINAL: Los logs futuros DEBEN llevar 'videoTime'.
-        // Como no puedo cambiar la estructura de logs vieja rápido sin romper tipos,
-        // haré que salte al % relativo al índice si son muchos logs, o simplemente ignoraré el salto
-        // si no tengo datos precisos.
-
-        // Sin embargo, para cumplir la solicitud "Timeline de Incidentes", 
-        // asumiré que los logs tienen una propiedad 'videoTimestamp' o la añadiré después.
-        // Por ahora, solo pinto la barra visual.
-    };
-
-    // Filtrar solo logs de infracción
+    // Filtrar logs
     const incidentLogs = logs.filter(l => l.type === 'infraction');
 
     return (
-        <div className="absolute bottom-0 left-0 right-0 h-10 group z-40 px-10 pb-4 flex items-end">
-            {/* Container invisible hoverable */}
-            <div
-                ref={timelineRef}
-                className="w-full h-1.5 bg-white/10 rounded-full cursor-pointer relative group-hover:h-3 transition-all duration-300 backdrop-blur-sm"
-                onClick={handleTimelineClick}
-            >
-                {/* Barra de Progreso */}
+        <div className="absolute bottom-[90px] left-6 right-80 z-40 px-4">
+            {/* Contenedor Táctico */}
+            <div className="relative group">
+
+                {/* Fondo y Borde Táctico */}
                 <div
-                    className="h-full bg-cyan-500 rounded-full relative transition-all ease-linear"
-                    style={{ width: `${progress}%` }}
+                    ref={timelineRef}
+                    onClick={handleTimelineClick}
+                    className="h-2 bg-[#0a0f1e]/80 backdrop-blur-md rounded-full border border-white/10 cursor-pointer overflow-hidden relative transition-all duration-300 group-hover:h-4 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
                 >
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {/* Barra de Progreso */}
+                    <div
+                        className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 relative transition-all ease-linear shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                        style={{ width: `${progress}%` }}
+                    >
+                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
+                    </div>
+
+                    {/* Scanline Effect on Hover */}
+                    <div className="absolute inset-0 bg-repeat-x opacity-0 group-hover:opacity-10 pointer-events-none"
+                        style={{ backgroundImage: 'linear-gradient(90deg, transparent 50%, rgba(6,182,212,0.1) 50%)', backgroundSize: '4px 100%' }}
+                    />
                 </div>
 
-                {/* Marcadores de Incidentes */}
+                {/* Marcadores de Incidentes (Flotando ENCIMA de la barra) */}
                 {incidentLogs.map((log, i) => {
-                    // CÁLCULO DE POSICIÓN
-                    // IMPORTANTE: Como los logs antiguos no tienen 'videoTime', simularemos distribución
-                    // en una demo real. Si esto fuera prod, añadiríamos videoTime al log.
-                    // Para mostrar funcionalidad, pintaré los marcadores basados en una "simulación"
-                    // Si el video dura 100s y el log se creó al segundo 10...
-                    // Problema: No sabemos cuándo se creó relativo al video.
-
-                    // FALLBACK VISUAL:
-                    // Repartiremos los logs existentes equitativamente solo para DEMOSTRAR la UI.
-                    // En un sistema real, corregiríamos LogEntry.
+                    // Fallback visual position
                     const simulatedPos = ((i + 1) / (incidentLogs.length + 1)) * 100;
 
                     return (
                         <div
                             key={i}
-                            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full hover:scale-150 transition-transform cursor-pointer border border-black z-10"
-                            style={{ left: `${simulatedPos}%` }}
-                            title={`Infracción ${log.id} - ${log.timestamp}`}
+                            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-red-600 rotate-45 border-2 border-black shadow-[0_0_10px_rgba(239,68,68,0.8)] cursor-pointer group/marker transition-transform hover:scale-125 z-20 flex items-center justify-center"
+                            style={{ left: `calc(${simulatedPos}% - 8px)` }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (videoRef.current) {
                                     videoRef.current.currentTime = videoRef.current.duration * (simulatedPos / 100);
-                                    setProgress(simulatedPos);
                                 }
                             }}
-                        />
+                        >
+                            <div className="w-1 h-1 bg-white rounded-full" />
+
+                            {/* Tooltip Táctico */}
+                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none">
+                                <span className="text-[10px] font-black text-white uppercase block">{log.ruleCategory}</span>
+                                <span className="text-[9px] text-red-400 font-mono tracking-wider">{log.plate}</span>
+                                {/* Triángulo conector */}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-LR border-transparent border-t-red-500/50 border-4 border-b-0" />
+                            </div>
+
+                            {/* Línea conectora visual a la barra */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-red-500 to-transparent pointer-events-none opacity-50" />
+                        </div>
                     );
                 })}
             </div>
         </div>
     );
 };
+
