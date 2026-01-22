@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { GeometryLine, InfractionLog, SystemLog, Track, AppStats, AuditPresetType } from '../types';
 import { AIService } from '../services/aiService';
+import { logger } from '../services/logger';
 
 const MAX_LOGS = 50;
 
@@ -12,21 +13,32 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
     const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
     const addLog = useCallback((type: SystemLog['type'], content: string) => {
-        setSystemLogs(prev => [{
-            id: Math.random().toString(36).substr(2, 9),
-            timestamp: new Date().toLocaleTimeString(),
-            type,
-            content
-        }, ...prev].slice(0, MAX_LOGS));
+        // Ahora addLog es un wrapper de logger para mantener compatibilidad
+        if (type === 'INFO') logger.info('SYSTEM', content);
+        else if (type === 'WARN') logger.warn('SYSTEM', content);
+        else if (type === 'ERROR') logger.error('SYSTEM', content);
+        else if (type === 'AI') logger.ai('SYSTEM', content);
+        else if (type === 'CORE') logger.core('SYSTEM', content);
     }, []);
 
     useEffect(() => {
+        const unsubscribe = logger.subscribe((entry) => {
+            setSystemLogs(prev => [{
+                id: Math.random().toString(36).substr(2, 9),
+                timestamp: new Date(entry.timestamp).toLocaleTimeString(),
+                type: (entry.level === 'DEBUG' || entry.level === 'SUCCESS') ? 'INFO' : entry.level as any,
+                content: entry.message
+            }, ...prev].slice(0, MAX_LOGS));
+        });
+
         if (hasApiKey) {
-            addLog('AI', 'Unidad Forense: Conexión Gemini AGI validada.');
+            logger.ai('SENTINEL_SYSTEM', 'Unidad Forense: Conexión Gemini AGI validada.');
         } else {
-            addLog('ERROR', 'Unidad Forense: Sin acceso a Núcleo Forense (Falta API KEY).');
+            logger.error('SENTINEL_SYSTEM', 'Unidad Forense: Sin acceso a Núcleo Forense (Falta API KEY).');
         }
-    }, [hasApiKey, addLog]);
+
+        return unsubscribe;
+    }, [hasApiKey]);
 
     const generateGeometry = useCallback(async (directives: string, instruction?: string, image?: string) => {
         if (!hasApiKey) return { lines: [], suggestedDirectives: "" };

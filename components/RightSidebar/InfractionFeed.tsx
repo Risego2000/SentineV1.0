@@ -1,15 +1,19 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 import { TacticalMetrics } from './TacticalMetrics';
 
 export const InfractionFeed = () => {
     const { logs, setSelectedLog } = useSentinel();
+    const { helpProps } = useHelp();
 
     return (
         <>
-            <div className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0">
+            <div className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0"
+                {...helpProps("Flujo de infracciones confirmadas por la Unidad Forense Gemini IA.")}
+            >
                 <FileText className="text-red-400" size={18} />
                 <span className="text-sm font-bold text-red-100 uppercase tracking-wider">
                     Infracciones Detectadas
@@ -32,6 +36,7 @@ export const InfractionFeed = () => {
                             key={log.id}
                             onClick={() => setSelectedLog(log)}
                             className="group cursor-pointer bg-slate-900/50 hover:bg-slate-800 border border-white/5 hover:border-red-500/30 rounded-xl overflow-hidden transition-all shadow-lg hover:shadow-red-900/10"
+                            {...helpProps(`Vehículo ${log.plate || 'desconocido'}. Pulsa para abrir peritaje completo.`)}
                         >
                             <div className="relative h-32 w-full">
                                 <img

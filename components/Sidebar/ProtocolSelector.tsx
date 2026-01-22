@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Map, MapPin, Layers, CheckCircle2, ChevronDown, ChevronRight, Car, Truck, AlertTriangle } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 interface ZoneOption {
     id: string;
@@ -43,15 +44,23 @@ const CATEGORIES = [
 ];
 
 export const ProtocolSelector = () => {
-    const { generateGeometry, setDirectives, directives } = useSentinel();
+    const { generateGeometry, setDirectives, directives, addLog, videoRef } = useSentinel();
+    const { helpProps } = useHelp();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [openCategories, setOpenCategories] = useState<string[]>(['access']); // Default open
     const [isGenerating, setIsGenerating] = useState(false);
 
     const toggleSelection = (id: string) => {
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
+        const option = DAGANZO_OPTIONS.find(o => o.id === id);
+        setSelectedIds(prev => {
+            const isSelected = prev.includes(id);
+            if (!isSelected && option) {
+                addLog('CORE', `Protocolo seleccionado: ${option.label}`);
+            } else if (option) {
+                addLog('CORE', `Protocolo desactivado: ${option.label}`);
+            }
+            return isSelected ? prev.filter(x => x !== id) : [...prev, id];
+        });
     };
 
     const toggleCategory = (catId: string) => {
@@ -115,7 +124,9 @@ export const ProtocolSelector = () => {
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between"
+                {...helpProps("Selector avanzado de configuraciones territoriales y protocolos de peritaje específicos.")}
+            >
                 <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                     <Map size={14} className="text-cyan-500" /> Selector Avanzado
                 </h3>
@@ -127,6 +138,7 @@ export const ProtocolSelector = () => {
                         <button
                             onClick={() => setSelectedIds([])}
                             className="text-[9px] text-slate-500 hover:text-white transition-colors uppercase"
+                            {...helpProps("Limpia todas las selecciones de protocolo municipal actuales.")}
                         >
                             Limpiar
                         </button>
@@ -146,6 +158,7 @@ export const ProtocolSelector = () => {
                         <button
                             onClick={() => toggleCategory(cat.id)}
                             className="w-full flex items-center justify-between p-2 text-left hover:bg-white/5 rounded-lg transition-colors"
+                            {...helpProps(`Categoría: ${cat.label}. Haz clic para expandir opciones.`)}
                         >
                             <span className="text-[10px] font-black uppercase text-slate-300 flex items-center gap-2">
                                 <cat.icon size={12} className="text-cyan-500" />
@@ -173,6 +186,7 @@ export const ProtocolSelector = () => {
                                                 ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100'
                                                 : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10'
                                                 }`}
+                                            {...helpProps(opt.context)}
                                         >
                                             <div className={`mt-0.5 w-3 h-3 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600'
                                                 }`}>

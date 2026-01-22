@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GeometryLine, EntityType } from '../../types';
-import { X, Trash2, Ban, ShieldAlert, GitCommitVertical, Box } from 'lucide-react';
+import { X, Trash2, Ban, ShieldAlert, GitCommitVertical, Box, Scale } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
 interface Point {
@@ -13,7 +13,9 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
         geometry,
         setGeometry,
         isMeshRenderEnabled,
-        setIsMeshRenderEnabled
+        setIsMeshRenderEnabled,
+        calibration,
+        setCalibration
     } = useSentinel();
 
     const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -237,6 +239,30 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                         <div className="flex flex-col">
                             <span className="text-[10px] font-bold text-orange-400 uppercase">Box Junction</span>
                             <span className="text-[7px] text-slate-500">Detección por bloqueo</span>
+                        </div>
+                    </button>
+                    <button onClick={() => {
+                        if (!startPoint || !currentPoint || !canvasRef.current) return;
+                        const distMeters = prompt("Introduce la distancia REAL en METROS entre estos dos puntos:");
+                        if (distMeters && !isNaN(parseFloat(distMeters))) {
+                            const rect = canvasRef.current.getBoundingClientRect();
+                            const dx = (currentPoint.x - startPoint.x) * rect.width;
+                            const dy = (currentPoint.y - startPoint.y) * rect.height;
+                            const pixelDist = Math.sqrt(dx * dx + dy * dy);
+                            if (pixelDist > 0) {
+                                const newCalib = parseFloat(distMeters) / pixelDist;
+                                setCalibration(newCalib);
+                                alert(`Calibración actualizada: ${newCalib.toFixed(6)} m/px`);
+                            }
+                        }
+                        setStartPoint(null); setCurrentPoint(null); setShowMenu(false);
+                    }} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group border-t border-white/10 mt-1 pt-2">
+                        <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                            <Scale size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase">Calibrar Escala (m)</span>
+                            <span className="text-[10px] text-slate-500">Ajusta m/px según distancia real</span>
                         </div>
                     </button>
                 </div>

@@ -1,9 +1,11 @@
 import React from 'react';
 import { Play, Pause } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 export const ControlBar = () => {
     const { isPlaying, setIsPlaying } = useSentinel();
+    const { helpProps } = useHelp();
 
     const togglePlayback = () => {
         setIsPlaying(!isPlaying);
@@ -16,6 +18,7 @@ export const ControlBar = () => {
                     onClick={togglePlayback}
                     className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl active:scale-90 ${isPlaying ? 'bg-red-800 text-white' : 'bg-cyan-500 text-black'
                         }`}
+                    {...helpProps(isPlaying ? "Pausa la transmisión biónica." : "Inicia el análisis de vectores en tiempo real.")}
                 >
                     {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
                 </button>

@@ -228,11 +228,18 @@ export const renderScene = (
 
         ctx.stroke();
 
-        // Label Dinámico con Telemetría
+        // Label Dinámico con Telemetría (Fondo para legibilidad)
+        const speedKmh = track.avgVelocity ? (track.avgVelocity * 100 * 3.6).toFixed(1) : '0'; // Conversión estimada
+        const dwellSeconds = (track.dwellTime / 1000).toFixed(1);
+        const tacticalLabel = `${label} #${track.id} | ${speedKmh} km/h | ${dwellSeconds}s`;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        const labelWidth = ctx.measureText(tacticalLabel).width;
+        ctx.fillRect(x, y - 18, labelWidth + 10, 14);
+
         ctx.fillStyle = color;
-        ctx.font = 'bold 10px sans-serif';
-        const speedText = track.avgVelocity ? ` | ${(track.avgVelocity * 100).toFixed(1)} km/h` : ''; // Estimación visual
-        ctx.fillText(`${label} #${track.id}${speedText}`, x, y - 5);
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText(tacticalLabel, x + 5, y - 8);
 
         // --- VISUALIZACIÓN DE EVENTOS TÁCTICOS ---
 

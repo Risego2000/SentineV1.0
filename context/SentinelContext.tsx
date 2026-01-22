@@ -7,7 +7,7 @@ import {
     AppStats,
     EngineConfig
 } from '../types';
-import { DETECTION_PRESETS, PresetType, AUDIT_PRESETS, AuditPresetType } from '../constants';
+import { DETECTION_PRESETS, PresetType, AUDIT_PRESETS, AuditPresetType, KINEMATIC_PRESETS, KinematicPresetType } from '../constants';
 import { useSentinelSystem } from '../components/useSentinelSystem';
 import { useNeuralCore } from '../components/useNeuralCore';
 import { AIService } from '../services/aiService';
@@ -27,6 +27,8 @@ interface SentinelContextType {
     geometry: GeometryLine[];
     selectedLog: InfractionLog | null;
     isListening: boolean;
+    helpMsg: string | null;
+    setHelpMsg: (msg: string | null) => void;
     isPoseEnabled: boolean;
     currentPreset: PresetType;
     engineConfig: EngineConfig;
@@ -67,6 +69,8 @@ interface SentinelContextType {
     setIsAuditEnabled: (e: boolean) => void;
     currentAuditPreset: AuditPresetType;
     setAuditPreset: (p: AuditPresetType) => void;
+    currentKinematicPreset: KinematicPresetType;
+    setKinematicPreset: (p: KinematicPresetType) => void;
     startLiveFeed: () => Promise<void>;
     onFileChange: (file: File, videoRef: React.RefObject<HTMLVideoElement | null>) => void;
     addInfraction: (log: InfractionLog) => void;
@@ -77,10 +81,11 @@ interface SentinelContextType {
 export const SentinelContext = createContext<SentinelContextType | undefined>(undefined);
 
 export const SentinelProvider = ({ children }: { children: ReactNode }) => {
-    const [source, setSource] = useState<'none' | 'live' | 'upload'>('none');
+    const [source, _setSource] = useState<'none' | 'live' | 'upload'>('none');
     const [selectedLog, setSelectedLog] = useState<InfractionLog | null>(null);
     const [isListening, setIsListening] = useState(false);
-    const [isPoseEnabled, setIsPoseEnabled] = useState(false);
+    const [helpMsg, setHelpMsg] = useState<string | null>("Bienvenido a Sentinel AI. Pase el ratón sobre los elementos para obtener ayuda.");
+    const [isPoseEnabled, _setIsPoseEnabled] = useState(false);
     const [currentPreset, setPreset] = useState<PresetType>(() => {
         const saved = localStorage.getItem('sentinel_preset') as PresetType;
         return (saved && DETECTION_PRESETS[saved]) ? saved : 'standard';
@@ -88,12 +93,12 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset]?.config || DETECTION_PRESETS.standard.config);
     const [fps, setFps] = useState(0);
     const [latency, setLatency] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isMeshRenderEnabled, setIsMeshRenderEnabled] = useState(true);
-    const [directives, setDirectives] = useState('Monitoriza la vía principal...');
+    const [isPlaying, _setIsPlaying] = useState(false);
+    const [isMeshRenderEnabled, _setIsMeshRenderEnabled] = useState(true);
+    const [directives, _setDirectives] = useState('Monitoriza la vía principal...');
     const [geometry, setGeometry] = useState<GeometryLine[]>([]);
     const [tracks, setTracks] = useState<any[]>([]);
-    const [calibration, setCalibration] = useState(() => {
+    const [calibration, _setCalibration] = useState(() => {
         const saved = localStorage.getItem('sentinel_calibration');
         return saved ? parseFloat(saved) : 0.05;
     });
@@ -160,8 +165,56 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [mpDetectPose, handleError]);
 
-    const [isAuditEnabled, setIsAuditEnabled] = useState(true);
-    const [currentAuditPreset, setAuditPreset] = useState<AuditPresetType>('standard');
+    // Wrapped Setters for Logging
+    const setSource = useCallback((s: 'none' | 'live' | 'upload') => {
+        _setSource(s);
+        addLog('CORE', `Fuente de video cambiada a: ${s.toUpperCase()}`);
+    }, [addLog]);
+
+    const setIsPlaying = useCallback((p: boolean) => {
+        _setIsPlaying(p);
+        addLog('CORE', `Estado de reproducción: ${p ? 'PLAYING' : 'PAUSED'}`);
+    }, [addLog]);
+
+    const setIsMeshRenderEnabled = useCallback((e: boolean) => {
+        _setIsMeshRenderEnabled(e);
+        addLog('CORE', `Renderizado de malla: ${e ? 'ON' : 'OFF'}`);
+    }, [addLog]);
+
+    const setDirectives = useCallback((d: string) => {
+        _setDirectives(d);
+        addLog('AI', `Directivas de protocolo actualizadas: "${d.substring(0, 50)}${d.length > 50 ? '...' : ''}"`);
+    }, [addLog]);
+
+    const setIsPoseEnabled = useCallback((p: boolean) => {
+        _setIsPoseEnabled(p);
+        addLog('CORE', `Motor cinemático (Pose): ${p ? 'ACTIVADO' : 'DESACTIVADO'}`);
+    }, [addLog]);
+
+    const setCalibration = useCallback((c: number) => {
+        _setCalibration(c);
+        addLog('CORE', `Calibración métrica actualizada: ${c} m/px`);
+    }, [addLog]);
+
+    const [isAuditEnabled, _setIsAuditEnabled] = useState(true);
+    const [currentAuditPreset, _setAuditPreset] = useState<AuditPresetType>('standard');
+    const [currentKinematicPreset, _setKinematicPreset] = useState<KinematicPresetType>('full');
+
+    const setIsAuditEnabled = useCallback((e: boolean) => {
+        _setIsAuditEnabled(e);
+        addLog('AI', `Auditoría forense Gemini: ${e ? 'ACTIVADA' : 'DESACTIVADA'}`);
+    }, [addLog]);
+
+    const setAuditPreset = useCallback((p: AuditPresetType) => {
+        _setAuditPreset(p);
+        addLog('AI', `Preset de auditoría cambiado a: ${AUDIT_PRESETS[p].label}`);
+    }, [addLog]);
+
+    const setKinematicPreset = useCallback((p: KinematicPresetType) => {
+        _setKinematicPreset(p);
+        const presetLabel = KINEMATIC_PRESETS[p]?.model || p.toUpperCase();
+        addLog('CORE', `Modelo cinemático MediaPipe: ${presetLabel}`);
+    }, [addLog]);
 
     const setPresetAndConfig = useCallback((preset: PresetType) => {
         setPreset(preset); // Use the local setPreset
@@ -365,6 +418,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         videoRef,
         selectedLog, setSelectedLog,
         isListening, setIsListening,
+        helpMsg, setHelpMsg,
         isPoseEnabled, setIsPoseEnabled,
         currentPreset, setPreset: setPresetAndConfig,
         engineConfig,
@@ -392,6 +446,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         setTracks,
         isAuditEnabled, setIsAuditEnabled,
         currentAuditPreset, setAuditPreset,
+        currentKinematicPreset, setKinematicPreset,
         calibration,
         setCalibration
     };

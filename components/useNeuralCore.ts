@@ -80,7 +80,7 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
         isPoseInitializingRef.current = true;
 
         try {
-            onLog('CORE', 'Activando Módulo de Análisis Cinemático (Pose)...');
+            logger.core('NEURAL_CORE', 'Activando Módulo de Análisis Cinemático (Pose)...');
             poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(visionRef.current, {
                 baseOptions: {
                     modelAssetPath: MEDIAPIPE_POSE_PATH,
@@ -89,9 +89,9 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
                 runningMode: "VIDEO",
                 numPoses: 1
             });
-            onLog('AI', 'Unidad Cinemática: Pose Landmarker Calibrado y Listo.');
+            logger.ai('NEURAL_CORE', 'Unidad Cinemática: Pose Landmarker Calibrado y Listo.');
         } catch (e: any) {
-            onLog('ERROR', `Error al cargar Módulo de Pose: ${e.message}`);
+            logger.error('NEURAL_CORE', `Error al cargar Módulo de Pose: ${e.message}`);
         } finally {
             isPoseInitializingRef.current = false;
         }

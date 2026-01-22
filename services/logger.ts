@@ -17,6 +17,7 @@ class TacticalLogger {
     private static instance: TacticalLogger;
     private maxLogs = 1000;
     private logs: LogEntry[] = [];
+    private onLogListeners: ((entry: LogEntry) => void)[] = [];
 
     private constructor() { }
 
@@ -25,6 +26,13 @@ class TacticalLogger {
             TacticalLogger.instance = new TacticalLogger();
         }
         return TacticalLogger.instance;
+    }
+
+    public subscribe(listener: (entry: LogEntry) => void) {
+        this.onLogListeners.push(listener);
+        return () => {
+            this.onLogListeners = this.onLogListeners.filter(l => l !== listener);
+        };
     }
 
     private log(level: LogLevel, category: string, message: string, data?: any) {
@@ -40,6 +48,9 @@ class TacticalLogger {
         if (this.logs.length > this.maxLogs) {
             this.logs.shift();
         }
+
+        // Notificar suscriptores (React UI)
+        this.onLogListeners.forEach(listener => listener(entry));
 
         const color = this.getLevelColor(level);
         const timestampStr = new Date().toLocaleTimeString();

@@ -1,13 +1,17 @@
 import React, { memo } from 'react';
 import { Terminal } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useHelp } from '../../hooks/useHelp';
 
 export const SystemTerminal = memo(() => {
     const { systemLogs } = useSentinel();
+    const { helpProps } = useHelp();
 
     return (
         <>
-            <div className="p-3 border-b border-white/10 flex items-center gap-2 bg-black/40 border-t border-white/10 shrink-0">
+            <div className="p-3 border-b border-white/10 flex items-center gap-2 bg-black/40 border-t border-white/10 shrink-0"
+                {...helpProps("Terminal de trazas en tiempo real. Registra eventos del Motor Vectorial y la Unidad Forense.")}
+            >
                 <Terminal className="text-slate-400" size={16} />
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                     Log de Aplicación Monitorizado

@@ -13,7 +13,7 @@ const getAIClient = () => {
         logger.error('AI_SERVICE', 'Falta la API Key de Gemini (VITE_GOOGLE_GENAI_KEY)');
         throw new Error("API Key missing");
     }
-    return new GoogleGenAI(apiKey);
+    return new (GoogleGenAI as any)(apiKey);
 };
 
 /**

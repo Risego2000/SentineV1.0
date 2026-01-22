@@ -91,19 +91,22 @@ export type AuditPresetType = keyof typeof AUDIT_PRESETS;
  * Controla la profundidad del análisis estructural y trayectorias.
  */
 export const KINEMATIC_PRESETS = {
-    passive: {
-        label: 'PASIVO',
-        description: 'Seguimiento base sin análisis de pose.',
-        pose: false
+    lite: {
+        label: 'MODELO LITE',
+        description: 'Procesado ultrarrápido para análisis de flujo.',
+        model: 'lite',
+        pose: true
     },
-    active: {
-        label: 'ACTIVO',
-        description: 'Análisis de trayectoria y colisiones.',
-        pose: false
+    full: {
+        label: 'MODELO FULL',
+        description: 'Balance ideal: Detección estándar biónica.',
+        model: 'full',
+        pose: true
     },
-    bionic: {
-        label: 'BIÓNICO',
-        description: 'Análisis de pose y conducta humana.',
+    heavy: {
+        label: 'MODELO HEAVY',
+        description: 'Máxima precisión: Peritaje estructural profundo.',
+        model: 'heavy',
         pose: true
     }
 };

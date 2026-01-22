@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 // Components & Modules
 import { Sidebar } from './components/Sidebar';
 import { RightSidebar } from './components/RightSidebar';
-import { MainViewer } from './components/MainViewer';
+import { MainViewer } from './components/MainViewer/MainViewer';
 import { InfractionModal } from './components/InfractionModal';
 import { useNeuralCore } from './components/useNeuralCore';
 import { useSentinelSystem } from './components/useSentinelSystem';

@@ -1,13 +1,14 @@
 import React, { memo } from 'react';
 import { Waves } from 'lucide-react';
-import { useSentinel } from '../hooks/useSentinel';
-import { EmptyState } from './MainViewer/EmptyState';
-import { NeuralStatusHUD } from './MainViewer/NeuralStatusHUD';
-import { ControlBar } from './MainViewer/ControlBar';
-import { HeaderActions } from './MainViewer/HeaderActions';
-import { ForensicAnalysisOverlay } from './MainViewer/ForensicAnalysisOverlay';
-import { GeometryEditor } from './MainViewer/GeometryEditor';
-import { VideoTimeline } from './MainViewer/VideoTimeline';
+import { useSentinel } from '../../hooks/useSentinel';
+import { EmptyState } from './EmptyState';
+import { NeuralStatusHUD } from './NeuralStatusHUD';
+import { ControlBar } from './ControlBar';
+import { HeaderActions } from './HeaderActions';
+import { ForensicAnalysisOverlay } from './ForensicAnalysisOverlay';
+import { GeometryEditor } from './GeometryEditor';
+import { VideoTimeline } from './VideoTimeline';
+import { HelpCapsule } from './HelpCapsule';
 
 interface MainViewerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -41,8 +42,6 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
                 onLive={onLive}
                 onUpload={onUpload}
                 activeMode={source === 'upload' ? 'video' : source}
-                isEditing={isMeshRenderEnabled}
-                onEdit={() => setIsMeshRenderEnabled(!isMeshRenderEnabled)}
             />
 
             {/* Overlay de Análisis Forense */}
@@ -70,6 +69,7 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
 
             {/* Barra de Control Inferior */}
             <div className="relative z-50">
+                <HelpCapsule />
                 <VideoTimeline videoRef={videoRef} />
                 <ControlBar />
             </div>
