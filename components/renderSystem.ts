@@ -118,28 +118,57 @@ export const renderScene = (
             ctx.setLineDash([]);
             ctx.globalAlpha = 1.0;
 
-            // 3.2 Draw Predictive Vector (LIGHTWEIGHT)
-            const last = points[points.length - 1];
+            // 3.2 ADVANCED PREDICTIVE VECTOR (Arrow System)
+            const last = points[points.length - 1]; // Origen: Última posición conocida
             if (track.kf) {
-                // Proyección lineal simple (menos costosa)
-                const futureX = last.x + (track.kf.vx * width * 15);
-                const futureY = last.y + (track.kf.vy * height * 15);
+                // Factor de proyección: Aumentar predicción para visibilidad
+                const predictionFactor = 25;
+                const vx = track.kf.vx * width;
+                const vy = track.kf.vy * height;
 
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-                // Eliminado shadowBlur y shadowColor para rendimiento
+                // Calcular destino
+                const futureX = last.x + (vx * predictionFactor);
+                const futureY = last.y + (vy * predictionFactor);
 
-                ctx.moveTo(last.x, last.y);
-                ctx.lineTo(futureX, futureY);
-                ctx.stroke();
+                // Ángulo del vector (para rotar la flecha)
+                const angle = Math.atan2(futureY - last.y, futureX - last.x);
+                const arrowLength = Math.hypot(futureX - last.x, futureY - last.y);
 
-                // Punta de flecha simplificada (sin transformaciones de contexto costosas)
-                // Se dibuja un pequeño círculo al final en lugar de una flecha rotada
-                ctx.beginPath();
-                ctx.fillStyle = color;
-                ctx.arc(futureX, futureY, 3, 0, Math.PI * 2);
-                ctx.fill();
+                // Dibujar solo si hay movimiento significativo (> 5px)
+                if (arrowLength > 5) {
+                    ctx.save();
+                    ctx.translate(last.x, last.y);
+                    ctx.rotate(angle);
+
+                    // --- CUERPO DE LA FLECHA (Gradient) ---
+                    const grad = ctx.createLinearGradient(0, 0, arrowLength, 0);
+                    grad.addColorStop(0, color); // Color del vehículo
+                    grad.addColorStop(1, 'rgba(255, 255, 255, 0)'); // Desvanecer al final
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(arrowLength - 5, 0); // Dejar espacio para la punta
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // --- PUNTA DE FLECHA (Tactical Triangle) ---
+                    ctx.translate(arrowLength, 0); // Mover al final
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0); // Punta
+                    ctx.lineTo(-8, -4); // Base izquierda
+                    ctx.lineTo(-6, 0);  // Centro hundido (estilo flecha rápida)
+                    ctx.lineTo(-8, 4);  // Base derecha
+                    ctx.closePath();
+
+                    ctx.fillStyle = color;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10; // Glow effect
+                    ctx.fill();
+
+                    // Restaurar contexto
+                    ctx.restore();
+                }
             }
         }
 
