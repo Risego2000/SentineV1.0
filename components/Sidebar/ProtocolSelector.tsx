@@ -5,7 +5,7 @@ import { useSentinel } from '../../hooks/useSentinel';
 interface ZoneOption {
     id: string;
     label: string;
-    category: 'access' | 'intersection' | 'urban_zone' | 'behavior_audit';
+    category: 'access' | 'intersection' | 'behavior_audit';
     context: string;
 }
 
@@ -24,18 +24,7 @@ const DAGANZO_OPTIONS: ZoneOption[] = [
     { id: 'type_paso_peatones', label: 'Pasos de Peatones', category: 'intersection', context: 'Intersección de flujo peatonal. Prioridad absoluta del peatón. Prohibición de parada sobre el paso.' },
     { id: 'type_merge', label: 'Carriles de Incorporación', category: 'intersection', context: 'Accesos a vías rápidas (M-100/M-113). Control de velocidad de entrada y ceda el paso al tráfico pasante.' },
 
-    // ZONAS MUNICIPIO (BARRIOS / POLÍGONOS / COLEGIOS)
-    { id: 'casco_historico', label: 'Casco Histórico', category: 'urban_zone', context: 'Calles estrechas, aceras reducidas. Prioridad peatonal absoluta. Zonas de carga y descarga limitadas.' },
-    { id: 'pol_los_frailes', label: 'Polígono Los Frailes', category: 'urban_zone', context: 'Área industrial mixta. Estacionamiento en doble fila y maniobras de vehículos pesados.' },
-    { id: 'pol_el_globo', label: 'Polígono El Globo', category: 'urban_zone', context: 'Zona industrial perimetral. Accesos directos a carreteras secundarias.' },
-    { id: 'pol_camino_ancho', label: 'Polígono Camino Ancho', category: 'urban_zone', context: 'Pequeña zona industrial integrada. Tráfico de furgonetas y distribución.' },
-    { id: 'residencial_mirador', label: 'Residencial Mirador / Villa Daganzo', category: 'urban_zone', context: 'Nuevos desarrollos. Calles anchas residenciales, prioridad niños/familias. Control velocidad 30.' },
 
-    // CENTROS EDUCATIVOS (PUNTOS CRÍTICOS)
-    { id: 'colegio_angel_berzal', label: 'CEIP Ángel Berzal Fernández', category: 'urban_zone', context: 'ENTORNO ESCOLAR. Prohibición total de estacionamiento en doble fila. Cruces escolares vigilados.' },
-    { id: 'colegio_salvador', label: 'CEIP Salvador de Madariaga', category: 'urban_zone', context: 'ENTORNO ESCOLAR. Zona de "Kiss & Ride". Riesgo de atropello en horas de entrada/salida.' },
-    { id: 'ies_lazaro', label: 'SIES Lázaro Carreter', category: 'urban_zone', context: 'Instituto. Tráfico peatonal adolescente. Pasos de cebra elevados.' },
-    { id: 'casa_ninos', label: 'Casa de Niños (Hnos. Álvarez Quintero)', category: 'urban_zone', context: 'Escuela infantil. Tráfico lento y paradas frecuentes.' },
 
     // ANÁLISIS DE COMPORTAMIENTO (GEOMETRÍA ESTRICTA)
     { id: 'inf_linea_continua', label: 'Cruce Línea Continua', category: 'behavior_audit', context: 'Invasión física de carril contrario o carril bus.' },
@@ -49,7 +38,7 @@ const DAGANZO_OPTIONS: ZoneOption[] = [
 const CATEGORIES = [
     { id: 'access', label: 'Vías de Acceso', icon: MapPin },
     { id: 'intersection', label: 'Tipos de Intersección', icon: AlertTriangle },
-    { id: 'urban_zone', label: 'Barrios y Zonas', icon: Map },
+
     { id: 'behavior_audit', label: 'Auditoría de Infracciones', icon: CheckCircle2 },
 ];
 
