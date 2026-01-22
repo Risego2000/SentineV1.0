@@ -21,7 +21,7 @@ interface MainViewerProps {
  * Estructura optimizada para renderizado fluido.
  */
 export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainViewerProps) => {
-    const { source, isAnalyzing, isEditingGeometry, setIsEditingGeometry } = useSentinel();
+    const { source, isAnalyzing, isMeshRenderEnabled, setIsMeshRenderEnabled } = useSentinel();
 
     return (
         <main className="flex-1 relative flex flex-col bg-black overflow-hidden h-screen">
@@ -41,8 +41,8 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
                 onLive={onLive}
                 onUpload={onUpload}
                 activeMode={source === 'upload' ? 'video' : source}
-                isEditing={isEditingGeometry}
-                onEdit={() => setIsEditingGeometry(!isEditingGeometry)}
+                isEditing={isMeshRenderEnabled}
+                onEdit={() => setIsMeshRenderEnabled(!isMeshRenderEnabled)}
             />
 
             {/* Overlay de Análisis Forense */}

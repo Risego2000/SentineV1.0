@@ -7,7 +7,7 @@ import {
     AppStats,
     EngineConfig
 } from '../types';
-import { DETECTION_PRESETS, PresetType } from '../constants';
+import { DETECTION_PRESETS, PresetType, AUDIT_PRESETS, AuditPresetType } from '../constants';
 import { useSentinelSystem } from '../components/useSentinelSystem';
 import { useNeuralCore } from '../components/useNeuralCore';
 import { AIService } from '../services/aiService';
@@ -22,7 +22,7 @@ interface SentinelContextType {
     // State
     source: 'none' | 'live' | 'upload';
     isPlaying: boolean;
-    isEditingGeometry: boolean;
+    isMeshRenderEnabled: boolean;
     directives: string;
     geometry: GeometryLine[];
     selectedLog: InfractionLog | null;
@@ -49,7 +49,8 @@ interface SentinelContextType {
     // Actions
     setSource: (s: 'none' | 'live' | 'upload') => void;
     setIsPlaying: (p: boolean) => void;
-    setIsEditingGeometry: (e: boolean) => void;
+    setIsMeshRenderEnabled: (e: boolean) => void;
+    parseMeshDirectives: () => void;
     setDirectives: (d: string) => void;
     setGeometry: (g: GeometryLine[]) => void;
     setSelectedLog: (l: InfractionLog | null) => void;
@@ -62,6 +63,10 @@ interface SentinelContextType {
     runAudit: (track: any, line: GeometryLine) => Promise<void>;
     setStatusMsg: (msg: string | null) => void;
     setPerformanceMetrics: (fps: number, latency: number) => void;
+    isAuditEnabled: boolean;
+    setIsAuditEnabled: (e: boolean) => void;
+    currentAuditPreset: AuditPresetType;
+    setAuditPreset: (p: AuditPresetType) => void;
     startLiveFeed: () => Promise<void>;
     onFileChange: (file: File, videoRef: React.RefObject<HTMLVideoElement | null>) => void;
     addInfraction: (log: InfractionLog) => void;
@@ -73,24 +78,20 @@ export const SentinelContext = createContext<SentinelContextType | undefined>(un
 
 export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [source, setSource] = useState<'none' | 'live' | 'upload'>('none');
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [directives, setDirectives] = useState(() => localStorage.getItem('sentinel_directives') || `- Sancionar invasión de carril bus.\n - Prohibido giros oblicuos peligrosos.`);
-    const [geometry, setGeometry] = useState<GeometryLine[]>(() => {
-        const saved = localStorage.getItem('sentinel_geometry');
-        return saved ? JSON.parse(saved) : [];
-    });
     const [selectedLog, setSelectedLog] = useState<InfractionLog | null>(null);
     const [isListening, setIsListening] = useState(false);
     const [isPoseEnabled, setIsPoseEnabled] = useState(false);
     const [currentPreset, setPreset] = useState<PresetType>(() => {
         const saved = localStorage.getItem('sentinel_preset') as PresetType;
-        // Validación táctica: Si el preset guardado no existe en el motor actual, usar default
-        return (saved && DETECTION_PRESETS[saved]) ? saved : 'neural_core';
+        return (saved && DETECTION_PRESETS[saved]) ? saved : 'standard';
     });
-    const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset]?.config || DETECTION_PRESETS.neural_core.config);
+    const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset]?.config || DETECTION_PRESETS.standard.config);
     const [fps, setFps] = useState(0);
     const [latency, setLatency] = useState(0);
-    const [isEditingGeometry, setIsEditingGeometry] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isMeshRenderEnabled, setIsMeshRenderEnabled] = useState(true);
+    const [directives, setDirectives] = useState('Monitoriza la vía principal...');
+    const [geometry, setGeometry] = useState<GeometryLine[]>([]);
     const [tracks, setTracks] = useState<any[]>([]);
     const [calibration, setCalibration] = useState(() => {
         const saved = localStorage.getItem('sentinel_calibration');
@@ -158,6 +159,9 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
             return null;
         }
     }, [mpDetectPose, handleError]);
+
+    const [isAuditEnabled, setIsAuditEnabled] = useState(true);
+    const [currentAuditPreset, setAuditPreset] = useState<AuditPresetType>('standard');
 
     const setPresetAndConfig = useCallback((preset: PresetType) => {
         setPreset(preset); // Use the local setPreset
@@ -238,13 +242,13 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const runAudit = useCallback(async (track: any, line: GeometryLine) => {
         try {
             setIsAnalyzing(true);
-            await aiRunAudit(track, line, directives);
+            await aiRunAudit(track, line, directives, currentAuditPreset);
         } catch (error) {
             handleError('AUDIT', error);
         } finally {
             setIsAnalyzing(false);
         }
-    }, [aiRunAudit, directives, handleError]);
+    }, [aiRunAudit, directives, currentAuditPreset, handleError]);
 
     const startLiveFeed = useCallback(async () => {
         addLog('CORE', 'Solicitando acceso a Entrada Biónica (Cámara)...');
@@ -292,6 +296,48 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [addLog, setStatusMsg, generateGeometry, setStats, setGeometry, setDirectives]);
 
+    const parseMeshDirectives = useCallback(() => {
+        addLog('CORE', 'Sincronizando Malla: Escaneando directivas textuales...');
+        const newLines: GeometryLine[] = [];
+        const text = directives.toLowerCase();
+
+        // 1. Detección por Palabras Clave
+        if (text.includes('continua') || text.includes('línea continua')) {
+            newLines.push({ id: 'kw_solid_' + Date.now(), x1: 0.2, y1: 0.5, x2: 0.8, y2: 0.5, label: 'Línea Continua', type: 'lane_divider' });
+        }
+        if (text.includes('stop') || text.includes('detención')) {
+            newLines.push({ id: 'kw_stop_' + Date.now(), x1: 0.3, y1: 0.4, x2: 0.7, y2: 0.4, label: 'Línea de STOP', type: 'stop_line' });
+        }
+        if (text.includes('peatones') || text.includes('cebra')) {
+            newLines.push({ id: 'kw_ped_' + Date.now(), x1: 0.2, y1: 0.6, x2: 0.8, y2: 0.6, label: 'Paso Peatones', type: 'pedestrian' });
+        }
+        if (text.includes('bus') || text.includes('carril bus')) {
+            newLines.push({ id: 'kw_bus_' + Date.now(), x1: 0.1, y1: 0.45, x2: 0.9, y2: 0.45, label: 'Carril BUS', type: 'bus_lane' });
+        }
+
+        // 2. Detección por Sintaxis Manual [LINE: Y=X, TYPE=Y, LABEL=Z]
+        const lineRegex = /\[LINE:\s*Y=(\d+),\s*TYPE=(\w+),\s*LABEL=([^,\]]+)(?:,\s*INFRACTION=[^\]]+)?\]/gi;
+        let match;
+        while ((match = lineRegex.exec(directives)) !== null) {
+            const y = parseInt(match[1]) / 1000;
+            const type = match[2].toLowerCase() as any;
+            const label = match[3].trim();
+            newLines.push({
+                id: 'sync_' + Math.random().toString(36).substr(2, 9),
+                x1: 0.1, y1: y, x2: 0.9, y2: y,
+                label: label,
+                type: type === 'solid' ? 'lane_divider' : type as any
+            });
+        }
+
+        if (newLines.length > 0) {
+            setGeometry(prev => [...prev, ...newLines]);
+            addLog('AI', `Malla Actualizada: ${newLines.length} sensores generados.`);
+        } else {
+            addLog('WARN', 'No se detectaron directivas de línea válidas en el prompt.');
+        }
+    }, [directives, addLog, setGeometry]);
+
     // --- PROTOCOL SYNC ---
     useEffect(() => {
         if (directives) {
@@ -312,7 +358,8 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const value = {
         source, setSource,
         isPlaying, setIsPlaying,
-        isEditingGeometry, setIsEditingGeometry,
+        isMeshRenderEnabled, setIsMeshRenderEnabled,
+        parseMeshDirectives,
         directives, setDirectives,
         geometry, setGeometry,
         videoRef,
@@ -343,6 +390,8 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         setPerformanceMetrics,
         tracks,
         setTracks,
+        isAuditEnabled, setIsAuditEnabled,
+        currentAuditPreset, setAuditPreset,
         calibration,
         setCalibration
     };

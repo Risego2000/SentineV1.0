@@ -131,18 +131,25 @@ export class ByteTracker {
                 const newHeading = t.kf.getHeading();
                 const deltaV = newVelocity - t.velocity;
 
-                // Suavizado de velocidad para visualización (Moving Average)
+                // Suavizado de velocidad 
                 if (!t.velocityHistory) t.velocityHistory = [];
                 t.velocityHistory.push(newVelocity);
                 if (t.velocityHistory.length > 15) t.velocityHistory.shift();
-                t.avgVelocity = t.velocityHistory.reduce((a: number, b: number) => a + b, 0) / t.velocityHistory.length;
+
+                const avgNormVel = t.velocityHistory.reduce((a: number, b: number) => a + b, 0) / t.velocityHistory.length;
+
+                // CALIBRACIÓN DINÁMICA (3 metros por carril)
+                // Asumimos que el ancho promedio de un carril en perspectiva (0.15 norm) = 3 metros
+                // 1 unit = 20 meters (aprox en base a carril de 3m ocupando el 15% de pantalla)
+                const METERS_PER_UNIT = 20;
+                const FPS = 30;
+                t.avgVelocity = avgNormVel * METERS_PER_UNIT * FPS * 3.6; // km/h
 
                 // Lógica de Permanencia (Dwell Time)
-                // Si la velocidad es < 0.002, acumulamos tiempo de permanencia (asumiendo ~30fps -> 33ms/f)
                 if (newVelocity < 0.002) {
                     t.dwellTime += 33;
                 } else {
-                    t.dwellTime = 0; // Reset si se mueve
+                    t.dwellTime = 0;
                 }
 
                 t.acceleration = deltaV;

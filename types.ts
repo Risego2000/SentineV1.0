@@ -1,4 +1,4 @@
-export type EntityType = 'forbidden' | 'lane_divider' | 'stop_line' | 'box_junction';
+export type EntityType = 'forbidden' | 'lane_divider' | 'stop_line' | 'box_junction' | 'pedestrian' | 'bus_lane';
 export type LogType = 'INFO' | 'WARN' | 'ERROR' | 'AI' | 'CORE';
 export type SeverityType = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -66,6 +66,7 @@ export interface InfractionLog {
     description: string;
     severity: SeverityType;
     image: string;
+    videoClip?: string; // Base64 or Blob URL of the 8s clip
     time: string;
     reasoning?: string[];
     legalArticle?: string;
@@ -77,6 +78,7 @@ export interface InfractionLog {
         speedEstimated: string;
         acceleration?: string;
     };
+    visualTimestamp?: string; // Timestamp visible en el video
     infraction: boolean;
 }
 

@@ -12,8 +12,8 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
     const {
         geometry,
         setGeometry,
-        isEditingGeometry,
-        setIsEditingGeometry
+        isMeshRenderEnabled,
+        setIsMeshRenderEnabled
     } = useSentinel();
 
     const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -30,13 +30,13 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                     setCurrentPoint(null);
                     setShowMenu(false);
                 } else {
-                    setIsEditingGeometry(false);
+                    setIsMeshRenderEnabled(false);
                 }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [startPoint, setIsEditingGeometry]);
+    }, [startPoint, setIsMeshRenderEnabled]);
 
     const getNormalizedPoint = (e: React.MouseEvent): Point => {
         if (!canvasRef.current) return { x: 0, y: 0 };
@@ -55,7 +55,7 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (!isEditingGeometry) return;
+        if (!isMeshRenderEnabled) return;
         if (showMenu) return;
         if (!canvasRef.current) return;
 
@@ -76,7 +76,7 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isEditingGeometry) return;
+        if (!isMeshRenderEnabled) return;
         if (startPoint && !showMenu) {
             setCurrentPoint(getNormalizedPoint(e));
         }
@@ -109,22 +109,22 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
 
     return (
         <div
-            className={`absolute inset-0 z-40 ${isEditingGeometry ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'}`}
+            className={`absolute inset-0 z-40 ${isMeshRenderEnabled ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'}`}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
         >
             {/* UI DE EDICIÓN (SOLO VISIBLE SI EDITAMOS) */}
-            {isEditingGeometry && (
+            {isMeshRenderEnabled && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/80 border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-full text-xs font-mono flex items-center gap-4 pointer-events-auto">
-                    <span className="uppercase font-bold animate-pulse">MODO EDICIÓN ACTIVO</span>
+                    <span className="uppercase font-bold animate-pulse">MESH_RENDER ACTIVO</span>
                     <div className="h-4 w-px bg-white/20" />
-                    <span className="text-slate-400">Click: Inicio/Fin</span>
-                    <span className="text-slate-400">ESC: Cancelar</span>
+                    <span className="text-slate-400 text-[10px]">Utiliza el MESH para calibrar sensores</span>
+                    <div className="h-4 w-px bg-white/20" />
                     <button onClick={removeLastLine} className="hover:text-white" title="Deshacer última">
                         <Trash2 size={14} />
                     </button>
                     <div className="h-4 w-px bg-white/20" />
-                    <button onClick={() => setIsEditingGeometry(false)} className="hover:text-white">
+                    <button onClick={() => setIsMeshRenderEnabled(false)} className="hover:text-white">
                         <X size={14} />
                     </button>
                 </div>
@@ -134,17 +134,24 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
             <svg className="w-full h-full pointer-events-none">
                 {geometry
                     .filter(line => !isNaN(line.x1) && !isNaN(line.x2))
-                    .map(line => (
-                        <line
-                            key={line.id}
-                            x1={`${line.x1 * 100}%`} y1={`${line.y1 * 100}%`}
-                            x2={`${line.x2 * 100}%`} y2={`${line.y2 * 100}%`}
-                            stroke={line.type === 'forbidden' ? '#ef4444' : line.type === 'stop_line' ? '#f59e0b' : '#06b6d4'}
-                            strokeWidth={line.type === 'lane_divider' ? "2" : "4"}
-                            strokeDasharray={line.type === 'lane_divider' ? "10, 5" : "0"}
-                            opacity={isEditingGeometry ? "0.6" : "0.9"}
-                        />
-                    ))}
+                    .map(line => {
+                        let strokeColor = '#06b6d4'; // Default Cyan
+                        if (line.type === 'forbidden' || line.type === 'stop_line') strokeColor = '#ef4444'; // Rojo (Infranqueable)
+                        if (line.type === 'pedestrian') strokeColor = '#06b6d4'; // Cian (Peatonal)
+                        if (line.type === 'bus_lane') strokeColor = '#f97316'; // Naranja (Carril Bus)
+
+                        return (
+                            <line
+                                key={line.id}
+                                x1={`${line.x1 * 100}%`} y1={`${line.y1 * 100}%`}
+                                x2={`${line.x2 * 100}%`} y2={`${line.y2 * 100}%`}
+                                stroke={strokeColor}
+                                strokeWidth={line.type === 'lane_divider' ? "2" : "4"}
+                                strokeDasharray={line.type === 'lane_divider' ? "10, 5" : "0"}
+                                opacity={isMeshRenderEnabled ? "0.9" : "0"}
+                            />
+                        );
+                    })}
 
                 {/* Línea actual siendo dibujada */}
                 {startPoint && currentPoint && (
@@ -187,6 +194,22 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] font-bold text-cyan-400 uppercase">División Carril</span>
+                        </div>
+                    </button>
+                    <button onClick={() => confirmLine('pedestrian', 'PEATONES')} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group">
+                        <div className="p-1.5 rounded bg-blue-500/20 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                            <ShieldAlert size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-blue-400 uppercase">Paso Peatones</span>
+                        </div>
+                    </button>
+                    <button onClick={() => confirmLine('bus_lane', 'CARRIL BUS')} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group">
+                        <div className="p-1.5 rounded bg-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                            <Box size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-orange-400 uppercase">Carril BUS</span>
                         </div>
                     </button>
                     <button onClick={() => {

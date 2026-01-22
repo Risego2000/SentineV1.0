@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
-import { GeometryLine, InfractionLog, SystemLog, Track, AppStats } from '../types';
+import { GeometryLine, InfractionLog, SystemLog, Track, AppStats, AuditPresetType } from '../types';
 import { AIService } from '../services/aiService';
 
 const MAX_LOGS = 50;
@@ -48,7 +48,7 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         }
     }, [hasApiKey, addLog]);
 
-    const runAudit = useCallback(async (track: Track, line: GeometryLine, directives: string) => {
+    const runAudit = useCallback(async (track: Track, line: GeometryLine, directives: string, auditPreset?: AuditPresetType) => {
         if (!hasApiKey) {
             addLog('ERROR', 'Unidad Forense: Error de Acceso. API Key no detectada.');
             return;
@@ -67,8 +67,8 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
 
         try {
             const timeCode = new Date().toLocaleTimeString();
-            addLog('AI', `[${timeCode}] Analizando infracción en "${line.label}" via Gemini...`);
-            const audit = await AIService.runAudit(track, line, directives);
+            addLog('AI', `[${timeCode}] Auditoría Táctica [ID:${track.id}] via Gemini...`);
+            const audit = await AIService.runAudit(track, line, directives, auditPreset);
 
             if (audit.infraction) {
                 addLog('WARN', `Unidad Forense: INFRACCIÓN CONFIRMADA [${audit.severity}] - ${audit.ruleCategory}`);
@@ -79,8 +79,9 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
                     ...audit,
                     id: Date.now(),
                     image: `data:image/jpeg;base64,${track.snapshots[0]}`,
+                    videoClip: track.videoClip, // Adjuntar el clip de video de 8s
+                    visualTimestamp: audit.visualTimestamp,
                     time: new Date().toLocaleTimeString(),
-                    date: new Date().toLocaleDateString()
                 }, ...prev]);
 
                 track.isInfractor = true;

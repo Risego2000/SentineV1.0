@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../components/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
+import { VideoBufferService } from '../services/videoRecorder';
 
 export const useFrameProcessor = () => {
     const {
@@ -12,7 +13,8 @@ export const useFrameProcessor = () => {
         isPoseEnabled,
         detect,
         detectPose,
-        setTracks
+        setTracks,
+        isAuditEnabled
     } = useSentinel();
 
     const trackerRef = useRef<ByteTracker>(new ByteTracker());
@@ -20,6 +22,7 @@ export const useFrameProcessor = () => {
     const frameCountRef = useRef(0);
     const isProcessingRef = useRef(false);
     const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const recorderRef = useRef<any>(null);
 
     const captureSnapshot = useCallback((video: HTMLVideoElement, track: any) => {
         if (!video || video.readyState < 2) {
@@ -127,15 +130,29 @@ export const useFrameProcessor = () => {
                             }
 
                             if (isInfraction) {
-                                const snapshotCaptured = captureSnapshot(v, t);
-                                if (snapshotCaptured) {
-                                    t.processedLines.push(line.id);
-                                    t.crossedLine = true;
-                                    t.audited = true;
-                                    t.auditStatus = 'pending';
+                                if (isAuditEnabled) {
+                                    const snapshotCaptured = captureSnapshot(v, t);
+                                    if (snapshotCaptured) {
+                                        t.processedLines.push(line.id);
+                                        t.crossedLine = true;
+                                        t.audited = true;
+                                        t.auditStatus = 'pending';
 
-                                    const auditLine = { ...line, label: infractionLabel };
-                                    runAudit(t, auditLine);
+                                        // Capturar Clip de Video (Asíncrono para no bloquear)
+                                        if (recorderRef.current) {
+                                            recorderRef.current.getClip().then((clip: string) => {
+                                                t.videoClip = clip;
+                                                const auditLine = { ...line, label: infractionLabel };
+                                                runAudit(t, auditLine);
+                                            });
+                                        } else {
+                                            const auditLine = { ...line, label: infractionLabel };
+                                            runAudit(t, auditLine);
+                                        }
+                                    }
+                                } else {
+                                    // Si la auditoría está desactivada, simplemente marcamos como procesado
+                                    t.processedLines.push(line.id);
                                 }
                             } else {
                                 t.processedLines.push(line.id);
@@ -148,13 +165,21 @@ export const useFrameProcessor = () => {
                             if (inZone) {
                                 t.lastZoneId = line.id;
                                 // Si el vehículo se queda atrapado en el cruce (velocidad ~0 y dwellTime > 5s)
-                                if (t.dwellTime > 5000 && !t.processedLines.includes(line.id + '_box')) {
+                                if (t.dwellTime > 5000 && !t.processedLines.includes(line.id + '_box') && isAuditEnabled) {
                                     console.log(`[FORENSIC] ID:${t.id} - BLOQUEO DE INTERSECCIÓN DETECTADO.`);
                                     const snap = captureSnapshot(v, t);
                                     if (snap) {
                                         t.processedLines.push(line.id + '_box');
                                         t.audited = true;
-                                        runAudit(t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
+
+                                        if (recorderRef.current) {
+                                            recorderRef.current.getClip().then((clip: string) => {
+                                                t.videoClip = clip;
+                                                runAudit(t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
+                                            });
+                                        } else {
+                                            runAudit(t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
+                                        }
                                     }
                                 }
                             } else if (t.lastZoneId === line.id) {
@@ -172,6 +197,12 @@ export const useFrameProcessor = () => {
 
         isProcessingRef.current = true;
         try {
+            // Inicializar grabador si no existe
+            if (!recorderRef.current && canvas) {
+                recorderRef.current = new VideoBufferService(canvas);
+                recorderRef.current.start();
+            }
+
             frameCountRef.current++;
             trackerRef.current.step();
 

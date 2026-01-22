@@ -13,9 +13,11 @@ const PRESETS = [
 
 export const GeometryTools = () => {
     const {
-        setIsEditingGeometry,
-        isEditingGeometry,
+        isMeshRenderEnabled,
+        setIsMeshRenderEnabled,
+        parseMeshDirectives,
         generateGeometry,
+        geometry,
         setGeometry,
         calibration,
         setCalibration,
@@ -23,7 +25,7 @@ export const GeometryTools = () => {
     } = useSentinel();
 
     const handleAutoDetect = () => {
-        generateGeometry("ANALIZA EL ENTORNO VIAL: Detecta carriles, líneas divisorias, zonas prohibidas y puntos de parada. Traza la geometría vectorial completa para monitorización de tráfico.", videoRef.current);
+        parseMeshDirectives();
     };
 
     const loadPreset = (id: string) => {
@@ -38,6 +40,35 @@ export const GeometryTools = () => {
         generateGeometry(prompts[id] || prompts.m113_highway, videoRef.current);
     };
 
+    const removeLine = (id: string) => {
+        const line = geometry.find(l => l.id === id);
+        if (line) {
+            // Eliminar de la geometría
+            setGeometry(geometry.filter(l => l.id !== id));
+
+            // Intentar eliminar del texto de directivas (Reverse Sync)
+            const label = line.label.toLowerCase();
+            let newDirectives = directives;
+
+            // Caso 1: Palabras clave
+            const keywords = ['continua', 'stop', 'peatones', 'bus', 'detención', 'cebra'];
+            keywords.forEach(kw => {
+                if (label.includes(kw) || kw.includes(label)) {
+                    const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+                    newDirectives = newDirectives.replace(regex, '');
+                }
+            });
+
+            // Caso 2: Sintaxis manual [LINE: ...]
+            const lineRegex = new RegExp(`\\[LINE:\\s*Y=\\d+,\\s*TYPE=\\w+,\\s*LABEL=${line.label}[^\\]]*\\]`, 'gi');
+            newDirectives = newDirectives.replace(lineRegex, '');
+
+            if (newDirectives !== directives) {
+                setDirectives(newDirectives.replace(/\s+/g, ' ').trim());
+            }
+        }
+    };
+
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -48,29 +79,28 @@ export const GeometryTools = () => {
 
             <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
 
-                {/* Editor Toggle */}
-                <button
-                    onClick={() => setIsEditingGeometry(!isEditingGeometry)}
-                    className={`w-full py-2 rounded-lg border flex items-center justify-center gap-2 transition-all ${isEditingGeometry
-                        ? 'bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                        : 'bg-black/30 text-slate-400 border-white/5 hover:border-white/20'
-                        }`}
-                >
-                    <PenTool size={12} />
-                    <span className="text-[10px] font-black uppercase">
-                        {isEditingGeometry ? 'Editor Visual Activo' : 'Activar Editor Visual'}
+                {/* Mesh Toggle */}
+                <div className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/10">
+                    <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2">
+                        MESH_RENDER
                     </span>
-                </button>
+                    <button
+                        onClick={() => setIsMeshRenderEnabled(!isMeshRenderEnabled)}
+                        className={`w-8 h-4 rounded-full relative transition-colors ${isMeshRenderEnabled ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                        <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isMeshRenderEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                </div>
 
-                {/* Auto Detection */}
+                {/* Auto Detection / MESH SYNTHESIS */}
                 <div className="grid grid-cols-2 gap-2">
                     <button
                         onClick={handleAutoDetect}
                         className="p-2 bg-black/20 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 rounded-lg flex flex-col items-center gap-1 transition-colors group"
                     >
-                        <Divide size={14} className="text-slate-500 group-hover:text-cyan-400" />
+                        <RefreshCw size={14} className="text-slate-500 group-hover:text-cyan-400" />
                         <span className="text-[8px] font-bold text-slate-500 group-hover:text-cyan-400 uppercase text-center leading-none">
-                            Detección Auto Vía
+                            AUTOMATIC MESH SYNTHESIS
                         </span>
                     </button>
                     <button
@@ -83,20 +113,36 @@ export const GeometryTools = () => {
                     </button>
                 </div>
 
+                {/* Active Line Tags */}
+                {geometry.length > 0 && (
+                    <div className="space-y-2">
+                        <span className="text-[9px] font-bold text-slate-600 uppercase block pl-1">Sensores Activos</span>
+                        <div className="flex flex-wrap gap-1">
+                            {geometry.map(line => (
+                                <div key={line.id} className="flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
+                                    <span className="text-[8px] font-bold text-cyan-400 uppercase">{line.label}</span>
+                                    <button onClick={() => removeLine(line.id)} className="text-cyan-500/50 hover:text-cyan-400">
+                                        <ShieldAlert size={10} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Presets */}
-                <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-slate-600 uppercase block pl-1">Plantillas Rápidas</span>
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                    <span className="text-[9px] font-bold text-slate-600 uppercase block pl-1">Protocolos de Vía</span>
                     <div className="grid grid-cols-3 gap-1">
                         {PRESETS.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => loadPreset(preset.id)}
-                                className="p-2 bg-slate-800/50 hover:bg-white/5 border border-white/5 rounded-lg flex flex-col items-center justify-center gap-1.5 transition-all"
-                                title={preset.label}
+                                className="p-2 bg-slate-800/50 hover:bg-white/5 border border-white/5 rounded-lg flex flex-col items-center justify-center gap-1.5 transition-all text-center"
                             >
                                 <preset.icon size={12} className="text-slate-400" />
-                                <span className="text-[7px] font-black text-slate-500 uppercase tracking-wide">
-                                    {preset.label.split(' ')[0]}
+                                <span className="text-[7px] font-black text-slate-500 uppercase tracking-tight">
+                                    {preset.label.split(' ').slice(1).join(' ') || preset.label}
                                 </span>
                             </button>
                         ))}
@@ -117,7 +163,6 @@ export const GeometryTools = () => {
                         className="w-12 bg-transparent text-right text-[10px] font-mono text-cyan-500 outline-none border-b border-white/10 focus:border-cyan-500"
                     />
                 </div>
-
             </div>
         </div>
     );

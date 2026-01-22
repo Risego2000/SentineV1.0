@@ -1,27 +1,26 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GeometryLine, InfractionLog, Track, SeverityType } from "../types";
+import { GeometryLine, Track } from "../types";
 import { logger } from "./logger";
+import { AUDIT_PRESETS, AuditPresetType } from "../constants";
 
 /**
  * Servicio encargado de la comunicación con los modelos de IA de Google Gemini.
  * Implementa validación de seguridad y sanitización de contenido.
  */
 const getAIClient = () => {
-    // Vite uses import.meta.env
     const apiKey = (import.meta as any).env.VITE_GOOGLE_GENAI_KEY;
-
     if (!apiKey) {
         logger.error('AI_SERVICE', 'Falta la API Key de Gemini (VITE_GOOGLE_GENAI_KEY)');
         throw new Error("API Key missing");
     }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI(apiKey);
 };
 
 /**
  * Sanitiza texto para prevenir inyección de scripts básicos (XSS).
  */
 export const sanitizeText = (text: string): string => {
-    return text
+    return (text || "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -35,15 +34,47 @@ export interface GeometryResponse {
 }
 
 export const AIService = {
+    /**
+     * Motor Geométrico de Sentinel AI.
+     */
     async generateGeometry(directives: string, instruction?: string, image?: string): Promise<GeometryResponse> {
-        const ai = getAIClient();
+        const genAI = getAIClient();
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash',
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        lines: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    id: { type: Type.STRING },
+                                    x1: { type: Type.NUMBER },
+                                    y1: { type: Type.NUMBER },
+                                    x2: { type: Type.NUMBER },
+                                    y2: { type: Type.NUMBER },
+                                    label: { type: Type.STRING },
+                                    type: { type: Type.STRING }
+                                },
+                                required: ["x1", "y1", "x2", "y2", "label", "type"]
+                            }
+                        },
+                        suggestedDirectives: { type: Type.STRING }
+                    },
+                    required: ["lines", "suggestedDirectives"]
+                }
+            }
+        });
 
         const prompt = `DIRECTIVAS DE INFRACCIÓN: "${directives}". PETICIÓN ADICIONAL: "${instruction || 'Generación automática de geometría'}". 
       
       Eres el motor geométrico de Sentinel AI. Tu misión CRÍTICA es crear una geometría de detección precisa basada en las directivas de infracción proporcionadas y la IMAGEN DE LA ESCENA adjunta.
       
       ANÁLISIS VISUAL OBLIGATORIO:
-      1. Observa la imagen proporcionada del vial (si está presente).
+      1. Observa la imagen proporcionada del vial.
       2. Identifica los carriles, líneas divisorias, y señales de tráfico (STOP, pasos de cebra).
       3. Coloca los vectores geométricos (x1, y1, x2, y2) EXACTAMENTE sobre las marcas viales visibles en el video.
       4. Si las directivas piden "Cruce Línea Continua", traza líneas 'lane_divider' sobre las líneas reales de la carretera.
@@ -51,11 +82,11 @@ export const AIService = {
       
       REGLAS DE GENERACIÓN DE JSON:
       - Genera un JSON con un array "lines".
-      - Coordenadas (x1, y1, x2, y2) normalizadas entre 0 y 1 respecto a la imagen.
+      - Coordenadas (x1, y1, x2, y2) normalizadas entre 0 y 1 respecto a la imagen (0,0 es arriba-izquierda, 1,1 abajo-derecha).
       - "label": Nombre corto y técnico de la zona.
-      - "type": 'forbidden', 'stop_line', 'lane_divider' o 'box_junction'.
+      - "type": 'forbidden', 'stop_line', 'lane_divider', 'box_junction', 'pedestrian' o 'bus_lane'.
       
-      IMPORTANTE: No te limites a coordenadas genéricas. Adapta la geometría a la PERSPECTIVA de la cámara en el video.
+      IMPORTANTE: Adapta la geometría a la PERSPECTIVA de la cámara en el video. No asumas que la carretera es horizontal.
       
       RETORNA ÚNICAMENTE EL JSON.`;
 
@@ -69,175 +100,162 @@ export const AIService = {
             });
         }
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: { parts },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        lines: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    id: { type: Type.STRING },
-                                    x1: { type: Type.NUMBER }, y1: { type: Type.NUMBER },
-                                    x2: { type: Type.NUMBER }, y2: { type: Type.NUMBER },
-                                    label: { type: Type.STRING },
-                                    type: { type: Type.STRING }
-                                }
-                            }
-                        },
-                        suggestedDirectives: { type: Type.STRING }
-                    }
-                }
-            }
-        });
-        const responseText = response.text.trim();
-        let cleanJson = responseText;
-
-        // Remove markdown backticks if present
-        if (responseText.includes("```json")) {
-            cleanJson = responseText.split("```json")[1].split("```")[0].trim();
-        } else if (responseText.includes("```")) {
-            cleanJson = responseText.split("```")[1].split("```")[0].trim();
-        }
-
-        // AGGRESSIVE CLEANUP: Fix cases where AI returns floats with hundreds of decimals
-        cleanJson = cleanJson.replace(/(\d+\.\d{6})\d+/g, "$1");
-
-        // TRUNCATED JSON FALLBACK: If the JSON is cut off, try to close it
-        let openBraces = (cleanJson.match(/\{/g) || []).length;
-        let closeBraces = (cleanJson.match(/\}/g) || []).length;
-        if (openBraces > closeBraces) {
-            // Very basic repair: if we have an unclosed array or object, close it
-            if (cleanJson.includes('"lines": [') && !cleanJson.includes(']')) {
-                cleanJson += ']}';
-            } else if (openBraces > closeBraces) {
-                cleanJson += '}'.repeat(openBraces - closeBraces);
-            }
-        }
-
         try {
-            const data = JSON.parse(cleanJson);
+            const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+            const response = result.response;
+            const responseText = response.text();
 
-            // VALIDACIÓN: Asegurar que las coordenadas son seguras
+            let cleanJson = responseText.trim();
+            if (cleanJson.includes("```json")) {
+                cleanJson = cleanJson.split("```json")[1].split("```")[0].trim();
+            } else if (cleanJson.includes("```")) {
+                cleanJson = cleanJson.split("```")[1].split("```")[0].trim();
+            }
+
+            const data = JSON.parse(cleanJson);
             const validatedLines = (data.lines || [])
                 .filter((l: any) =>
                     typeof l.x1 === 'number' && !isNaN(l.x1) &&
                     typeof l.y1 === 'number' && !isNaN(l.y1)
                 )
-                .slice(0, 10) as GeometryLine[];
+                .map((l: any) => ({
+                    ...l,
+                    id: l.id || `ai_${Math.random().toString(36).substr(2, 9)}`
+                }))
+                .slice(0, 15) as GeometryLine[];
 
             return {
                 lines: validatedLines,
                 suggestedDirectives: sanitizeText(data.suggestedDirectives || "")
             };
         } catch (e) {
-            logger.error("AI_SERVICE", "Error al parsear JSON de geometría", { json: cleanJson });
+            logger.error("AI_SERVICE", "Error en generación de geometría", e);
             throw new Error("Respuesta de IA con formato incorrecto");
         }
     },
 
     /**
-     * Realiza una auditoría visual y cinemática de una maniobra.
-     * @param track Información de trayectoria y capturas del vehículo.
-     * @param line Línea o zona con la que interactuó.
-     * @param directives Protocolos de seguridad vigentes.
+     * AUDITOR FORENSE SUPREMO de SENTINEL.AI v.1.0
+     * Unidad de Peritaje Judicial - Daganzo de Arriba (Madrid).
      */
-    async runAudit(track: Track, line: GeometryLine, directives: string) {
-        const ai = getAIClient();
+    async runAudit(track: Track, line: GeometryLine, directives: string, auditPreset: AuditPresetType = 'standard') {
+        const genAI = getAIClient();
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash',
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        });
 
-        // Resumen cinemático para la IA
+        const presetInfo = AUDIT_PRESETS[auditPreset];
+
+        // Resumen cinemático preciso (Capa Edge)
         const kinematicData = {
-            avgVelocity: (track.avgVelocity * 100).toFixed(2), // Escala visual 0-100
-            currentSpeed: (track.velocity * 100).toFixed(2),
+            velocityKmH: track.avgVelocity.toFixed(1) + " km/h",
             acceleration: (track.acceleration * 100).toFixed(4),
             heading: (track.heading * 180 / Math.PI).toFixed(2) + "°",
+            dwellTime: (track.dwellTime / 1000).toFixed(2) + "s",
             trajectoryPoints: track.tail.length,
-            label: track.label
+            label: track.label,
+            isAnomalous: track.isAnomalous ? 'SÍ' : 'NO'
         };
 
-        // Preparar evidencias (Contexto + Zoom)
-        const evidenceParts = track.snapshots.map((data, index) => ({
+        const evidenceParts = track.snapshots.map((data) => ({
             inlineData: {
                 mimeType: 'image/jpeg',
                 data
             }
         }));
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: {
-                parts: [
-                    ...evidenceParts,
-                    {
-                        text: `SENTINEL AI - UNIDAD DE AUDITORÍA FORENSE OMNI-V1.6
+        const promptText = `Eres el AUDITOR FORENSE SUPREMO de SENTINEL.AI v.1.0, el sistema de infraestructura forense neural de última generación desplegado por la Policía Local de Daganzo de Arriba (Madrid).
+                      
+                      CONTEXTO TÉCNICO (CAPA EDGE):
+                      - Modelo de Detección: MediaPipe EfficientDet-Lite2 / Neural Motor
+                      - Tracking: Filtro de Kalman (8D) + Algoritmo Húngaro.
+                      - Geometría: Espacio normalizado 1000x1000 píxeles.
                       
                       EVIDENCIA DISPONIBLE:
-                      - Imag 1: Contexto Escena Completa.
-                      - Imag 2: Zoom Táctico de Alta Resolución (para identificación de placa/detalles).
+                      - Secuencia de capturas tácticas del vehículo (snapshots).
+                      - Telemetría vectorial en tiempo real.
                       
-                      DATOS TELEMÉTRICOS (UNIDAD VECTORIAL):
+                      DATOS TELEMÉTRICOS CERTIFICADOS:
                       - VEHÍCULO: ${kinematicData.label} (ID: ${track.id})
-                      - VELOCIDAD MEDIA: ${kinematicData.avgVelocity} pts
-                      - ACELERACIÓN ACTUAL: ${kinematicData.acceleration} pts/f
-                      - VECTOR DE RUMBO: ${kinematicData.heading}
+                      - VELOCIDAD: ${kinematicData.velocityKmH}
+                      - ACELERACIÓN: ${kinematicData.acceleration} pts/f
+                      - DWELL_TIME (ZONA): ${kinematicData.dwellTime}
+                      - COMPORTAMIENTO ANÓMALO: ${kinematicData.isAnomalous}
                       
-                      CONFIGURACIÓN GEOMÉTRICA:
-                      - ZONA ACTIVADA: "${line.label}" (Tipo: ${line.type})
-                      - PROTOCOLO VIGENTE:
-                      ${directives}
+                      CONFIGURACIÓN GEOMÉTRICA ACTIVADA:
+                      - SENSORES AFECTADOS: "${line.label}" (Tipo: ${line.type})
+                      - PROTOCOLO VIGENTE: "${directives}"
+                      - PRESET DE AUDITORÍA: "${presetInfo.label}" (${presetInfo.instructions})
                       
                       MISIÓN DE PERITAJE JUDICIAL:
-                      Actúa como un Perito de Tráfico Avanzado. Analiza la secuencia de imágenes (Contexto + Zoom) y la telemetría para generar un Expediente Forense vinculante.
+                      Como Perito Supremo, debes seguir estrictamente este flujo forense:
                       
-                      PROCEDIMIENTO OBLIGATORIO:
-                      1. IDENTIFICACIÓN TÉCNICA: Indica Marca, Modelo y Color dominante del vehículo.
-                      2. OCR MATRICULAR: Lee la placa (plate) con precisión quirúrgica en el Zoom Táctico.
-                      3. ANÁLISIS CONDUCTUAL: Valida si la maniobra (intersección, giro, dwellTime) viola el protocolo.
-                      4. BASE LEGAL (RGC): Cita los artículos del Reglamento General de Circulación infringidos.
+                      1. ANÁLISIS VISUAL: Identifica Marca, Modelo, Color y extrae Matrícula (OCR).
+                      2. DETECCIÓN DE MANIOBRA: Clasifica el movimiento (Giro, Detención, Invasión de Carril, etc.).
+                      3. CLASIFICACIÓN TÉCNICA (SISTEMA SENTINEL):
+                         - TIPO_A: Infracción Geométrica Directa (Línea Continua, Sentido Contrario).
+                         - TIPO_B: Infracción de Zona (Box Junction, Carga y Descarga, Stop).
+                         - TIPO_C: Conducta Peligrosa (Aceleración/Frenada brusca, Zigzag).
+                         - TIPO_D: Incumplimiento Normativo (Carril BUS, Prioridad Peatonal).
+                      4. ANÁLISIS PREDICTIVO Y DE COMPORTAMIENTO:
+                         - Riesgo Inmediato: Probabilidad de colisión en el momento.
+                         - Distracción: Si el vehículo muestra trayectoria errática o el conductor usa móvil.
+                      5. EVALUACIÓN LEGAL: Cita artículos específicos del RGC (Reglamento General de Circulación).
                       
                       RETORNA ÚNICAMENTE JSON EN ESTE FORMATO:
                       {
                         "infraction": boolean,
                         "plate": "TEXTO_MATRICULA o DESCONOCIDO",
                         "makeModel": "MARCA MODELO",
-                        "color": "COLOR VEHÍCULO",
-                        "description": "Relato técnico detallado de la maniobra",
+                        "color": "COLOR",
+                        "description": "Relato técnico forense detallado de los hechos",
                         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
-                        "ruleCategory": "Categoría DGT",
-                        "legalBase": "Artículos del RGC vinculados (ej: Art 154, Art 151.2)",
-                        "reasoning": ["Hecho 1: Posición respecto a línea", "Hecho 2: Telemetría vs Protocolo"],
+                        "ruleCategory": "TIPO_A|TIPO_B|TIPO_C|TIPO_D",
+                        "legalBase": "Artículos específicos del RGC (Art 154, Art 151, etc.)",
+                        "reasoning": ["Evidencia 1", "Evidencia 2", "Evidencia 3"],
+                        "visualTimestamp": "Extracción de reloj visible o HH:MM:SS de la escena",
                         "telemetry": { 
-                           "speedEstimated": "Velocidad aprox en reporte",
-                           "acceleration": "Tendencia de aceleración"
+                           "speedEstimated": "${kinematicData.velocityKmH}",
+                           "behaviorAnomalies": "Descripción de conducta"
                         }
                       }
                       
-                      Idioma: ESPAÑOL TÉCNICO FORENSE.` }
-                ]
-            },
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
+                      Idioma: ESPAÑOL TÉCNICO FORENSE GARANTISTA.`;
 
         try {
-            const rawData = JSON.parse(response.text.trim());
+            const result = await model.generateContent({
+                contents: [{
+                    role: 'user',
+                    parts: [
+                        ...evidenceParts,
+                        { text: promptText }
+                    ]
+                }]
+            });
+            const response = result.response;
+            const responseText = response.text();
 
-            // SANITIZACIÓN: Limpiar campos de texto antes de entregarlos al UI
+            let cleanJson = responseText.trim();
+            if (cleanJson.includes("```json")) {
+                cleanJson = cleanJson.split("```json")[1].split("```")[0].trim();
+            } else if (cleanJson.includes("```")) {
+                cleanJson = cleanJson.split("```")[1].split("```")[0].trim();
+            }
+
+            const rawData = JSON.parse(cleanJson);
             return {
                 ...rawData,
                 plate: sanitizeText(rawData.plate || 'DESCONOCIDO'),
                 description: sanitizeText(rawData.description || 'Sin descripción'),
                 ruleCategory: sanitizeText(rawData.ruleCategory || 'VIOLACIÓN_VIAL'),
-                reasoning: (rawData.reasoning || []).map((r: string) => sanitizeText(r))
+                reasoning: (rawData.reasoning || []).map((r: string) => sanitizeText(r)),
+                visualTimestamp: sanitizeText(rawData.visualTimestamp || '--:--:--')
             };
         } catch (e) {
-            logger.error("AI_SERVICE", "Error en auditoría forense", { result: response.text });
+            logger.error("AI_SERVICE", "Error en auditoría forense", e);
             return { infraction: false, description: "Error en análisis forense" };
         }
     }

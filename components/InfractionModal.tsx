@@ -89,13 +89,26 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 backdrop-blur-2xl animate-in fade-in duration-300">
             <div className="bg-[#050914] w-full max-w-5xl h-[85vh] rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
                 <div className="flex-1 flex flex-col lg:flex-row">
-                    <div className="flex-1 relative bg-black flex items-center justify-center"><img src={log.image} className="w-full h-full object-cover" /></div>
+                    <div className="flex-1 relative bg-black flex items-center justify-center">
+                        {log.videoClip ? (
+                            <video
+                                src={log.videoClip}
+                                controls
+                                autoPlay
+                                loop
+                                className="w-full h-full object-contain"
+                            />
+                        ) : (
+                            <img src={log.image} className="w-full h-full object-cover" />
+                        )}
+                    </div>
                     <div className="w-full lg:w-[450px] p-10 flex flex-col bg-slate-950/50 border-l border-white/5 overflow-y-auto">
                         <button onClick={onClose} className="self-end p-2 text-slate-500 hover:text-white mb-4"><X size={24} /></button>
                         <div className="space-y-8">
                             <div><span className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-2 block">Captura Forense</span><h2 className="text-4xl font-black text-white italic tracking-tighter">{log.ruleCategory}</h2></div>
                             <div className="bg-black/60 p-6 rounded-3xl border border-white/5 space-y-4">
                                 <div className="flex justify-between items-center pb-4 border-b border-white/5"><span className="text-[10px] font-black text-slate-500 uppercase">Vehículo</span><span className="text-2xl font-mono font-black text-cyan-400">{log.plate || 'SENT-IA'}</span></div>
+                                <div className="flex justify-between items-center pb-4 border-b border-white/5"><span className="text-[10px] font-black text-slate-500 uppercase">Cronomarca Video</span><span className="text-xl font-mono font-bold text-amber-500">{log.visualTimestamp || '--:--:--'}</span></div>
                                 <div className="flex justify-between"><span className="text-[10px] font-black text-slate-500 uppercase">Gravedad</span><span className="text-xl font-black text-red-600 uppercase italic">{log.severity}</span></div>
                             </div>
                             <div className="space-y-4">
