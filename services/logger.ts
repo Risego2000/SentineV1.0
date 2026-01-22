@@ -3,7 +3,7 @@
  * Proporciona trazabilidad centralizada con niveles de severidad y visualización formateada.
  */
 
-type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'SUCCESS' | 'CORE';
+type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'SUCCESS' | 'CORE' | 'AI';
 
 interface LogEntry {
     timestamp: string;
@@ -60,6 +60,7 @@ class TacticalLogger {
             case 'DEBUG': return '#8b5cf6'; // Violet
             case 'SUCCESS': return '#10b981'; // Emerald
             case 'CORE': return '#d946ef'; // Fuchsia
+            case 'AI': return '#06b6d4'; // Cyan
             default: return '#9ca3af'; // Gray
         }
     }
@@ -86,6 +87,10 @@ class TacticalLogger {
 
     public core(category: string, message: string, data?: any) {
         this.log('CORE', category, message, data);
+    }
+
+    public ai(category: string, message: string, data?: any) {
+        this.log('AI', category, message, data);
     }
 
     public getLogs(): LogEntry[] {
