@@ -61,7 +61,7 @@ export const useNeuralCore = ({ onLog, confidenceThreshold, isPoseEnabled }: Use
                 logger.ai('NEURAL_CORE', 'Unidad de Detección Visual Calibrada y Activa.');
             }
 
-            setStatusLabel('NÚCLEO_OPERATIVO');
+            setStatusLabel('NEURAL_SENTINEL_V11');
             setStatus('ready');
 
         } catch (e: any) {

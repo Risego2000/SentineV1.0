@@ -23,10 +23,10 @@ export const SystemStatus = () => {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-mono text-cyan-400 font-bold italic tracking-tight">
-                                EFFICIENTDET_LITE0
+                                NEURAL_SENTINEL_V11
                             </span>
                             <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-500/30 text-cyan-400 tracking-tighter uppercase shadow-sm">
-                                NÚCLEO_OPERATIVO
+                                640PX_ACCURATE
                             </span>
                         </div>
                     </div>

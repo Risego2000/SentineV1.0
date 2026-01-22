@@ -49,11 +49,46 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
     // Filtrar logs
     const incidentLogs = logs.filter(l => l.type === 'infraction');
 
-    return (
-        <div className="absolute bottom-[90px] left-6 right-80 z-40 px-4">
-            {/* Contenedor Táctico */}
-            <div className="relative group">
+    // Formateador de tiempo táctico
+    const formatTime = (seconds: number) => {
+        if (isNaN(seconds)) return "00:00";
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        const f = Math.floor((seconds % 1) * 100); // centésimas para el toque pro
 
+        let res = "";
+        if (h > 0) res += `${h.toString().padStart(2, '0')}:`;
+        res += `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${res}.${f.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="absolute bottom-[85px] left-6 right-80 z-40">
+            {/* Header del Timeline: Código de Tiempo */}
+            <div className="flex justify-between items-end mb-2 px-1">
+                <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-cyan-500/50 uppercase tracking-[0.2em]">Live Vector Tracking</span>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-black text-white font-mono tracking-tighter shadow-cyan-500/20 drop-shadow-md">
+                            {formatTime(progress * duration / 100)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 font-mono">
+                            / {formatTime(duration)}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="text-right">
+                    <span className="text-[9px] font-black text-red-500/50 uppercase tracking-[0.2em]">Incidents Detected</span>
+                    <div className="text-xs font-black text-red-500 font-mono tracking-widest">
+                        {incidentLogs.length.toString().padStart(2, '0')}
+                    </div>
+                </div>
+            </div>
+
+            {/* Contenedor Táctico de la Barra */}
+            <div className="relative group">
                 {/* Fondo y Borde Táctico */}
                 <div
                     ref={timelineRef}
@@ -67,11 +102,6 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
                     >
                         <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
                     </div>
-
-                    {/* Scanline Effect on Hover */}
-                    <div className="absolute inset-0 bg-repeat-x opacity-0 group-hover:opacity-10 pointer-events-none"
-                        style={{ backgroundImage: 'linear-gradient(90deg, transparent 50%, rgba(6,182,212,0.1) 50%)', backgroundSize: '4px 100%' }}
-                    />
                 </div>
 
                 {/* Marcadores de Incidentes (Flotando ENCIMA de la barra) */}
@@ -97,12 +127,7 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
                             <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none">
                                 <span className="text-[10px] font-black text-white uppercase block">{log.ruleCategory}</span>
                                 <span className="text-[9px] text-red-400 font-mono tracking-wider">{log.plate}</span>
-                                {/* Triángulo conector */}
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-LR border-transparent border-t-red-500/50 border-4 border-b-0" />
                             </div>
-
-                            {/* Línea conectora visual a la barra */}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-red-500 to-transparent pointer-events-none opacity-50" />
                         </div>
                     );
                 })}
