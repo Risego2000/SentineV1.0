@@ -1,17 +1,18 @@
 export const TRACK_SMOOTHING = 0.4;
 
 export const VEHICLE_COLORS: Record<string, string> = {
-    car: '#06b6d4', truck: '#f59e0b', motorcycle: '#8b5cf6', bus: '#10b981', person: '#f43f5e'
+    car: '#06b6d4', truck: '#f59e0b', motorcycle: '#8b5cf6', bus: '#10b981', person: '#f43f5e', bicycle: '#22d3ee'
 };
 
-export const RELEVANT_CLASSES = ['car', 'truck', 'motorcycle', 'bus', 'person'];
+export const RELEVANT_CLASSES = ['car', 'truck', 'motorcycle', 'bus', 'person', 'bicycle'];
 
 export const LABEL_MAP: Record<string, string> = {
     car: 'VEHÍCULO',
     truck: 'CAMIÓN',
     motorcycle: 'MOTO',
     bus: 'BUS',
-    person: 'PEATÓN'
+    person: 'PEATÓN',
+    bicycle: 'CICLISTA'
 };
 
 // MediaPipe Assets - Upgraded to Lite2 for better accuracy (Fastest + Most Accurate balance)
@@ -62,6 +63,17 @@ export const DETECTION_PRESETS = {
             detectionSkip: 2,
             persistence: 40,
             predictionLookahead: 20
+        }
+    },
+    audit: {
+        label: 'AUDITORÍA FORENSE',
+        description: 'Máxima sensibilidad y rastreo frame a frame.',
+        config: {
+            confidenceThreshold: 0.20,
+            nmsThreshold: 0.35,
+            detectionSkip: 1,
+            persistence: 60,
+            predictionLookahead: 30
         }
     }
 };

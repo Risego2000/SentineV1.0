@@ -160,8 +160,6 @@ export class ByteTracker {
                 t.score = d.score;
                 t.missedFrames = 0;
                 t.isCoasting = false;
-                t.tail.push({ x: cx, y: cy });
-                if (t.tail.length > 100) t.tail.shift();
             }
         }
 
