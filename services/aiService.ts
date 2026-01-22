@@ -7,9 +7,11 @@ import { logger } from "./logger";
  * Implementa validación de seguridad y sanitización de contenido.
  */
 const getAIClient = () => {
-    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY;
+    // Vite uses import.meta.env
+    const apiKey = (import.meta as any).env.VITE_GOOGLE_GENAI_KEY;
+
     if (!apiKey) {
-        logger.error('AI_SERVICE', 'Falta la API Key de Gemini');
+        logger.error('AI_SERVICE', 'Falta la API Key de Gemini (VITE_GOOGLE_GENAI_KEY)');
         throw new Error("API Key missing");
     }
     return new GoogleGenAI({ apiKey });
