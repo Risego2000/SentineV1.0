@@ -98,13 +98,22 @@ export const App = () => {
         e.target.value = '';
     };
 
-    // Sync Video Control
+    // Sync Video Control & Events
     useEffect(() => {
-        if (videoRef.current) {
-            if (isPlaying) videoRef.current.play().catch(e => console.error("Play error:", e));
-            else videoRef.current.pause();
+        const v = videoRef.current;
+        if (v) {
+            if (isPlaying) v.play().catch(e => console.error("Play error:", e));
+            else v.pause();
+
+            const handleEnded = () => {
+                setIsPlaying(false);
+                addLog('INFO', 'Análisis finalizado: Fin de la transmisión.');
+            };
+
+            v.addEventListener('ended', handleEnded);
+            return () => v.removeEventListener('ended', handleEnded);
         }
-    }, [isPlaying]);
+    }, [isPlaying, addLog, setIsPlaying]);
 
     return (
         <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">

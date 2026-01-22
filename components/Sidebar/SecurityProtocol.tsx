@@ -69,38 +69,42 @@ export const SecurityProtocol = () => {
                 </div>
 
                 {/* Visualizador de Reglas (Cards) */}
-                <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                     {parsedRules.length === 0 ? (
-                        <div className="text-center py-4 border border-dashed border-white/5 rounded-lg">
-                            <span className="text-[9px] text-slate-600 uppercase">Sin Protocolos Activos</span>
+                        <div className="text-center py-6 border border-dashed border-white/5 rounded-xl bg-black/20">
+                            <span className="text-[9px] text-slate-600 uppercase font-black tracking-widest animate-pulse">
+                                [ SISTEMA MONITORIZANDO SIN RESTRICCIONES ]
+                            </span>
                         </div>
                     ) : (
                         parsedRules.map(rule => (
                             <div
                                 key={rule.id}
-                                className={`p-2.5 rounded-lg border flex items-start gap-3 transition-all ${rule.type === 'CRITICAL' ? 'bg-red-950/20 border-red-500/30' :
-                                        rule.type === 'WARNING' ? 'bg-amber-950/20 border-amber-500/30' :
-                                            'bg-cyan-950/20 border-cyan-500/20'
+                                className={`p-4 rounded-xl border-2 flex items-start gap-4 transition-all hover:scale-[1.02] duration-300 ${rule.type === 'CRITICAL'
+                                        ? 'bg-[#0f0505]/95 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                                        : rule.type === 'WARNING'
+                                            ? 'bg-[#0f0a05]/95 border-amber-500/40'
+                                            : 'bg-[#050a0f]/95 border-cyan-500/30'
                                     }`}
                             >
-                                <div className={`mt-0.5 shrink-0 ${rule.type === 'CRITICAL' ? 'text-red-500' :
-                                        rule.type === 'WARNING' ? 'text-amber-500' :
-                                            'text-cyan-500'
+                                <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 ${rule.type === 'CRITICAL' ? 'text-red-500 border-red-500/40 bg-red-500/5' :
+                                        rule.type === 'WARNING' ? 'text-amber-500 border-amber-500/40 bg-amber-500/5' :
+                                            'text-cyan-500 border-cyan-500/40 bg-cyan-500/5'
                                     }`}>
-                                    {rule.type === 'CRITICAL' ? <AlertOctagon size={14} /> :
-                                        rule.type === 'WARNING' ? <AlertTriangle size={14} /> :
-                                            <Info size={14} />}
+                                    {rule.type === 'CRITICAL' ? <AlertOctagon size={18} strokeWidth={2.5} /> :
+                                        rule.type === 'WARNING' ? <AlertTriangle size={18} strokeWidth={2.5} /> :
+                                            <Info size={18} strokeWidth={2.5} />}
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className={`text-[8px] font-black uppercase tracking-wider mb-0.5 ${rule.type === 'CRITICAL' ? 'text-red-400' :
-                                            rule.type === 'WARNING' ? 'text-amber-400' :
-                                                'text-cyan-400'
+                                <div className="flex flex-col gap-1">
+                                    <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${rule.type === 'CRITICAL' ? 'text-red-500/90' :
+                                            rule.type === 'WARNING' ? 'text-amber-500/90' :
+                                                'text-cyan-500/90'
                                         }`}>
                                         {rule.type === 'CRITICAL' ? 'PROHIBICIÓN ESTRICTA' :
-                                            rule.type === 'WARNING' ? 'PRECAUCIÓN' :
-                                                'NORMATIVA'}
+                                            rule.type === 'WARNING' ? 'PRECAUCIÓN OPERATIVA' :
+                                                'DIRECTIVA DE SISTEMA'}
                                     </span>
-                                    <span className="text-[10px] font-medium text-slate-300 uppercase leading-snug">
+                                    <span className="text-[11px] font-bold text-slate-200 uppercase leading-[1.4] tracking-tight">
                                         {rule.content}
                                     </span>
                                 </div>

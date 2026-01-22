@@ -31,7 +31,6 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
                 ref={videoRef}
                 playsInline
                 muted
-                loop
                 className="absolute inset-0 w-full h-full object-contain"
                 style={{ opacity: 0 }} // Mantener oculto pero renderizado para que MediaPipe pueda leerlo
             />
