@@ -240,6 +240,7 @@ export class ByteTracker {
                     heading: 0,
                     acceleration: 0,
                     headingChange: 0,
+                    dwellTime: 0, // Iniciar temporizador de permanencia
                     isAnomalous: false,
                     processedLines: []
                 });
