@@ -21,9 +21,20 @@ export const MEDIAPIPE_WASM_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/task
 export const MEDIAPIPE_POSE_PATH = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 export const DETECTION_PRESETS = {
+    performance: {
+        label: 'RENDIMIENTO LIVE',
+        description: 'Optimizado para fluidez máxima y menor consumo.',
+        config: {
+            confidenceThreshold: 0.45,
+            nmsThreshold: 0.50,
+            detectionSkip: 4,
+            persistence: 15,
+            predictionLookahead: 10
+        }
+    },
     standard: {
-        label: 'ESTÁNDAR',
-        description: 'Equilibrio óptimo para flujo vehicular constante.',
+        label: 'MODO PATRULLA',
+        description: 'Equilibrio ideal para vigilancia urbana continua.',
         config: {
             confidenceThreshold: 0.35,
             nmsThreshold: 0.45,
@@ -33,47 +44,25 @@ export const DETECTION_PRESETS = {
         }
     },
     precision: {
-        label: 'ALTA PRECISIÓN',
-        description: 'Análisis exhaustivo, ideal para auditoría forense.',
+        label: 'ALTA DEFINICIÓN',
+        description: 'Mayor rango de detección en escenas complejas.',
         config: {
-            confidenceThreshold: 0.25,
+            confidenceThreshold: 0.28,
             nmsThreshold: 0.40,
             detectionSkip: 1,
-            persistence: 50,
+            persistence: 45,
             predictionLookahead: 25
-        }
-    },
-    performance: {
-        label: 'RENDIMIENTO',
-        description: 'Máxima fluidez, optimizado para live feeds y móviles.',
-        config: {
-            confidenceThreshold: 0.45,
-            nmsThreshold: 0.50,
-            detectionSkip: 4,
-            persistence: 15,
-            predictionLookahead: 10
-        }
-    },
-    urban: {
-        label: 'TRÁFICO URBANO',
-        description: 'Especializado en peatones y tráfico denso lento.',
-        config: {
-            confidenceThreshold: 0.30,
-            nmsThreshold: 0.45,
-            detectionSkip: 2,
-            persistence: 40,
-            predictionLookahead: 20
         }
     },
     audit: {
         label: 'AUDITORÍA FORENSE',
-        description: 'Máxima sensibilidad y rastreo frame a frame.',
+        description: 'Análisis quirúrgico frame a frame para expedientes.',
         config: {
-            confidenceThreshold: 0.20,
+            confidenceThreshold: 0.18,
             nmsThreshold: 0.35,
             detectionSkip: 1,
             persistence: 60,
-            predictionLookahead: 30
+            predictionLookahead: 35
         }
     }
 };

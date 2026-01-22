@@ -31,20 +31,30 @@ export const useFrameProcessor = () => {
         const oY = (canvas.height - dH) / 2;
 
         activeTracks.forEach((t: any) => {
-            // Stats counting (Moved from old location)
+            // Stats counting
             const minHits = t.label === 'person' ? 5 : 3;
             if (t.hits >= minHits && !seenTrackIds.current.has(t.id)) {
                 seenTrackIds.current.add(t.id);
                 setStats(prev => ({ ...prev, det: prev.det + 1 }));
             }
 
-            // Usar el CENTRO del vehículo para ser consistente con el tail del tracker
+            // Usar el CENTRO del vehículo para ser consistente con el tail y el motor de colisiones
             const cx = t.bbox.x * dW + t.bbox.w * dW / 2 + oX;
-            const cy = t.bbox.y * dH + t.bbox.h * dH / 2 + oY; // Ahora usamos el Centro
+            const cy = t.bbox.y * dH + t.bbox.h * dH / 2 + oY;
+
+            // Enriquecer el tail para el renderizado (Sincronización con el tracker)
+            if (!t.tail) t.tail = [];
+            const normX = (cx - oX) / dW;
+            const normY = (cy - oY) / dH;
+
+            // Solo añadir si es un punto significativamente nuevo (evitar duplicados por predicción/detección)
+            const lastT = t.tail[t.tail.length - 1];
+            if (!lastT || Math.hypot(lastT.x - normX, lastT.y - normY) > 0.001) {
+                t.tail.push({ x: normX, y: normY });
+                if (t.tail.length > 50) t.tail.shift();
+            }
 
             if (!t.processedLines) t.processedLines = [];
-
-            // SINGLE DETECTION RULE: Si ya fue auditado, ignorar.
             if (t.audited) return;
 
             geometry.forEach(line => {
@@ -57,28 +67,19 @@ export const useFrameProcessor = () => {
                         const lx2 = line.x2 * dW + oX; const ly2 = line.y2 * dH + oY;
 
                         if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
-                            console.log(`[DETECCIÓN] Vehículo ${t.id} cruzó línea ${line.label}`);
+                            console.log(`[FORENSIC] ID:${t.id} (${t.label}) - Cruce Detectado en ${line.label}`);
 
                             let isInfraction = true;
                             let infractionLabel = line.label || 'INFRACCIÓN';
 
-                            // --- TRUE STOP LOGIC ---
+                            // --- VALIDACIÓN DE STOP (Usando telemetría del tracker) ---
                             if (line.type === 'stop_line') {
-                                if (t.tail.length >= 10) {
-                                    const history = t.tail.slice(-20);
-                                    let totalDist = 0;
-                                    for (let i = 1; i < history.length; i++) {
-                                        const dx = history[i].x - history[i - 1].x;
-                                        const dy = history[i].y - history[i - 1].y;
-                                        totalDist += Math.sqrt(dx * dx + dy * dy);
-                                    }
-                                    const avgSpeed = totalDist / (history.length - 1);
-                                    if (avgSpeed < 0.005) {
-                                        isInfraction = false;
-                                        console.log(`[AUDIT] Vehículo ${t.id} realizó STOP válido.`);
-                                    } else {
-                                        infractionLabel = 'STOP VIOLATION';
-                                    }
+                                // Usar la velocidad promediada (avgVelocity) calculada en ByteTracker
+                                if (t.avgVelocity && t.avgVelocity < 0.005) {
+                                    isInfraction = false;
+                                    console.log(`[AUDIT] ID:${t.id} - Parada Validada.`);
+                                } else {
+                                    infractionLabel = 'VIOLACIÓN_STOP';
                                 }
                             }
 
@@ -102,7 +103,7 @@ export const useFrameProcessor = () => {
                                     const data = sC.toDataURL('image/jpeg', 0.5);
                                     t.snapshots.push(data.split(',')[1]);
 
-                                    console.log(`[AUDIT] Enviando vehículo ${t.id} a Gemini...`);
+                                    console.log(`[AUDIT] Solicitando informe pericial para ID:${t.id}...`);
                                     runAudit(t, auditLine);
                                 }
                             } else {
@@ -113,7 +114,7 @@ export const useFrameProcessor = () => {
                 }
             });
         });
-    }, [geometry, runAudit]);
+    }, [geometry, runAudit, setStats]);
 
     const processFrame = useCallback(async (v: HTMLVideoElement, canvas: HTMLCanvasElement) => {
         if (!v || v.paused || v.ended || isProcessingRef.current) return;

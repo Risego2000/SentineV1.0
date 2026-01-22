@@ -191,23 +191,51 @@ export const renderScene = (
 
         ctx.stroke();
 
-        // Label Simple (Sin fondo transparente costoso)
+        // Label Dinámico con Telemetría
         ctx.fillStyle = color;
         ctx.font = 'bold 10px sans-serif';
-        ctx.fillText(`${label} #${track.id}`, x, y - 5);
+        const speedText = track.avgVelocity ? ` | ${(track.avgVelocity * 100).toFixed(1)} km/h` : ''; // Estimación visual
+        ctx.fillText(`${label} #${track.id}${speedText}`, x, y - 5);
 
-        // 3.4 Forensic Audit Indicator
-        // Asumimos que podemos marcar tracks bajo análisis
-        if (track.crossedLine) { // Usamos crossedLine como proxy de "bajo análisis" o podemos añadir flag isAuditing
-            ctx.save();
-            ctx.strokeStyle = '#ef4444'; // Red for Alert
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+        // --- VISUALIZACIÓN DE EVENTOS TÁCTICOS ---
+
+        // 1. Alertas de Comportamiento Anómalo
+        if (track.isAnomalous && track.anomalyLabel) {
+            ctx.fillStyle = '#facc15'; // Yellow
+            ctx.font = 'black 9px monospace';
+            ctx.fillText(`⚠ ${track.anomalyLabel.toUpperCase()}`, x, y - 18);
+
+            // Halo de advertencia
+            ctx.strokeStyle = '#facc15';
+            ctx.setLineDash([2, 2]);
+            ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+            ctx.setLineDash([]);
+        }
+
+        // 2. Alerta de Colisión Inminente
+        if (track.potentialCollision) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(x + w / 2, y + h / 2, Math.max(w, h) * 0.8, 0, Math.PI * 2);
+            ctx.stroke();
 
             ctx.fillStyle = '#ef4444';
-            ctx.font = 'bold 10px monospace';
-            ctx.fillText('AUDITORÍA FORENSE EN CURSO...', x, y + h + 15);
+            ctx.font = 'black 10px monospace';
+            ctx.fillText('☢ RIESGO COLISIÓN', x, y + h + 12);
+        }
+
+        // 3. Indicador de Auditoría Forense Activa
+        if (track.audited) {
+            ctx.save();
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
+
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'bold 9px monospace';
+            ctx.fillText('EV_CONFIRMADO: REPORTE IA GENERADO', x, y + h + 25);
             ctx.restore();
         }
     });

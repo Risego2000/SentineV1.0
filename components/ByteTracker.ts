@@ -119,38 +119,57 @@ export class ByteTracker {
                 const modeLabel = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 
                 // Refinamiento por Aspect Ratio (Sanity Check)
-                // Un coche rara vez es más alto que ancho en perspectiva cenital/oblicua normal
                 const aspectRatio = d.w / d.h;
                 if (modeLabel === 'truck' && aspectRatio > 1.2 && d.h < 0.25) {
-                    // Si detecta camión pero es bajito y ancho, probablemente es un COCHE
                     t.label = 'car';
                 } else {
                     t.label = modeLabel;
                 }
 
-                // Physics Telemetry Update
+                // --- TELEMETRÍA AVANZADA ---
                 const newVelocity = t.kf.getVelocity();
                 const newHeading = t.kf.getHeading();
-                const accel = newVelocity - t.velocity; // Simple delta val
+                const accel = newVelocity - t.velocity;
                 const headingChange = Math.abs(newHeading - t.heading);
+
+                // Suavizado de velocidad para visualización (Moving Average)
+                if (!t.velocityHistory) t.velocityHistory = [];
+                t.velocityHistory.push(newVelocity);
+                if (t.velocityHistory.length > 10) t.velocityHistory.shift();
+                t.avgVelocity = t.velocityHistory.reduce((a: number, b: number) => a + b, 0) / t.velocityHistory.length;
 
                 t.acceleration = accel;
                 t.headingChange = headingChange;
                 t.velocity = newVelocity;
                 t.heading = newHeading;
 
-                // Anomaly Detection Logic (Rule-based)
-                // 1. Sudden Braking/Acceleration (> 0.05 normalized units per frame is huge)
-                const isErraticAccel = Math.abs(accel) > 0.04;
-                // 2. Erratic Steering (Quick angle change > 45 degrees approx 0.8 rads in one frame)
-                const isErraticSteer = headingChange > 0.8;
+                // --- DETECCIÓN DE COMPORTAMIENTO ANÓMALO (Heurística Forense) ---
+                // 1. Aceleración/Frenado Brusco (Umbral Cineamático > 0.04)
+                const isPanicBrake = accel < -0.04;
+                const isSuddenAccel = accel > 0.04;
+                // 2. Viraje Errático (Cambio de rumbo > 0.9 rads/frame)
+                const isErraticSteer = headingChange > 0.9;
+                // 3. Drift Lateral (Velocidad lateral alta respecto al centro)
+                const isLateralDrift = Math.abs(t.kf.vx) > 0.08 && Math.abs(t.kf.vx) > Math.abs(t.kf.vy);
 
-                t.isAnomalous = isErraticAccel || isErraticSteer;
+                t.isAnomalous = isPanicBrake || isSuddenAccel || isErraticSteer || isLateralDrift;
+
                 if (t.isAnomalous) {
-                    t.anomalyLabel = isErraticAccel ? 'Aceleración Brusca' : 'Viraje Brusco';
+                    if (isPanicBrake) t.anomalyLabel = 'Frenado Crítico';
+                    else if (isSuddenAccel) t.anomalyLabel = 'Aceleración Brusca';
+                    else if (isErraticSteer) t.anomalyLabel = 'Viraje Errático';
+                    else if (isLateralDrift) t.anomalyLabel = 'Derrape Lateral';
                 } else {
                     t.anomalyLabel = undefined;
                 }
+
+                // --- PREDICCIÓN DE COLISIÓN (Proyectar trayectoria a 20 frames) ---
+                t.potentialCollision = false;
+                const lookahead = 20;
+                t.futurePos = {
+                    x: t.kf.x + t.kf.vx * lookahead,
+                    y: t.kf.y + t.kf.vy * lookahead
+                };
 
                 t.bbox.w = d.w;
                 t.bbox.h = d.h;
@@ -160,6 +179,28 @@ export class ByteTracker {
                 t.score = d.score;
                 t.missedFrames = 0;
                 t.isCoasting = false;
+
+                // Actualizar tail
+                t.tail.push({ x: cx, y: cy });
+                if (t.tail.length > 50) t.tail.shift();
+            }
+        }
+
+        // --- MOTOR DE COLISIONES CROSS-TRACK ---
+        for (let i = 0; i < this.tracks.length; i++) {
+            for (let j = i + 1; j < this.tracks.length; j++) {
+                const t1 = this.tracks[i];
+                const t2 = this.tracks[j];
+                if (!t1.futurePos || !t2.futurePos) continue;
+
+                // Si las posiciones futuras proyectadas están muy cerca (< 5% del ancho total)
+                const dist = Math.hypot(t1.futurePos.x - t2.futurePos.x, t1.futurePos.y - t2.futurePos.y);
+                if (dist < 0.05 && t1.velocity > 0.01 && t2.velocity > 0.01) {
+                    t1.potentialCollision = true;
+                    t2.potentialCollision = true;
+                    t1.collisionTargetId = t2.id;
+                    t2.collisionTargetId = t1.id;
+                }
             }
         }
 
@@ -182,6 +223,8 @@ export class ByteTracker {
                     bbox: { ...d },
                     label: d.label,
                     labelHistory: [d.label], // Inicializar historial
+                    velocityHistory: [],     // Inicializar telemetría
+                    avgVelocity: 0,
                     score: d.score,
                     missedFrames: 0,
                     isCoasting: false,
