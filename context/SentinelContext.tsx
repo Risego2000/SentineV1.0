@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import {
     GeometryLine,
     InfractionLog,
@@ -44,6 +44,7 @@ interface SentinelContextType {
     setTracks: (t: any[]) => void;
     calibration: number;
     setCalibration: (c: number) => void;
+    videoRef: React.RefObject<HTMLVideoElement | null>;
 
     // Actions
     setSource: (s: 'none' | 'live' | 'upload') => void;
@@ -57,7 +58,7 @@ interface SentinelContextType {
     setPreset: (p: PresetType) => void;
     setStats: (s: (prev: AppStats) => AppStats) => void;
     addLog: (type: SystemLog['type'], content: string) => void;
-    generateGeometry: (instruction?: string) => Promise<void>;
+    generateGeometry: (instruction?: string, videoElement?: HTMLVideoElement | null) => Promise<void>;
     runAudit: (track: any, line: GeometryLine) => Promise<void>;
     setStatusMsg: (msg: string | null) => void;
     setPerformanceMetrics: (fps: number, latency: number) => void;
@@ -95,6 +96,8 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         const saved = localStorage.getItem('sentinel_calibration');
         return saved ? parseFloat(saved) : 0.05;
     });
+
+    const videoRef = useRef<HTMLVideoElement | null>(null);
 
     const hasApiKey = !!((process.env.GEMINI_API_KEY) || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY);
 
@@ -191,11 +194,11 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('sentinel_calibration', calibration.toString());
     }, [calibration]);
 
-    const generateGeometry = useCallback(async (instruction?: string) => {
+    const generateGeometry = useCallback(async (instruction?: string, videoElement?: HTMLVideoElement | null) => {
         const cacheKey = CacheService.generateKey(directives, instruction);
         const cached = CacheService.get<any>(cacheKey);
 
-        if (cached) {
+        if (cached && !videoElement) {
             logger.info('SENTINEL_CONTEXT', 'Recuperando geometría de caché local.');
             setGeometry(cached.lines);
             if (cached.suggestedDirectives) setDirectives(cached.suggestedDirectives);
@@ -203,15 +206,28 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            setStatusMsg("GENERANDO VECTORES...");
+            setStatusMsg("ANALIZANDO VÍA...");
             setIsAnalyzing(true);
-            const result = await aiGenerateGeometry(directives, instruction);
+
+            let base64Image: string | undefined = undefined;
+            if (videoElement) {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(videoElement, 0, 0);
+                    base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                }
+            }
+
+            const result = await aiGenerateGeometry(directives, instruction, base64Image);
             if (result.lines.length > 0) {
                 setGeometry(result.lines);
                 if (result.suggestedDirectives) setDirectives(result.suggestedDirectives);
-                CacheService.set(cacheKey, result);
+                if (!videoElement) CacheService.set(cacheKey, result);
             }
-            setStatusMsg("ZONAS ACTUALIZADAS");
+            setStatusMsg("GEOMETRÍA_SINCRONIZADA");
         } catch (error: any) {
             handleError('GEOMETRY', error);
         } finally {
@@ -299,6 +315,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         isEditingGeometry, setIsEditingGeometry,
         directives, setDirectives,
         geometry, setGeometry,
+        videoRef,
         selectedLog, setSelectedLog,
         isListening, setIsListening,
         isPoseEnabled, setIsPoseEnabled,

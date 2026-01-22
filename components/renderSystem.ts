@@ -9,17 +9,15 @@ export const renderScene = (
 ) => {
     if (!ctx || !video) return;
 
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
-
-    // 1. Draw Video Frame
+    // 1. Draw Video Frame (Sync dimensions)
     // Asegurar que el canvas coincide con el video
-    if (width !== video.videoWidth || height !== video.videoHeight) {
+    if (ctx.canvas.width !== video.videoWidth || ctx.canvas.height !== video.videoHeight) {
         ctx.canvas.width = video.videoWidth;
         ctx.canvas.height = video.videoHeight;
-        // Necesitamos salir y esperar al siguiente frame para que el contexto se ajuste si hubo resize
-        // o simplemente continuar con las nuevas dimensiones
     }
+
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
 
     // Dibujar imagen del video
     ctx.drawImage(video, 0, 0, width, height);

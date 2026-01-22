@@ -18,23 +18,24 @@ export const GeometryTools = () => {
         generateGeometry,
         setGeometry,
         calibration,
-        setCalibration
+        setCalibration,
+        videoRef
     } = useSentinel();
 
     const handleAutoDetect = () => {
-        generateGeometry("ANALIZA EL ENTORNO VIAL: Detecta carriles, líneas divisorias, zonas prohibidas y puntos de parada. Traza la geometría vectorial completa para monitorización de tráfico.");
+        generateGeometry("ANALIZA EL ENTORNO VIAL: Detecta carriles, líneas divisorias, zonas prohibidas y puntos de parada. Traza la geometría vectorial completa para monitorización de tráfico.", videoRef.current);
     };
 
     const loadPreset = (id: string) => {
         const prompts: Record<string, string> = {
-            highway: "ESCENA AUTOVÍA: Traza carriles principales, línea de arcén prohibido y divisorias de velocidad.",
-            urban_cross: "CRUCE URBANO: Configura pasos de cebra, líneas de stop y zonas de giro prohibido.",
-            roundabout: "ROTONDA: Traza el anillo central como zona prohibida y carriles de entrada/salida.",
-            bus_lane: "CARRIL BUS: Define el carril derecho como zona restringida. Solo buses autorizados.",
-            pedestrian: "ZONA PEATONAL: Traza pasos de cebra y aceras como zonas de máxima alerta para peatones.",
-            loading_zone: "ZONA CARGA/DESCARGA: Define áreas de servicio. Monitoriza tiempo de permanencia."
+            m113_highway: "ESCENA CARRETERA M-113: Traza carriles principales, línea de arcén prohibido y divisorias de velocidad.",
+            calle_real_cross: "CRUCE URBANO CALLE REAL: Configura pasos de cebra, líneas de stop y zonas de giro prohibido.",
+            daganzo_roundabout: "GLORIETA ACCESO: Traza el anillo central como zona prohibida y carriles de entrada/salida.",
+            urban_bus: "CARRIL BUS URBANO: Define el carril derecho como zona restringida. Solo buses autorizados.",
+            residential_zone: "ZONA RESIDENCIAL S-28: Traza la zona como prioridad peatonal y áreas de estacionamiento controlado.",
+            commercial_loading: "ZONA CARGA/DESCARGA COMERCIAL: Define el área de servicio junto al bordillo."
         };
-        generateGeometry(prompts[id] || prompts.highway);
+        generateGeometry(prompts[id] || prompts.m113_highway, videoRef.current);
     };
 
     return (

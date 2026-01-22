@@ -28,14 +28,14 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
         }
     }, [hasApiKey, addLog]);
 
-    const generateGeometry = useCallback(async (directives: string, instruction?: string) => {
+    const generateGeometry = useCallback(async (directives: string, instruction?: string, image?: string) => {
         if (!hasApiKey) return { lines: [], suggestedDirectives: "" };
         setStatusMsg("GENERANDO VECTORES...");
         setIsAnalyzing(true);
 
         try {
-            addLog('AI', 'Conectando con Gemini 2.0 Flash (Neural-V2) para análisis espacial...');
-            const result = await AIService.generateGeometry(directives, instruction);
+            addLog('AI', 'Conectando con Gemini 2.0 Flash para análisis visual de la vía...');
+            const result = await AIService.generateGeometry(directives, instruction, image);
             setStatusMsg("ZONAS ACTUALIZADAS");
             return result;
         } catch (e) {

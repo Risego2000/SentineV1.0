@@ -33,16 +33,16 @@ export const App = () => {
         systemStatus,
         statusLabel,
         addLog,
-        generateGeometry,
-        startLiveFeed: contextStartLiveFeed,
+        addInfraction,
+        videoRef,
         onFileChange: contextOnFileChange,
+        startLiveFeed: contextStartLiveFeed,
         mediapipeReady
     } = useSentinel();
 
     const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
 
     // refs
-    const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const manualRender = useState(0)[0]; // Dummy for backward compatibility if needed, but we'll use actual loop
 

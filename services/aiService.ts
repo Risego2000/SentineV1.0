@@ -35,49 +35,43 @@ export interface GeometryResponse {
 }
 
 export const AIService = {
-    async generateGeometry(directives: string, instruction?: string): Promise<GeometryResponse> {
+    async generateGeometry(directives: string, instruction?: string, image?: string): Promise<GeometryResponse> {
         const ai = getAIClient();
+
         const prompt = `DIRECTIVAS DE INFRACCIÓN: "${directives}". PETICIÓN ADICIONAL: "${instruction || 'Generación automática de geometría'}". 
       
-      Eres el motor geométrico de Sentinel AI. Tu misión CRÍTICA es crear una geometría de detección precisa basada en las directivas de infracción proporcionadas.
+      Eres el motor geométrico de Sentinel AI. Tu misión CRÍTICA es crear una geometría de detección precisa basada en las directivas de infracción proporcionadas y la IMAGEN DE LA ESCENA adjunta.
       
-      ANÁLISIS DE ESCENA Y GENERACIÓN AUTOMÁTICA:
-      1. Lee las DIRECTIVAS DE INFRACCIÓN. Identifica qué comportamientos se deben castigar.
-      2. Crea AUTOMÁTICAMENTE líneas geométricas (horizontales, verticales u oblicuas) para interceptar infracciones VISUALES:
-      
-         A. CRUCE DE LÍNEAS / GIROS:
-            - "Cruce Línea Continua": Genera 'lane_divider' estrictos a lo largo de las divisiones de carril visibles.
-            - "Giro Prohibido": Genera barreras 'forbidden' oblicuas/curvas que bloqueen la trayectoria del giro ilegal.
-            - "Sentido Contrario": Genera líneas 'lane_divider' oblicuas que crucen el carril para detectar vectores opuestos.
-
-         B. INTERSECCIONES Y PRIORIDAD:
-            - "Saltarse STOP" / "Semáforo Rojo": Genera una 'stop_line' HORIZONTAL precisa justo antes de la intersección.
-            - "Saltarse Ceda el Paso": Genera una línea de 'stop_line' (o 'yield_line') en el punto de incorporación.
-            - "Bloqueo Intersección (Yellow Box)": Genera un polígono (o varias líneas 'forbidden') cruzando el centro de la intersección (caja amarilla).
-
-         C. ZONAS PROTEGIDAS:
-            - "Invasión Paso Peatones": Genera líneas 'forbidden' rodeando o cruzando el paso de cebra.
-            - "Estacionamiento Doble Fila": Genera líneas 'forbidden' longitudinales paralelas al bordillo (donde aparcarían ilegalmente).
-            - "Invasión Arcén": Genera líneas 'forbidden' delimitando el arcén.
+      ANÁLISIS VISUAL OBLIGATORIO:
+      1. Observa la imagen proporcionada del vial (si está presente).
+      2. Identifica los carriles, líneas divisorias, y señales de tráfico (STOP, pasos de cebra).
+      3. Coloca los vectores geométricos (x1, y1, x2, y2) EXACTAMENTE sobre las marcas viales visibles en el video.
+      4. Si las directivas piden "Cruce Línea Continua", traza líneas 'lane_divider' sobre las líneas reales de la carretera.
+      5. Si piden "STOP", coloca la 'stop_line' sobre la línea de detención real.
       
       REGLAS DE GENERACIÓN DE JSON:
       - Genera un JSON con un array "lines".
-      - Coordenadas (x1, y1, x2, y2) normalizadas entre 0 y 1. Máximo 4 decimales.
-      - "label": Nombre corto y técnico de la zona (ej: "ZONA_GIRO_PROHIBIDO", "LINEA_STOP_1").
-      - "type": Usa 'forbidden' para áreas donde entrar es infracción directa, 'stop_line' para líneas de detención, 'lane_divider' para separación.
+      - Coordenadas (x1, y1, x2, y2) normalizadas entre 0 y 1 respecto a la imagen.
+      - "label": Nombre corto y técnico de la zona.
+      - "type": 'forbidden', 'stop_line', 'lane_divider' o 'box_junction'.
       
-      LIMITACIONES TÉCNICAS:
-      - Genera un máximo de 15 líneas esenciales para cubrir todas las directivas.
+      IMPORTANTE: No te limites a coordenadas genéricas. Adapta la geometría a la PERSPECTIVA de la cámara en el video.
       
-      RETORNA ÚNICAMENTE EL JSON.
-      {
-        "lines": [...],
-        "suggestedDirectives": "Resumen conciso y técnico de las reglas generadas (en Español)."
-      }`;
+      RETORNA ÚNICAMENTE EL JSON.`;
+
+        const parts: any[] = [{ text: prompt }];
+        if (image) {
+            parts.push({
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: image
+                }
+            });
+        }
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash',
-            contents: prompt,
+            contents: { parts },
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
