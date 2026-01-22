@@ -38,33 +38,47 @@ export const renderScene = (
 
         // Estilos diferenciados por tipo de línea
         ctx.setLineDash([]); // Reset
+        let strokeColor = 'rgba(255, 255, 255, 0.5)';
+        let lineWidth = 2;
 
         if (line.type === 'forbidden') {
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)'; // RED
-            ctx.lineWidth = 3;
+            strokeColor = '#ef4444'; // RED
+            lineWidth = 4;
+            ctx.shadowColor = '#ef4444';
         } else if (line.type === 'stop_line') {
-            ctx.strokeStyle = 'rgba(245, 158, 11, 1)'; // ORANGE/AMBER (Highvis)
-            ctx.lineWidth = 4;
+            strokeColor = '#f59e0b'; // AMBER
+            lineWidth = 5;
+            ctx.shadowColor = '#f59e0b';
         } else if (line.type === 'lane_divider') {
-            ctx.strokeStyle = 'rgba(6, 182, 212, 0.8)'; // CYAN
-            ctx.lineWidth = 2;
-            ctx.setLineDash([10, 5]); // Punteado
-        } else {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // Fallback
-            ctx.lineWidth = 1;
+            strokeColor = '#06b6d4'; // CYAN
+            lineWidth = 2;
+            ctx.setLineDash([15, 10]);
+            ctx.shadowColor = '#06b6d4';
         }
 
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+
+        // Glow Effect
+        ctx.shadowBlur = 15;
         ctx.stroke();
-        ctx.setLineDash([]); // Cleanup
+
+        // Reset Shadow for high performance
+        ctx.shadowBlur = 0;
 
         // Endpoints (Anchors) para ver claramente inicio/fin
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.beginPath(); ctx.arc(x1, y1, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x2, y2, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = strokeColor;
+        ctx.beginPath(); ctx.arc(x1, y1, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x2, y2, 5, 0, Math.PI * 2); ctx.fill();
 
         // Line Label
-        ctx.font = 'bold 11px monospace';
-        ctx.fillText(line.label || line.type?.toUpperCase() || 'ZONE', (x1 + x2) / 2, (y1 + y2) / 2 - 5);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'black 12px monospace';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#000';
+        ctx.fillText(line.label || line.type?.toUpperCase() || 'ZONE', (x1 + x2) / 2, (y1 + y2) / 2 - 10);
+        ctx.shadowBlur = 0;
     });
 
     // 3. Draw Tracks

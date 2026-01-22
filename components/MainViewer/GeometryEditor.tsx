@@ -139,10 +139,10 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                             key={line.id}
                             x1={`${line.x1 * 100}%`} y1={`${line.y1 * 100}%`}
                             x2={`${line.x2 * 100}%`} y2={`${line.y2 * 100}%`}
-                            stroke={line.type === 'forbidden' ? '#ef4444' : '#06b6d4'}
-                            strokeWidth="2"
-                            strokeDasharray={isEditingGeometry ? "4" : "0"} // Sólido si no editamos
-                            opacity={isEditingGeometry ? "0.5" : "0.8"} // Más visible si no editamos
+                            stroke={line.type === 'forbidden' ? '#ef4444' : line.type === 'stop_line' ? '#f59e0b' : '#06b6d4'}
+                            strokeWidth={line.type === 'lane_divider' ? "2" : "4"}
+                            strokeDasharray={line.type === 'lane_divider' ? "10, 5" : "0"}
+                            opacity={isEditingGeometry ? "0.6" : "0.9"}
                         />
                     ))}
 

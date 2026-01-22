@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { PenTool, Box, Divide, Scale, Save, RefreshCw } from 'lucide-react';
+import { PenTool, Box, Divide, Scale, Save, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
 const PRESETS = [
-    { id: 'highway', label: 'Autovía Estándar', icon: Divide },
-    { id: 'urban_cross', label: 'Cruce Urbano', icon: Box },
+    { id: 'highway', label: 'Autovía', icon: Divide },
+    { id: 'urban_cross', label: 'Cruce', icon: Box },
     { id: 'roundabout', label: 'Rotonda', icon: RefreshCw },
+    { id: 'bus_lane', label: 'Carril Bus', icon: Divide },
+    { id: 'pedestrian', label: 'Paso Peatonal', icon: ShieldAlert },
+    { id: 'loading_zone', label: 'Carga/Descarga', icon: Box },
 ];
 
 export const GeometryTools = () => {
@@ -19,19 +22,19 @@ export const GeometryTools = () => {
     } = useSentinel();
 
     const handleAutoDetect = () => {
-        generateGeometry("DETECTA Y TRAZA TODOS LOS CARRILES Y LÍNEAS DE CARRETERA VISIBLES PARA EL SISTEMA DE NAVEGACIÓN VECTORIAL. IGNORA OBJETOS, SOLO LÍNEAS.");
+        generateGeometry("ANALIZA EL ENTORNO VIAL: Detecta carriles, líneas divisorias, zonas prohibidas y puntos de parada. Traza la geometría vectorial completa para monitorización de tráfico.");
     };
 
     const loadPreset = (id: string) => {
-        // En una implementación real, estos serían JSONs complejos precargados
-        // Por ahora simulamos la acción de carga
-        if (id === 'highway') {
-            generateGeometry("CONFIGURACIÓN AUTOVÍA: 3 Carriles rectos, líneas discontinuas, arcén prohibido.");
-        } else if (id === 'urban_cross') {
-            generateGeometry("CONFIGURACIÓN CRUCE: 2 Pasos de cebra, 1 Stop, Líneas de carril urbano.");
-        } else {
-            generateGeometry("CONFIGURACIÓN ROTONDA: Círculo central prohibido, carriles de entrada y salida.");
-        }
+        const prompts: Record<string, string> = {
+            highway: "ESCENA AUTOVÍA: Traza carriles principales, línea de arcén prohibido y divisorias de velocidad.",
+            urban_cross: "CRUCE URBANO: Configura pasos de cebra, líneas de stop y zonas de giro prohibido.",
+            roundabout: "ROTONDA: Traza el anillo central como zona prohibida y carriles de entrada/salida.",
+            bus_lane: "CARRIL BUS: Define el carril derecho como zona restringida. Solo buses autorizados.",
+            pedestrian: "ZONA PEATONAL: Traza pasos de cebra y aceras como zonas de máxima alerta para peatones.",
+            loading_zone: "ZONA CARGA/DESCARGA: Define áreas de servicio. Monitoriza tiempo de permanencia."
+        };
+        generateGeometry(prompts[id] || prompts.highway);
     };
 
     return (

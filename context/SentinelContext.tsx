@@ -83,7 +83,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [isPoseEnabled, setIsPoseEnabled] = useState(false);
     const [currentPreset, setPreset] = useState<PresetType>(() => {
         const saved = localStorage.getItem('sentinel_preset');
-        return (saved as PresetType) || 'standard';
+        return (saved as PresetType) || 'neural_core';
     });
     const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset].config);
     const [fps, setFps] = useState(0);
