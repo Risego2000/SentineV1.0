@@ -71,6 +71,14 @@ export const ProtocolSelector = () => {
         );
     };
 
+    // AUTO-APPLY: Trigger application when selection changes (with debounce)
+    React.useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            applyProtocols();
+        }, 800); // 800ms debounce
+        return () => clearTimeout(timeoutId);
+    }, [selectedIds]);
+
     const applyProtocols = async () => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
@@ -95,10 +103,24 @@ export const ProtocolSelector = () => {
         Genera un JSON con líneas de detección que INTEGREN tanto las directivas existentes como las nuevas selecciones del municipio.
         `;
 
-        const displayDirectives = `${directives}\n\n[ACTUALIZACIÓN TÁCTICA]:\n${activeOptions.map(o => `- ${o.label}`).join('\n')}`;
-        setDirectives(displayDirectives);
+        // Evitar duplicados en el texto
+        const currentDirectives = directives || '';
+        const newOptions = activeOptions.filter(o => !currentDirectives.includes(o.label));
 
-        await generateGeometry(fullPrompt);
+        let displayDirectives = currentDirectives;
+
+        if (newOptions.length > 0) {
+            const newText = newOptions.map(o => `- ${o.label}`).join('\n');
+            if (displayDirectives.includes('[ACTUALIZACIÓN TÁCTICA]:')) {
+                displayDirectives += `\n${newText.replace('[ACTUALIZACIÓN TÁCTICA]:', '')}`;
+                // Fix simple append logic to avoid header duplication inside the block
+            } else {
+                displayDirectives += `\n\n[ACTUALIZACIÓN TÁCTICA]:\n${newText}`;
+            }
+            setDirectives(displayDirectives);
+            await generateGeometry(fullPrompt);
+        }
+
         setIsGenerating(false);
     };
 
@@ -122,6 +144,12 @@ export const ProtocolSelector = () => {
                     </div>
                 )}
             </div>
+
+            {isGenerating && (
+                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-cyan-500 animate-pulse w-1/3 mx-auto" />
+                </div>
+            )}
 
             <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
                 {CATEGORIES.map(cat => (
@@ -173,24 +201,6 @@ export const ProtocolSelector = () => {
                 ))}
             </div>
 
-            <button
-                onClick={applyProtocols}
-                disabled={selectedIds.length === 0 || isGenerating}
-                className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all ${selectedIds.length > 0 && !isGenerating
-                    ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25 hover:bg-cyan-400 active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
-                    }`}
-            >
-                {isGenerating ? (
-                    <>
-                        <Layers size={14} className="animate-spin" /> Procesando Vector...
-                    </>
-                ) : (
-                    <>
-                        <Layers size={14} /> Aplicar Configuración
-                    </>
-                )}
-            </button>
         </div>
     );
 };

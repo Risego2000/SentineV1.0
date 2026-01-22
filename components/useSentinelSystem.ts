@@ -81,6 +81,6 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
     return {
         logs, systemLogs, stats, addLog,
         generateGeometry, runAudit,
-        isAnalyzing, statusMsg, setStatusMsg, setStats
+        isAnalyzing, statusMsg, setStatusMsg, setStats, setLogs
     };
 };

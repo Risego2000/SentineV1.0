@@ -1,9 +1,22 @@
 import React from 'react';
 import { Activity } from 'lucide-react';
-import { useSentinel } from '../../hooks/useSentinel';
 
-export const NeuralStatusHUD = () => {
-    const { source, systemStatus, statusMsg, isDetecting, fps, latency } = useSentinel();
+interface NeuralStatusHUDProps {
+    source: 'none' | 'live' | 'upload';
+    systemStatus: {
+        neural: string;
+        forensic: string;
+        bionics: string;
+        vector?: string;
+        mediapipeReady?: boolean;
+    };
+    statusMsg: string | null;
+    isDetecting: boolean;
+    fps: number;
+    latency: number;
+}
+
+export const NeuralStatusHUD: React.FC<NeuralStatusHUDProps> = ({ source, systemStatus, statusMsg, isDetecting, fps, latency }) => {
     const modelLoaded = systemStatus.neural === 'ready';
 
     return (

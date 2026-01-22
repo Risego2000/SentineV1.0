@@ -4,6 +4,8 @@ import { SystemStatus } from './Sidebar/SystemStatus';
 import { EngineSettings } from './Sidebar/EngineSettings';
 import { SecurityProtocol } from './Sidebar/SecurityProtocol';
 import { ProtocolSelector } from './Sidebar/ProtocolSelector';
+import { GeometryTools } from './Sidebar/GeometryTools';
+import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
 
 
 interface SidebarProps {
@@ -30,8 +32,10 @@ export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
             <div className="flex-1 p-5 space-y-6 overflow-y-auto custom-scrollbar">
                 <SystemStatus />
                 <EngineSettings />
-                <SecurityProtocol toggleListening={toggleListening} />
+                <GeometryTools />
                 <ProtocolSelector />
+                <SecurityProtocol toggleListening={toggleListening} />
+                <PredictiveAnalytics />
             </div>
 
 

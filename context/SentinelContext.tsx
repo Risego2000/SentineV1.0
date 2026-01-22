@@ -40,6 +40,10 @@ interface SentinelContextType {
     hasApiKey: boolean;
     fps: number;
     latency: number;
+    tracks: any[];
+    setTracks: (t: any[]) => void;
+    calibration: number;
+    setCalibration: (c: number) => void;
 
     // Actions
     setSource: (s: 'none' | 'live' | 'upload') => void;
@@ -85,22 +89,28 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [fps, setFps] = useState(0);
     const [latency, setLatency] = useState(0);
     const [isEditingGeometry, setIsEditingGeometry] = useState(false);
+    const [tracks, setTracks] = useState<any[]>([]);
+    const [calibration, setCalibration] = useState(() => {
+        const saved = localStorage.getItem('sentinel_calibration');
+        return saved ? parseFloat(saved) : 0.05;
+    });
 
     const hasApiKey = !!((process.env.GEMINI_API_KEY) || (import.meta as any).env.VITE_GOOGLE_GENAI_KEY);
 
     const [isDetecting, setIsDetecting] = useState(false);
-    const [isAnalyzing, setIsAnalyzing] = useState(false); // Moved from useSentinelSystem to local state for better control
-
-    const [logs, setLogs] = useState<InfractionLog[]>([]); // Moved from useSentinelSystem to local state
-    const [stats, setStats] = useState<AppStats>({ det: 0, inf: 0 }); // Moved from useSentinelSystem to local state
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const {
+        logs,
+        stats,
+        setStats,
         systemLogs,
         addLog,
-        generateGeometry: aiGenerateGeometry, // Renamed to avoid conflict
-        runAudit: aiRunAudit, // Renamed to avoid conflict
+        generateGeometry: aiGenerateGeometry,
+        runAudit: aiRunAudit,
         statusMsg,
         setStatusMsg,
+        setLogs
     } = useSentinelSystem(hasApiKey);
 
     const {
@@ -177,6 +187,10 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         localStorage.setItem('sentinel_preset', currentPreset);
     }, [currentPreset]);
+
+    useEffect(() => {
+        localStorage.setItem('sentinel_calibration', calibration.toString());
+    }, [calibration]);
 
     const generateGeometry = useCallback(async (instruction?: string) => {
         const cacheKey = CacheService.generateKey(directives, instruction);
@@ -309,7 +323,11 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         detectPose,
         fps,
         latency,
-        setPerformanceMetrics
+        setPerformanceMetrics,
+        tracks,
+        setTracks,
+        calibration,
+        setCalibration
     };
 
     return (

@@ -1,74 +1,107 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+// Components & Modules
 import { Sidebar } from './components/Sidebar';
 import { RightSidebar } from './components/RightSidebar';
 import { MainViewer } from './components/MainViewer';
-import { SentinelProvider } from './context/SentinelContext';
-import { useSentinel } from './hooks/useSentinel';
-import { logger } from './services/logger';
-
-const TacticalOverlay = React.lazy(() => import('./components/TacticalOverlay').then(m => ({ default: m.TacticalOverlay })));
-const InfractionModal = React.lazy(() => import('./components/InfractionModal').then(m => ({ default: m.InfractionModal })));
+import { InfractionModal } from './components/InfractionModal';
+import { useNeuralCore } from './components/useNeuralCore';
+import { useSentinelSystem } from './components/useSentinelSystem';
+import { ByteTracker } from './components/ByteTracker'; // Importar Tracker
+import { EngineConfig, GeometryLine, InfractionLog, Track } from './types';
+import { TRACK_SMOOTHING, DETECTION_PRESETS, PresetType } from './constants';
+import { lineIntersect } from './utils';
 import './index.css';
 
-const SentinelApp = () => {
+import { useSentinel } from './hooks/useSentinel';
+import { useFrameProcessor } from './hooks/useFrameProcessor';
+import { renderScene } from './components/renderSystem';
+import './index.css';
+
+export const App = () => {
     const {
-        directives,
-        setDirectives,
-        selectedLog,
-        setSelectedLog,
+        source, setSource,
+        isPlaying, setIsPlaying,
+        directives, setDirectives,
+        geometry, setGeometry,
+        selectedLog, setSelectedLog,
+        isListening, setIsListening,
+        isPoseEnabled, setIsPoseEnabled,
+        currentPreset, setPreset,
+        stats, setStats,
+        statusMsg, setStatusMsg,
+        isAnalyzing,
+        systemStatus,
+        statusLabel,
+        addLog,
         generateGeometry,
-        startLiveFeed,
-        onFileChange,
-        isPlaying,
-        setIsPlaying,
-        addLog
+        startLiveFeed: contextStartLiveFeed,
+        onFileChange: contextOnFileChange,
+        mediapipeReady
     } = useSentinel();
 
+    const { processFrame, trackerRef } = useFrameProcessor();
+
+    // refs
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const manualRender = useState(0)[0]; // Dummy for backward compatibility if needed, but we'll use actual loop
+
+    // --- SYSTEM INIT ---
+    useEffect(() => {
+        addLog('CORE', 'Sincronizando Motor Vectorial Sentinel AI...');
+    }, []);
+
+    const processTrackResults = (activeTracks: any[]) => {
+        // This is now mostly handled by useFrameProcessor, 
+        // but we might want to trigger manual render or side effects here.
+    };
+
+    // --- PROCESS FRAME ---
+    const loop = useCallback(async () => {
+        const v = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!v || !canvas || source === 'none') return;
+
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx || v.readyState < 2) return;
+
+        // Sync processing
+        if (isPlaying) {
+            await processFrame(v, canvas);
+        }
+
+        // Render
+        renderScene(ctx, v, trackerRef.current.tracks, geometry);
+
+        // Feedback loop
+    }, [isPlaying, source, geometry, processFrame]);
+
+    useEffect(() => {
+        let anim: number;
+        const frameLoop = async () => {
+            await loop();
+            anim = requestAnimationFrame(frameLoop);
+        };
+        frameLoop();
+        return () => cancelAnimationFrame(anim);
+    }, [loop]);
+
+    // --- HANDLERS ---
 
     const handleFileSelect = () => {
         document.getElementById('file-up')?.click();
     };
 
-    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            onFileChange(file, videoRef);
-        }
+        if (file) contextOnFileChange(file, videoRef);
         e.target.value = '';
     };
 
-    const handleStartLive = async () => {
-        const stream = await startLiveFeed();
+    // Sync Video Control
+    useEffect(() => {
         if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().then(() => setIsPlaying(true));
-        }
-    };
-
-    const toggleListening = () => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            addLog('ERROR', 'Módulo de Voz: API de reconocimiento no soportada');
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'es-ES';
-        recognition.onstart = () => addLog('INFO', 'Módulo de Voz: Escuchando comandos...');
-        recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            addLog('AI', `Comando de Voz Recibido: "${transcript}"`);
-            setDirectives(directives + `\n- ${transcript}`);
-            generateGeometry(transcript);
-        };
-        recognition.start();
-    };
-
-    // Video sync effect
-    React.useEffect(() => {
-        if (videoRef.current) {
-            if (isPlaying) videoRef.current.play().catch(() => { });
+            if (isPlaying) videoRef.current.play().catch(e => console.error("Play error:", e));
             else videoRef.current.pause();
         }
     }, [isPlaying]);
@@ -76,35 +109,17 @@ const SentinelApp = () => {
     return (
         <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
             <Sidebar
-                toggleListening={toggleListening}
+                toggleListening={() => setIsListening(!isListening)}
             />
 
-            <React.Suspense fallback={<div className="flex-1 bg-black animate-pulse" />}>
-                <MainViewer
-                    videoRef={videoRef}
-                    canvasRef={canvasRef}
-                    onLive={handleStartLive}
-                    onUpload={handleFileSelect}
-                />
-            </React.Suspense>
-
-            <React.Suspense fallback={null}>
-                <TacticalOverlay videoRef={videoRef} canvasRef={canvasRef} />
-            </React.Suspense>
+            <MainViewer
+                videoRef={videoRef} canvasRef={canvasRef}
+                onLive={contextStartLiveFeed} onUpload={handleFileSelect}
+            />
 
             <RightSidebar />
-
-            <input id="file-up" type="file" className="hidden" accept="video/*" onChange={handleFileInput} />
-
-            <React.Suspense fallback={null}>
-                {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
-            </React.Suspense>
+            <input id="file-up" type="file" className="hidden" accept="video/*" onChange={onFileChange} />
+            {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
         </div>
     );
 };
-
-export const App = () => (
-    <SentinelProvider>
-        <SentinelApp />
-    </SentinelProvider>
-);

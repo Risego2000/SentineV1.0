@@ -4,18 +4,15 @@ export const VEHICLE_COLORS: Record<string, string> = {
     car: '#06b6d4', truck: '#f59e0b', motorcycle: '#8b5cf6', bus: '#10b981', person: '#f43f5e'
 };
 
+export const RELEVANT_CLASSES = ['car', 'truck', 'motorcycle', 'bus', 'person'];
+
 export const LABEL_MAP: Record<string, string> = {
     car: 'VEHÍCULO',
     truck: 'CAMIÓN',
     motorcycle: 'MOTO',
-    bus: 'AUTOBÚS',
-    person: 'PEATÓN',
-    bicycle: 'BICI',
-    van: 'FURGONETA',
-    moped: 'CICLOMOTOR'
+    bus: 'BUS',
+    person: 'PEATÓN'
 };
-
-export const RELEVANT_CLASSES = ['car', 'truck', 'motorcycle', 'bus', 'person', 'bicycle', 'van', 'moped'];
 
 // MediaPipe Assets
 export const MEDIAPIPE_MODEL_PATH = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite";
@@ -27,11 +24,11 @@ export const DETECTION_PRESETS = {
         label: 'ESTÁNDAR',
         description: 'Equilibrio óptimo para flujo vehicular constante.',
         config: {
-            confidenceThreshold: 0.20, // Lowered for maximum detection
+            confidenceThreshold: 0.35,
             nmsThreshold: 0.45,
             detectionSkip: 2,
-            persistence: 50,
-            predictionLookahead: 25
+            persistence: 30,
+            predictionLookahead: 15
         }
     },
     precision: {

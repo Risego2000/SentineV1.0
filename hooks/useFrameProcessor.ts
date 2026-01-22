@@ -11,7 +11,8 @@ export const useFrameProcessor = () => {
         runAudit,
         isPoseEnabled,
         detect,
-        detectPose
+        detectPose,
+        setTracks
     } = useSentinel();
 
     const trackerRef = useRef<ByteTracker>(new ByteTracker());
@@ -101,6 +102,9 @@ export const useFrameProcessor = () => {
             if (isPoseEnabled) {
                 await detectPose(v);
             }
+
+            // Sync with context
+            setTracks([...trackerRef.current.tracks]);
         } catch (e) {
             console.error("ProcessFrame Error:", e);
         } finally {

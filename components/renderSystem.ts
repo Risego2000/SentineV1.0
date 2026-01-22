@@ -1,7 +1,7 @@
 import { GeometryLine } from '../types';
 import { VEHICLE_COLORS, LABEL_MAP } from '../constants';
 
-export const renderScence = (
+export const renderScene = (
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     tracks: any[],
@@ -25,6 +25,7 @@ export const renderScence = (
     ctx.drawImage(video, 0, 0, width, height);
 
     // 2. Draw Geometry
+    // 2. Draw Geometry (ENHANCED VISUALIZATION)
     geometry.forEach((line) => {
         const x1 = line.x1 * width;
         const y1 = line.y1 * height;
@@ -34,14 +35,36 @@ export const renderScence = (
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = line.type === 'forbidden' ? 'rgba(239, 68, 68, 0.8)' : 'rgba(6, 182, 212, 0.8)';
+
+        // Estilos diferenciados por tipo de línea
+        ctx.setLineDash([]); // Reset
+
+        if (line.type === 'forbidden') {
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)'; // RED
+            ctx.lineWidth = 3;
+        } else if (line.type === 'stop_line') {
+            ctx.strokeStyle = 'rgba(245, 158, 11, 1)'; // ORANGE/AMBER (Highvis)
+            ctx.lineWidth = 4;
+        } else if (line.type === 'lane_divider') {
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.8)'; // CYAN
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 5]); // Punteado
+        } else {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // Fallback
+            ctx.lineWidth = 1;
+        }
+
         ctx.stroke();
+        ctx.setLineDash([]); // Cleanup
+
+        // Endpoints (Anchors) para ver claramente inicio/fin
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.beginPath(); ctx.arc(x1, y1, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x2, y2, 3, 0, Math.PI * 2); ctx.fill();
 
         // Line Label
-        ctx.fillStyle = line.type === 'forbidden' ? '#ef4444' : '#06b6d4';
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText(line.label || 'ZONA', x1 + 5, y1 - 5);
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(line.label || line.type?.toUpperCase() || 'ZONE', (x1 + x2) / 2, (y1 + y2) / 2 - 5);
     });
 
     // 3. Draw Tracks

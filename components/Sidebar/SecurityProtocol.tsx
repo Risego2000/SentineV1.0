@@ -47,20 +47,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                     </div>
                 </div>
 
-                <button
-                    onClick={() =>
-                        generateGeometry(
-                            'ANÁLISIS EXHAUSTIVO: Detecta TODAS las marcas viales y señalización. IMPORTANTE: Genera directivas de seguridad en ESPAÑOL.'
-                        )
-                    }
-                    className="w-full py-4 bg-cyan-500/5 border border-cyan-500/20 text-cyan-400 rounded-2xl font-black text-[11px] uppercase hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-all flex items-center justify-center gap-3 group shadow-[0_0_20px_rgba(34,211,238,0.05)]"
-                >
-                    <Sparkles
-                        size={16}
-                        className="group-hover:rotate-12 transition-transform text-cyan-500"
-                    />
-                    <span className="tracking-[0.15em]">Detección de Vía</span>
-                </button>
+
             </div>
         </div>
     );

@@ -1,75 +1,86 @@
-type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'AI' | 'CORE';
+/**
+ * Sistema de Logging táctico para Sentinel AI.
+ * Proporciona trazabilidad centralizada con niveles de severidad y visualización formateada.
+ */
+
+type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'SUCCESS';
 
 interface LogEntry {
-    level: LogLevel;
-    module: string;
-    message: string;
     timestamp: string;
+    level: LogLevel;
+    category: string;
+    message: string;
     data?: any;
 }
 
-class Logger {
-    private static instance: Logger;
+class TacticalLogger {
+    private static instance: TacticalLogger;
+    private maxLogs = 1000;
     private logs: LogEntry[] = [];
-    private readonly MAX_LOGS = 1000;
 
     private constructor() { }
 
-    public static getInstance(): Logger {
-        if (!Logger.instance) {
-            Logger.instance = new Logger();
+    public static getInstance(): TacticalLogger {
+        if (!TacticalLogger.instance) {
+            TacticalLogger.instance = new TacticalLogger();
         }
-        return Logger.instance;
+        return TacticalLogger.instance;
     }
 
-    private formatMessage(entry: LogEntry): string {
-        return `[${entry.timestamp}] [${entry.level}] [${entry.module}] ${entry.message}`;
-    }
-
-    public log(level: LogLevel, module: string, message: string, data?: any) {
+    private log(level: LogLevel, category: string, message: string, data?: any) {
         const entry: LogEntry = {
-            level,
-            module,
-            message,
             timestamp: new Date().toISOString(),
-            data,
+            level,
+            category,
+            message,
+            data
         };
 
-        this.logs.unshift(entry);
-        if (this.logs.length > this.MAX_LOGS) {
-            this.logs.pop();
+        this.logs.push(entry);
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
         }
 
-        // Console output with colors
-        const colors = {
-            INFO: 'color: #3b82f6',
-            WARN: 'color: #f59e0b',
-            ERROR: 'color: #ef4444; font-weight: bold',
-            AI: 'color: #8b5cf6',
-            CORE: 'color: #10b981',
-        };
+        const color = this.getLevelColor(level);
+        const timestampStr = new Date().toLocaleTimeString();
 
-        console.log(`%c${this.formatMessage(entry)}`, colors[level], data || '');
+        console.log(
+            `%c[${timestampStr}] [${level}] [${category}] %c${message}`,
+            `color: ${color}; font-weight: bold;`,
+            'color: inherit;',
+            data || ''
+        );
     }
 
-    public info(module: string, message: string, data?: any) {
-        this.log('INFO', module, message, data);
+    private getLevelColor(level: LogLevel): string {
+        switch (level) {
+            case 'INFO': return '#3b82f6'; // Blue
+            case 'WARN': return '#f59e0b'; // Amber
+            case 'ERROR': return '#ef4444'; // Red
+            case 'DEBUG': return '#8b5cf6'; // Violet
+            case 'SUCCESS': return '#10b981'; // Emerald
+            default: return '#9ca3af'; // Gray
+        }
     }
 
-    public warn(module: string, message: string, data?: any) {
-        this.log('WARN', module, message, data);
+    public info(category: string, message: string, data?: any) {
+        this.log('INFO', category, message, data);
     }
 
-    public error(module: string, message: string, data?: any) {
-        this.log('ERROR', module, message, data);
+    public warn(category: string, message: string, data?: any) {
+        this.log('WARN', category, message, data);
     }
 
-    public ai(module: string, message: string, data?: any) {
-        this.log('AI', module, message, data);
+    public error(category: string, message: string, data?: any) {
+        this.log('ERROR', category, message, data);
     }
 
-    public core(module: string, message: string, data?: any) {
-        this.log('CORE', module, message, data);
+    public debug(category: string, message: string, data?: any) {
+        this.log('DEBUG', category, message, data);
+    }
+
+    public success(category: string, message: string, data?: any) {
+        this.log('SUCCESS', category, message, data);
     }
 
     public getLogs(): LogEntry[] {
@@ -77,4 +88,4 @@ class Logger {
     }
 }
 
-export const logger = Logger.getInstance();
+export const logger = TacticalLogger.getInstance();

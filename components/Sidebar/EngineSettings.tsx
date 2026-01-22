@@ -1,7 +1,7 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
-import { useSentinel } from '../../hooks/useSentinel';
 import { DETECTION_PRESETS, PresetType } from '../../constants';
+import { useSentinel } from '../../hooks/useSentinel';
 
 export const EngineSettings = () => {
     const { currentPreset, setPreset, isPoseEnabled, setIsPoseEnabled } = useSentinel();

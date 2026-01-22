@@ -1,19 +1,21 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useSentinel } from '../../hooks/useSentinel';
+import React, { useState, useEffect } from 'react';
 import { GeometryLine, EntityType } from '../../types';
-import { X, Check, Trash2, Ban, ShieldAlert, GitCommitVertical } from 'lucide-react';
+import { X, Trash2, Ban, ShieldAlert, GitCommitVertical } from 'lucide-react';
+import { useSentinel } from '../../hooks/useSentinel';
 
 interface Point {
     x: number;
     y: number;
 }
 
-interface GeometryEditorProps {
-    canvasRef: React.RefObject<HTMLCanvasElement | null>;
-}
+export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasElement | null> }> = ({ canvasRef }) => {
+    const {
+        geometry,
+        setGeometry,
+        isEditingGeometry,
+        setIsEditingGeometry
+    } = useSentinel();
 
-export const GeometryEditor = ({ canvasRef }: GeometryEditorProps) => {
-    const { geometry, setGeometry, isEditingGeometry, setIsEditingGeometry } = useSentinel();
     const [startPoint, setStartPoint] = useState<Point | null>(null);
     const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
     const [showMenu, setShowMenu] = useState(false);

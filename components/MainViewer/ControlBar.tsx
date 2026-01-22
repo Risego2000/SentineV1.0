@@ -5,11 +5,15 @@ import { useSentinel } from '../../hooks/useSentinel';
 export const ControlBar = () => {
     const { isPlaying, setIsPlaying } = useSentinel();
 
+    const togglePlayback = () => {
+        setIsPlaying(!isPlaying);
+    };
+
     return (
         <div className="h-28 bg-[#020617] border-t border-white/5 flex items-center justify-between px-10 z-50 shrink-0">
             <div className="flex items-center gap-10">
                 <button
-                    onClick={() => setIsPlaying(!isPlaying)}
+                    onClick={togglePlayback}
                     className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl active:scale-90 ${isPlaying ? 'bg-red-800 text-white' : 'bg-cyan-500 text-black'
                         }`}
                 >

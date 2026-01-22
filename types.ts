@@ -43,6 +43,10 @@ export interface Track {
     snapshots: string[];
     isInfractor?: boolean;
     crossedLine?: boolean;
+    acceleration?: number;
+    headingChange?: number;
+    isAnomalous?: boolean;
+    anomalyLabel?: string;
     kf: any; // AdvancedKalman instance
 }
 

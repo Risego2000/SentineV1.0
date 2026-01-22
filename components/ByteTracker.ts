@@ -103,6 +103,30 @@ export class ByteTracker {
                 t.kf.update(cx, cy);
                 t.hits++;
 
+                // Physics Telemetry Update
+                const newVelocity = t.kf.getVelocity();
+                const newHeading = t.kf.getHeading();
+                const accel = newVelocity - t.velocity; // Simple delta val
+                const headingChange = Math.abs(newHeading - t.heading);
+
+                t.acceleration = accel;
+                t.headingChange = headingChange;
+                t.velocity = newVelocity;
+                t.heading = newHeading;
+
+                // Anomaly Detection Logic (Rule-based)
+                // 1. Sudden Braking/Acceleration (> 0.05 normalized units per frame is huge)
+                const isErraticAccel = Math.abs(accel) > 0.04;
+                // 2. Erratic Steering (Quick angle change > 45 degrees approx 0.8 rads in one frame)
+                const isErraticSteer = headingChange > 0.8;
+
+                t.isAnomalous = isErraticAccel || isErraticSteer;
+                if (t.isAnomalous) {
+                    t.anomalyLabel = isErraticAccel ? 'Aceleración Brusca' : 'Viraje Brusco';
+                } else {
+                    t.anomalyLabel = undefined;
+                }
+
                 t.bbox.w = d.w;
                 t.bbox.h = d.h;
                 t.bbox.x = t.kf.x - d.w / 2;
@@ -128,6 +152,8 @@ export class ByteTracker {
                     person: '#f472b6', bicycle: '#06b6d4', van: '#f59e0b', moped: '#8b5cf6'
                 };
 
+                const kfInstance = new AdvancedKalman(cx, cy);
+
                 this.tracks.push({
                     id: this.trackIdCount,
                     bbox: { ...d },
@@ -138,9 +164,12 @@ export class ByteTracker {
                     hits: 1,
                     tail: [{ x: cx, y: cy }],
                     color: colors[d.label.toLowerCase()] || '#00ff99',
-                    kf: new AdvancedKalman(cx, cy),
+                    kf: kfInstance,
                     velocity: 0,
                     heading: 0,
+                    acceleration: 0,
+                    headingChange: 0,
+                    isAnomalous: false,
                     processedLines: []
                 });
             }
