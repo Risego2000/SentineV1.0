@@ -82,10 +82,11 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     const [isListening, setIsListening] = useState(false);
     const [isPoseEnabled, setIsPoseEnabled] = useState(false);
     const [currentPreset, setPreset] = useState<PresetType>(() => {
-        const saved = localStorage.getItem('sentinel_preset');
-        return (saved as PresetType) || 'neural_core';
+        const saved = localStorage.getItem('sentinel_preset') as PresetType;
+        // Validación táctica: Si el preset guardado no existe en el motor actual, usar default
+        return (saved && DETECTION_PRESETS[saved]) ? saved : 'neural_core';
     });
-    const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset].config);
+    const [engineConfig, setEngineConfig] = useState<EngineConfig>(DETECTION_PRESETS[currentPreset]?.config || DETECTION_PRESETS.neural_core.config);
     const [fps, setFps] = useState(0);
     const [latency, setLatency] = useState(0);
     const [isEditingGeometry, setIsEditingGeometry] = useState(false);

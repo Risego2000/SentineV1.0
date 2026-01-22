@@ -1,7 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../components/ByteTracker';
-import { lineIntersect } from '../utils';
+import { lineIntersect, isPointInPoly } from '../utils';
 
 export const useFrameProcessor = () => {
     const {
@@ -107,27 +107,27 @@ export const useFrameProcessor = () => {
                         const lx1 = line.x1 * dW + oX; const ly1 = line.y1 * dH + oY;
                         const lx2 = line.x2 * dW + oX; const ly2 = line.y2 * dH + oY;
 
+                        // 1. LÓGICA DE LÍNEAS VECTORIALES (STOP, PROHIBIDO, CARRIL)
                         if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
-                            console.log(`[FORENSIC] ID:${t.id} (${t.label}) - Cruce Detectado en ${line.label}`);
+                            console.log(`[FORENSIC] ID:${t.id} (${t.label}) - Interacción Detectada en ${line.label}`);
 
                             let isInfraction = true;
                             let infractionLabel = line.label || 'INFRACCIÓN';
 
-                            // --- VALIDACIÓN DE STOP (Usando telemetría del tracker) ---
+                            // --- HEURÍSTICA DE STOP (Requiere detención > 3000ms) ---
                             if (line.type === 'stop_line') {
-                                // Usar la velocidad promediada (avgVelocity) calculada en ByteTracker
-                                if (t.avgVelocity && t.avgVelocity < 0.005) {
+                                // Si cruza la línea y su 'dwellTime' es menor a 3 segundos -> Infracción
+                                if (t.dwellTime > 3000) {
                                     isInfraction = false;
-                                    console.log(`[AUDIT] ID:${t.id} - Parada Validada.`);
+                                    console.log(`[AUDIT] ID:${t.id} - Stop Validado (${t.dwellTime}ms)`);
                                 } else {
                                     infractionLabel = 'VIOLACIÓN_STOP';
+                                    console.log(`[AUDIT] ID:${t.id} - Violación STOP: Detención insuficiente.`);
                                 }
                             }
 
                             if (isInfraction) {
-                                // Intentar capturar evidencia antes de iniciar análisis
                                 const snapshotCaptured = captureSnapshot(v, t);
-
                                 if (snapshotCaptured) {
                                     t.processedLines.push(line.id);
                                     t.crossedLine = true;
@@ -135,13 +135,30 @@ export const useFrameProcessor = () => {
                                     t.auditStatus = 'pending';
 
                                     const auditLine = { ...line, label: infractionLabel };
-                                    console.log(`[AUDIT] Iniciando proceso para ID:${t.id}...`);
                                     runAudit(t, auditLine);
-                                } else {
-                                    console.warn(`[AUDIT] No se pudo capturar evidencia para vehículo ${t.id}, reintentando en siguiente frame...`);
                                 }
                             } else {
                                 t.processedLines.push(line.id);
+                            }
+                        }
+
+                        // 2. LÓGICA DE ÁREAS (BOX JUNCTION / POLÍGONOS)
+                        if (line.type === 'box_junction' && line.points) {
+                            const inZone = isPointInPoly({ x: normX, y: normY }, line.points);
+                            if (inZone) {
+                                t.lastZoneId = line.id;
+                                // Si el vehículo se queda atrapado en el cruce (velocidad ~0 y dwellTime > 5s)
+                                if (t.dwellTime > 5000 && !t.processedLines.includes(line.id + '_box')) {
+                                    console.log(`[FORENSIC] ID:${t.id} - BLOQUEO DE INTERSECCIÓN DETECTADO.`);
+                                    const snap = captureSnapshot(v, t);
+                                    if (snap) {
+                                        t.processedLines.push(line.id + '_box');
+                                        t.audited = true;
+                                        runAudit(t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
+                                    }
+                                }
+                            } else if (t.lastZoneId === line.id) {
+                                t.lastZoneId = undefined;
                             }
                         }
                     }

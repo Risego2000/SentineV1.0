@@ -3,12 +3,12 @@ import { PenTool, Box, Divide, Scale, Save, RefreshCw, ShieldAlert } from 'lucid
 import { useSentinel } from '../../hooks/useSentinel';
 
 const PRESETS = [
-    { id: 'highway', label: 'Autovía', icon: Divide },
-    { id: 'urban_cross', label: 'Cruce', icon: Box },
-    { id: 'roundabout', label: 'Rotonda', icon: RefreshCw },
-    { id: 'bus_lane', label: 'Carril Bus', icon: Divide },
-    { id: 'pedestrian', label: 'Paso Peatonal', icon: ShieldAlert },
-    { id: 'loading_zone', label: 'Carga/Descarga', icon: Box },
+    { id: 'm113_highway', label: 'Carretera M-113', icon: Divide },
+    { id: 'calle_real_cross', label: 'Cruce Calle Real', icon: Box },
+    { id: 'daganzo_roundabout', label: 'Glorieta Acceso', icon: RefreshCw },
+    { id: 'urban_bus', label: 'Carril Bus Urbano', icon: Divide },
+    { id: 'residential_zone', label: 'Zona Residencial (S-28)', icon: ShieldAlert },
+    { id: 'commercial_loading', label: 'Carga/Descarga Daganzo', icon: Box },
 ];
 
 export const GeometryTools = () => {

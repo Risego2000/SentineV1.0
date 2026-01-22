@@ -198,25 +198,32 @@ export const AIService = {
                       ${directives}
                       
                       MISIÓN DE PERITAJE JUDICIAL:
-                      Actúa como un Perito de Tráfico Avanzado. Analiza la secuencia de imágenes y la telemetría para dictaminar si existe una infracción confirmada.
+                      Actúa como un Perito de Tráfico Avanzado. Analiza la secuencia de imágenes (Contexto + Zoom) y la telemetría para generar un Expediente Forense vinculante.
                       
                       PROCEDIMIENTO OBLIGATORIO:
-                      1. IDENTIFICACIÓN: Intenta leer la matrícula (plate) en el Zoom de Alta Resolución.
-                      2. ANÁLISIS CINÉTICO: ¿La velocidad y aceleración coinciden con una conducta infractora (ej: no detenerse en STOP)?
-                      3. VALIDACIÓN DE PROTOCOLO: Confronta la maniobra visualizada con las directivas de seguridad.
+                      1. IDENTIFICACIÓN TÉCNICA: Indica Marca, Modelo y Color dominante del vehículo.
+                      2. OCR MATRICULAR: Lee la placa (plate) con precisión quirúrgica en el Zoom Táctico.
+                      3. ANÁLISIS CONDUCTUAL: Valida si la maniobra (intersección, giro, dwellTime) viola el protocolo.
+                      4. BASE LEGAL (RGC): Cita los artículos del Reglamento General de Circulación infringidos.
                       
                       RETORNA ÚNICAMENTE JSON EN ESTE FORMATO:
                       {
                         "infraction": boolean,
                         "plate": "TEXTO_MATRICULA o DESCONOCIDO",
-                        "description": "Descripción técnica de la maniobra",
+                        "makeModel": "MARCA MODELO",
+                        "color": "COLOR VEHÍCULO",
+                        "description": "Relato técnico detallado de la maniobra",
                         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
                         "ruleCategory": "Categoría DGT",
-                        "reasoning": ["Punto clave 1", "Punto clave 2"],
-                        "telemetry": { "speedEstimated": "Velocidad aprox en reporte" }
+                        "legalBase": "Artículos del RGC vinculados (ej: Art 154, Art 151.2)",
+                        "reasoning": ["Hecho 1: Posición respecto a línea", "Hecho 2: Telemetría vs Protocolo"],
+                        "telemetry": { 
+                           "speedEstimated": "Velocidad aprox en reporte",
+                           "acceleration": "Tendencia de aceleración"
+                        }
                       }
                       
-                      Idioma: ESPAÑOL TÉCNICO.` }
+                      Idioma: ESPAÑOL TÉCNICO FORENSE.` }
                 ]
             },
             config: {

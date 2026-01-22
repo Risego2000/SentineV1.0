@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GeometryLine, EntityType } from '../../types';
-import { X, Trash2, Ban, ShieldAlert, GitCommitVertical } from 'lucide-react';
+import { X, Trash2, Ban, ShieldAlert, GitCommitVertical, Box } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
 interface Point {
@@ -187,6 +187,33 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] font-bold text-cyan-400 uppercase">División Carril</span>
+                        </div>
+                    </button>
+                    <button onClick={() => {
+                        if (!startPoint || !currentPoint) return;
+                        // Crear un RECTÁNGULO (Box Junction) a partir de los dos puntos
+                        const newLine: GeometryLine = {
+                            id: `geo_${Date.now()}`,
+                            x1: startPoint.x, y1: startPoint.y,
+                            x2: currentPoint.x, y2: currentPoint.y,
+                            type: 'box_junction',
+                            label: 'CRUCE_PROTEGIDO',
+                            points: [
+                                { x: startPoint.x, y: startPoint.y },
+                                { x: currentPoint.x, y: startPoint.y },
+                                { x: currentPoint.x, y: currentPoint.y },
+                                { x: startPoint.x, y: currentPoint.y }
+                            ]
+                        };
+                        setGeometry([...geometry, newLine]);
+                        setStartPoint(null); setCurrentPoint(null); setShowMenu(false);
+                    }} className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group">
+                        <div className="p-1.5 rounded bg-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                            <Box size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-orange-400 uppercase">Box Junction</span>
+                            <span className="text-[7px] text-slate-500">Detección por bloqueo</span>
                         </div>
                     </button>
                 </div>

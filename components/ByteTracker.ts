@@ -126,39 +126,43 @@ export class ByteTracker {
                     t.label = modeLabel;
                 }
 
-                // --- TELEMETRÍA AVANZADA ---
+                // --- TELEMETRÍA AVANZADA (Heuristic Engine) ---
                 const newVelocity = t.kf.getVelocity();
                 const newHeading = t.kf.getHeading();
-                const accel = newVelocity - t.velocity;
-                const headingChange = Math.abs(newHeading - t.heading);
+                const deltaV = newVelocity - t.velocity;
 
                 // Suavizado de velocidad para visualización (Moving Average)
                 if (!t.velocityHistory) t.velocityHistory = [];
                 t.velocityHistory.push(newVelocity);
-                if (t.velocityHistory.length > 10) t.velocityHistory.shift();
+                if (t.velocityHistory.length > 15) t.velocityHistory.shift();
                 t.avgVelocity = t.velocityHistory.reduce((a: number, b: number) => a + b, 0) / t.velocityHistory.length;
 
-                t.acceleration = accel;
-                t.headingChange = headingChange;
+                // Lógica de Permanencia (Dwell Time)
+                // Si la velocidad es < 0.002, acumulamos tiempo de permanencia (asumiendo ~30fps -> 33ms/f)
+                if (newVelocity < 0.002) {
+                    t.dwellTime += 33;
+                } else {
+                    t.dwellTime = 0; // Reset si se mueve
+                }
+
+                t.acceleration = deltaV;
                 t.velocity = newVelocity;
                 t.heading = newHeading;
 
-                // --- DETECCIÓN DE COMPORTAMIENTO ANÓMALO (Heurística Forense) ---
-                // 1. Aceleración/Frenado Brusco (Umbral Cineamático > 0.04)
-                const isPanicBrake = accel < -0.04;
-                const isSuddenAccel = accel > 0.04;
-                // 2. Viraje Errático (Cambio de rumbo > 0.9 rads/frame)
-                const isErraticSteer = headingChange > 0.9;
-                // 3. Drift Lateral (Velocidad lateral alta respecto al centro)
-                const isLateralDrift = Math.abs(t.kf.vx) > 0.08 && Math.abs(t.kf.vx) > Math.abs(t.kf.vy);
+                // --- DETECCIÓN DE COMPORTAMIENTO ANÓMALO (Heurística de Tráfico) ---
+                const isPanicBrake = deltaV < -0.05;
+                const isSuddenAccel = deltaV > 0.05;
+                const isErraticSteer = Math.abs(newHeading - t.heading) > 1.0;
 
-                t.isAnomalous = isPanicBrake || isSuddenAccel || isErraticSteer || isLateralDrift;
+                // Sentido Contrario (Necesita referencia, por ahora heurística de ángulo constante opuesto)
+                // ... (Implementar con referencia de carril en el futuro)
+
+                t.isAnomalous = isPanicBrake || isSuddenAccel || isErraticSteer;
 
                 if (t.isAnomalous) {
-                    if (isPanicBrake) t.anomalyLabel = 'Frenado Crítico';
+                    if (isPanicBrake) t.anomalyLabel = 'Frenado de Emergencia';
                     else if (isSuddenAccel) t.anomalyLabel = 'Aceleración Brusca';
-                    else if (isErraticSteer) t.anomalyLabel = 'Viraje Errático';
-                    else if (isLateralDrift) t.anomalyLabel = 'Derrape Lateral';
+                    else if (isErraticSteer) t.anomalyLabel = 'Maniobra Errática';
                 } else {
                     t.anomalyLabel = undefined;
                 }

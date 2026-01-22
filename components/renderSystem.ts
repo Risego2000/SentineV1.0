@@ -32,6 +32,31 @@ export const renderScene = (
         const x2 = line.x2 * width;
         const y2 = line.y2 * height;
 
+        // --- DIBUJO DE POLÍGONOS (Box Junction / Áreas) ---
+        if (line.type === 'box_junction' && line.points && line.points.length > 2) {
+            ctx.beginPath();
+            ctx.moveTo(line.points[0].x * width, line.points[0].y * height);
+            for (let i = 1; i < line.points.length; i++) {
+                ctx.lineTo(line.points[i].x * width, line.points[i].y * height);
+            }
+            ctx.closePath();
+
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)'; // Amber Fill
+            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label del área
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText(line.label, line.points[0].x * width + 5, line.points[0].y * height + 15);
+            return;
+        }
+
+        // --- DIBUJO DE LÍNEAS VECTORIALES ---
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
