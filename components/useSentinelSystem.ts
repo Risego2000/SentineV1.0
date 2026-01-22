@@ -49,11 +49,19 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
     }, [hasApiKey, addLog]);
 
     const runAudit = useCallback(async (track: Track, line: GeometryLine, directives: string) => {
-        if (!hasApiKey || track.snapshots.length === 0) return;
+        if (!hasApiKey) {
+            addLog('ERROR', 'Unidad Forense: Error de Acceso. API Key no detectada.');
+            return;
+        }
+        if (!track.snapshots || track.snapshots.length === 0) {
+            addLog('WARN', `Unidad Forense: Evidencia insuficiente para vehículo ${track.id}.`);
+            return;
+        }
         setIsAnalyzing(true);
 
         try {
-            addLog('AI', `Gemini 2.0 Flash: Auditando evento en "${line.label}"...`);
+            const timeCode = new Date().toLocaleTimeString();
+            addLog('AI', `[${timeCode}] Analizando infracción en "${line.label}" via Gemini...`);
             const audit = await AIService.runAudit(track, line, directives);
 
             if (audit.infraction) {

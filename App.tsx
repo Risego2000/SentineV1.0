@@ -39,7 +39,7 @@ export const App = () => {
         mediapipeReady
     } = useSentinel();
 
-    const { processFrame, trackerRef } = useFrameProcessor();
+    const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
 
     // refs
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -94,7 +94,10 @@ export const App = () => {
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) contextOnFileChange(file, videoRef);
+        if (file) {
+            resetTracker(); // LIMPIEZA TÁCTICA DEL TRACKER
+            contextOnFileChange(file, videoRef);
+        }
         e.target.value = '';
     };
 

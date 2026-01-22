@@ -57,6 +57,11 @@ export class ByteTracker {
     tracks: any[] = [];
     trackIdCount = 0;
 
+    reset() {
+        this.tracks = [];
+        this.trackIdCount = 0;
+    }
+
     // Advanced Trajectory Step (Motion Prediction)
     step() {
         this.tracks.forEach(t => {

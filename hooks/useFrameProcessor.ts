@@ -38,9 +38,9 @@ export const useFrameProcessor = () => {
                 setStats(prev => ({ ...prev, det: prev.det + 1 }));
             }
 
-            // Usar la BASE del vehículo (Punto de contacto con el suelo) para mayor precisión en perspectiva
+            // Usar el CENTRO del vehículo para ser consistente con el tail del tracker
             const cx = t.bbox.x * dW + t.bbox.w * dW / 2 + oX;
-            const cy = (t.bbox.y + t.bbox.h) * dH + oY; // Fondo del BBox (ruedas)
+            const cy = t.bbox.y * dH + t.bbox.h * dH / 2 + oY; // Ahora usamos el Centro
 
             if (!t.processedLines) t.processedLines = [];
 
@@ -57,15 +57,13 @@ export const useFrameProcessor = () => {
                         const lx2 = line.x2 * dW + oX; const ly2 = line.y2 * dH + oY;
 
                         if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
+                            console.log(`[DETECCIÓN] Vehículo ${t.id} cruzó línea ${line.label}`);
 
                             let isInfraction = true;
                             let infractionLabel = line.label || 'INFRACCIÓN';
 
                             // --- TRUE STOP LOGIC ---
-                            // Check velocity history for stop lines
                             if (line.type === 'stop_line') {
-                                // Calculate average displacement per frame over last 20 frames (~0.5s at 30fps)
-                                // Only works if we have enough tail history
                                 if (t.tail.length >= 10) {
                                     const history = t.tail.slice(-20);
                                     let totalDist = 0;
@@ -75,13 +73,9 @@ export const useFrameProcessor = () => {
                                         totalDist += Math.sqrt(dx * dx + dy * dy);
                                     }
                                     const avgSpeed = totalDist / (history.length - 1);
-
-                                    // Threshold: 0.005 normalized units per frame typically means very slow/stopped
-                                    // Adjust based on typical scene depth
                                     if (avgSpeed < 0.005) {
-                                        isInfraction = false; // He stopped!
-                                        // Optional: Log "Good Driver" event or simply ignore
-                                        console.log(`Vehicle ${t.id} performed a valid STOP.`);
+                                        isInfraction = false;
+                                        console.log(`[AUDIT] Vehículo ${t.id} realizó STOP válido.`);
                                     } else {
                                         infractionLabel = 'STOP VIOLATION';
                                     }
@@ -91,9 +85,8 @@ export const useFrameProcessor = () => {
                             if (isInfraction) {
                                 t.processedLines.push(line.id);
                                 t.crossedLine = true;
-                                t.audited = true; // Mark as audited
+                                t.audited = true;
 
-                                // Override label for the audit if modified
                                 const auditLine = { ...line, label: infractionLabel };
 
                                 if (!snapshotCanvasRef.current) {
@@ -109,11 +102,10 @@ export const useFrameProcessor = () => {
                                     const data = sC.toDataURL('image/jpeg', 0.5);
                                     t.snapshots.push(data.split(',')[1]);
 
-                                    // Send to Neural Core
+                                    console.log(`[AUDIT] Enviando vehículo ${t.id} a Gemini...`);
                                     runAudit(t, auditLine);
                                 }
                             } else {
-                                // If valid stop, we still mark line as processed so we don't check it again
                                 t.processedLines.push(line.id);
                             }
                         }
@@ -121,7 +113,7 @@ export const useFrameProcessor = () => {
                 }
             });
         });
-    }, [geometry, runAudit, setStats]);
+    }, [geometry, runAudit]);
 
     const processFrame = useCallback(async (v: HTMLVideoElement, canvas: HTMLCanvasElement) => {
         if (!v || v.paused || v.ended || isProcessingRef.current) return;
@@ -162,5 +154,11 @@ export const useFrameProcessor = () => {
         }
     }, [detect, detectPose, engineConfig, isPoseEnabled, processTrackResults]);
 
-    return { processFrame, trackerRef, seenTrackIds };
+    const resetTracker = useCallback(() => {
+        trackerRef.current.reset();
+        seenTrackIds.current.clear();
+        setTracks([]);
+    }, [setTracks]);
+
+    return { processFrame, trackerRef, seenTrackIds, resetTracker };
 };
