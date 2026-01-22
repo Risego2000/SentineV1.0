@@ -1,13 +1,9 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
-import { InfractionLog } from '../../types';
+import { useSentinel } from '../../hooks/useSentinel';
 
-interface InfractionFeedProps {
-    logs: InfractionLog[];
-    setSelectedLog: (log: InfractionLog | null) => void;
-}
-
-export const InfractionFeed: React.FC<InfractionFeedProps> = ({ logs, setSelectedLog }) => {
+export const InfractionFeed = () => {
+    const { logs, setSelectedLog } = useSentinel();
 
     return (
         <>

@@ -8,15 +8,7 @@ import { GeometryTools } from './Sidebar/GeometryTools';
 import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
 
 
-interface SidebarProps {
-    toggleListening: () => void;
-}
-
-/**
- * Componente Sidebar modularizado.
- * Utiliza memoización para evitar re-renders innecesarios.
- */
-export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
+export const Sidebar = memo(() => {
     return (
         <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0 h-screen overflow-hidden">
             <div className="p-6 border-b border-white/10 flex items-center gap-4 bg-cyan-950/10 shrink-0">
@@ -34,7 +26,7 @@ export const Sidebar = memo(({ toggleListening }: SidebarProps) => {
                 <EngineSettings />
                 <GeometryTools />
                 <ProtocolSelector />
-                <SecurityProtocol toggleListening={toggleListening} />
+                <SecurityProtocol />
                 <PredictiveAnalytics />
             </div>
 

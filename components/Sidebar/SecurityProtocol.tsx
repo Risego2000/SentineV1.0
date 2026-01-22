@@ -2,12 +2,8 @@ import React from 'react';
 import { Target, Mic, Sparkles } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
-interface SecurityProtocolProps {
-    toggleListening: () => void;
-}
-
-export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => {
-    const { directives, setDirectives, isListening, generateGeometry } = useSentinel();
+export const SecurityProtocol = () => {
+    const { directives, setDirectives, isListening, setIsListening, generateGeometry } = useSentinel();
 
     return (
         <div className="space-y-3">
@@ -16,7 +12,7 @@ export const SecurityProtocol = ({ toggleListening }: SecurityProtocolProps) => 
                     <Target size={14} className="text-cyan-500" /> Protocolo de Seguridad
                 </h3>
                 <button
-                    onClick={toggleListening}
+                    onClick={() => setIsListening(!isListening)}
                     className={`p-2 rounded-xl transition-all ${isListening
                         ? 'bg-red-500 text-white animate-pulse'
                         : 'bg-slate-800 text-cyan-500 hover:bg-slate-700'
