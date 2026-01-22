@@ -38,8 +38,9 @@ export const useFrameProcessor = () => {
                 setStats(prev => ({ ...prev, det: prev.det + 1 }));
             }
 
+            // Usar la BASE del vehículo (Punto de contacto con el suelo) para mayor precisión en perspectiva
             const cx = t.bbox.x * dW + t.bbox.w * dW / 2 + oX;
-            const cy = t.bbox.y * dH + t.bbox.h * dH / 2 + oY;
+            const cy = (t.bbox.y + t.bbox.h) * dH + oY; // Fondo del BBox (ruedas)
 
             if (!t.processedLines) t.processedLines = [];
 
