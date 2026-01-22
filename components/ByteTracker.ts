@@ -108,6 +108,26 @@ export class ByteTracker {
                 t.kf.update(cx, cy);
                 t.hits++;
 
+                // ACTUALIZACIÓN DE ETIQUETA POR VOTACIÓN (Temporal Smoothing)
+                if (!t.labelHistory) t.labelHistory = [];
+                t.labelHistory.push(d.label);
+                if (t.labelHistory.length > 30) t.labelHistory.shift();
+
+                // Calcular la moda del historial para estabilizar la clasificación
+                const counts: Record<string, number> = {};
+                t.labelHistory.forEach((lbl: string) => counts[lbl] = (counts[lbl] || 0) + 1);
+                const modeLabel = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+
+                // Refinamiento por Aspect Ratio (Sanity Check)
+                // Un coche rara vez es más alto que ancho en perspectiva cenital/oblicua normal
+                const aspectRatio = d.w / d.h;
+                if (modeLabel === 'truck' && aspectRatio > 1.2 && d.h < 0.25) {
+                    // Si detecta camión pero es bajito y ancho, probablemente es un COCHE
+                    t.label = 'car';
+                } else {
+                    t.label = modeLabel;
+                }
+
                 // Physics Telemetry Update
                 const newVelocity = t.kf.getVelocity();
                 const newHeading = t.kf.getHeading();
@@ -163,6 +183,7 @@ export class ByteTracker {
                     id: this.trackIdCount,
                     bbox: { ...d },
                     label: d.label,
+                    labelHistory: [d.label], // Inicializar historial
                     score: d.score,
                     missedFrames: 0,
                     isCoasting: false,
