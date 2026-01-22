@@ -262,11 +262,17 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
             videoRef.current.onloadeddata = () => {
                 addLog('INFO', `Procesador Cápsula: Video "${file.name}" sincronizado.`);
                 setStatusMsg("SISTEMA_LISTO");
+
+                // AUTO-ANALYSIS: Generar protocolo y geometría inicial
+                setTimeout(() => {
+                    addLog('Core', 'Unidad Táctica: Escaneando escena para generar Protocolo de Seguridad...');
+                    generateGeometry("PERFILADO DE ESCENA: Analiza el video, detecta el tipo de vía y genera un PROTOCOLO DE SEGURIDAD completo con su geometría asociada.");
+                }, 1000);
             };
             setIsPlaying(false);
             setSource('upload');
             setStatusMsg("VIDEO CARGADO");
-            addLog('CORE', 'Subsector de Datos: Transmisión cargada. Esperando configuración vectorial manual...');
+            addLog('CORE', 'Subsector de Datos: Transmisión cargada. Iniciando análisis de protocolos...');
             setTimeout(() => setStatusMsg(null), 2000);
         }
     }, [addLog, setStatusMsg, generateGeometry, setStats, setGeometry, setDirectives]);
