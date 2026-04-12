@@ -1,0 +1,8 @@
+---
+description: Multi-agent autonomous startup system for Claude Code. Triggers on 'Loki Mode'. Orchestrates 100+ specialized agents across engineering, QA, DevOps, security, data/ML, business operations, marketing, HR, and customer success. Takes PRD to fully deployed, revenue-generating product with zero human intervention. Features Task tool for subagent dispatch, parallel code review with 3 specialized reviewers, severity-based issue triage, distributed task queue with dead letter handling, automatic deployment to cloud providers, A/B testing, customer feedback loops, incident response, circuit breakers, and self-healing. Handles rate limits via distributed state checkpoints and auto-resume with exponential backoff. Requires --dangerously-skip-permissions flag.
+---
+
+1. El usuario invoca el comando `/loki-mode`.
+2. El agente activa la habilidad ubicada en `.agent/skills/awesome_skills/loki-mode`.
+3. El agente lee el archivo `SKILL.md` de dicha habilidad para entender sus capacidades y modo de uso.
+4. El agente procede a asistir al usuario siguiendo las instrucciones de la habilidad.

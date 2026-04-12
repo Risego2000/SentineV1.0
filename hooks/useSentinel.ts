@@ -6,9 +6,11 @@ import { SentinelContext } from '../context/SentinelContext';
  * Lanza un error descriptivo si se intenta usar fuera del SentinelProvider.
  */
 export const useSentinel = () => {
-    const context = useContext(SentinelContext);
-    if (context === undefined) {
-        throw new Error('useSentinel debe ser utilizado dentro de un SentinelProvider. Verifica la envoltura en App.tsx o index.tsx.');
-    }
-    return context;
+  const context = useContext(SentinelContext);
+  if (context === undefined) {
+    throw new Error(
+      'useSentinel debe ser utilizado dentro de un SentinelProvider. Verifica la envoltura en App.tsx o index.tsx.'
+    );
+  }
+  return context;
 };

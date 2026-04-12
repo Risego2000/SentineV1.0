@@ -1,137 +1,166 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
+
 // Components & Modules
 import { Sidebar } from './components/Sidebar';
 import { RightSidebar } from './components/RightSidebar';
 import { MainViewer } from './components/MainViewer/MainViewer';
 import { InfractionModal } from './components/InfractionModal';
-import { useNeuralCore } from './components/useNeuralCore';
-import { useSentinelSystem } from './components/useSentinelSystem';
-import { ByteTracker } from './components/ByteTracker'; // Importar Tracker
-import { EngineConfig, GeometryLine, InfractionLog, Track } from './types';
-import { TRACK_SMOOTHING, DETECTION_PRESETS, PresetType } from './constants';
-import { lineIntersect } from './utils';
-import './index.css';
-
+import { IpCameraModal } from './components/IpCameraModal';
 import { useSentinel } from './hooks/useSentinel';
 import { useFrameProcessor } from './hooks/useFrameProcessor';
 import { renderScene } from './components/renderSystem';
 import './index.css';
 
+/**
+ * Sentinel AI Supreme Command Unit (Main Application).
+ * Orchestrates global visuals, tactical feedback loop, and system synchronization.
+ */
 export const App = () => {
-    const {
-        source, setSource,
-        isPlaying, setIsPlaying,
-        directives, setDirectives,
-        geometry, setGeometry,
-        selectedLog, setSelectedLog,
-        isListening, setIsListening,
-        isPoseEnabled, setIsPoseEnabled,
-        currentPreset, setPreset,
-        stats, setStats,
-        statusMsg, setStatusMsg,
-        isAnalyzing,
-        systemStatus,
-        statusLabel,
-        addLog,
-        addInfraction,
-        videoRef,
-        onFileChange: contextOnFileChange,
-        startLiveFeed: contextStartLiveFeed,
-        mediapipeReady
-    } = useSentinel();
+  const {
+    source,
+    isPlaying,
+    setIsPlaying,
+    geometry,
+    selectedLog,
+    setSelectedLog,
+    isMeshRenderEnabled,
+    addLog,
+    videoRef,
+    onFilesChange: contextOnFilesChange,
+    isBatchMode,
+    loadNextInQueue,
+    finalizeVideoReport,
+    startLiveFeed: contextStartLiveFeed,
+    clearLogs,
+  } = useSentinel();
 
-    const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
+  const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
 
-    // refs
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const manualRender = useState(0)[0]; // Dummy for backward compatibility if needed, but we'll use actual loop
+  // UI States
+  const [showIpModal, setShowIpModal] = React.useState(false);
 
-    // --- SYSTEM INIT ---
-    useEffect(() => {
-        addLog('CORE', 'Sincronizando Motor Vectorial Sentinel AI...');
-    }, []);
+  // DOM Refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const processTrackResults = (activeTracks: any[]) => {
-        // This is now mostly handled by useFrameProcessor, 
-        // but we might want to trigger manual render or side effects here.
+  // --- SYSTEM INITIALIZATION ---
+  useEffect(() => {
+    addLog('CORE', 'Sincronizando Motor Vectorial Sentinel AI... Unidad de Comando Activa.');
+  }, [addLog]);
+
+  /**
+   * Tactical Render Loop.
+   * Synchronizes video processing and forensic visualization.
+   */
+  const loop = useCallback(async () => {
+    const v = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!v || !canvas || source === 'none') return;
+
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx || v.readyState < 2) return;
+
+    // Execute frame processing ONLY if playing
+    if (isPlaying) {
+      await processFrame(v, canvas);
+    }
+
+    // Always render the scene (includes tracked entities history/predictions)
+    renderScene(ctx, v, trackerRef.current.tracks, geometry, isMeshRenderEnabled);
+  }, [isPlaying, source, geometry, processFrame, isMeshRenderEnabled, videoRef, trackerRef]);
+
+  useEffect(() => {
+    let anim: number;
+    const frameLoop = async () => {
+      await loop();
+      anim = requestAnimationFrame(frameLoop);
+    };
+    anim = requestAnimationFrame(frameLoop);
+    return () => cancelAnimationFrame(anim);
+  }, [loop]);
+
+  // --- TACTICAL HANDLERS ---
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      resetTracker(); // Tactical Reset
+      clearLogs(); // Reset UI
+      contextOnFilesChange(files, videoRef);
+    }
+    e.target.value = '';
+  };
+
+  // Video State Management
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    if (isPlaying) {
+      v.play().catch((error) => {
+        console.error('Transmission Error:', error);
+      });
+    } else {
+      v.pause();
+    }
+
+    const handleEnded = async () => {
+      if (isBatchMode) {
+        addLog('INFO', 'Video finalizado. Transicionando al siguiente en la cola...');
+        await loadNextInQueue();
+      } else {
+        setIsPlaying(false);
+        addLog('INFO', 'Análisis finalizado: Fin de la transmisión de datos.');
+        if (source === 'upload') {
+          await finalizeVideoReport();
+        }
+      }
     };
 
-    // --- PROCESS FRAME ---
-    const loop = useCallback(async () => {
-        const v = videoRef.current;
-        const canvas = canvasRef.current;
-        if (!v || !canvas || source === 'none') return;
+    v.addEventListener('ended', handleEnded);
+    return () => v.removeEventListener('ended', handleEnded);
+  }, [
+    isPlaying,
+    isBatchMode,
+    loadNextInQueue,
+    addLog,
+    setIsPlaying,
+    videoRef,
+    source,
+    finalizeVideoReport,
+  ]);
 
-        const ctx = canvas.getContext('2d', { alpha: false });
-        if (!ctx || v.readyState < 2) return;
+  return (
+    <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
+      <Sidebar />
 
-        // Sync processing
-        if (isPlaying) {
-            await processFrame(v, canvas);
-        }
+      <MainViewer
+        videoRef={videoRef}
+        canvasRef={canvasRef}
+        onLive={() => {
+          clearLogs();
+          contextStartLiveFeed(videoRef);
+        }}
+        onUpload={handleFileSelect}
+      />
 
-        // Render
-        renderScene(ctx, v, trackerRef.current.tracks, geometry);
+      <RightSidebar />
 
-        // Feedback loop
-    }, [isPlaying, source, geometry, processFrame]);
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="video/*"
+        multiple
+        onChange={onFileChange}
+      />
 
-    useEffect(() => {
-        let anim: number;
-        const frameLoop = async () => {
-            await loop();
-            anim = requestAnimationFrame(frameLoop);
-        };
-        frameLoop();
-        return () => cancelAnimationFrame(anim);
-    }, [loop]);
-
-    // --- HANDLERS ---
-
-    const handleFileSelect = () => {
-        document.getElementById('file-up')?.click();
-    };
-
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            resetTracker(); // LIMPIEZA TÁCTICA DEL TRACKER
-            contextOnFileChange(file, videoRef);
-        }
-        e.target.value = '';
-    };
-
-    // Sync Video Control & Events
-    useEffect(() => {
-        const v = videoRef.current;
-        if (v) {
-            if (isPlaying) v.play().catch(e => console.error("Play error:", e));
-            else v.pause();
-
-            const handleEnded = () => {
-                setIsPlaying(false);
-                addLog('INFO', 'Análisis finalizado: Fin de la transmisión.');
-            };
-
-            v.addEventListener('ended', handleEnded);
-            return () => v.removeEventListener('ended', handleEnded);
-        }
-    }, [isPlaying, addLog, setIsPlaying]);
-
-    return (
-        <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
-            <Sidebar
-                toggleListening={() => setIsListening(!isListening)}
-            />
-
-            <MainViewer
-                videoRef={videoRef} canvasRef={canvasRef}
-                onLive={contextStartLiveFeed} onUpload={handleFileSelect}
-            />
-
-            <RightSidebar />
-            <input id="file-up" type="file" className="hidden" accept="video/*" onChange={onFileChange} />
-            {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
-        </div>
-    );
+      {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+      {showIpModal && <IpCameraModal onClose={() => setShowIpModal(false)} />}
+    </div>
+  );
 };

@@ -1,119 +1,162 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Zap, TrendingUp, AlertOctagon } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Zap, TrendingUp, AlertOctagon } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
 
 export const PredictiveAnalytics = () => {
-    const { stats, tracks } = useSentinel();
-    const { helpProps } = useHelp();
-    const [congestionLevel, setCongestionLevel] = useState(0);
-    const [prediction, setPrediction] = useState('ESTABLE');
-    const [anomalies, setAnomalies] = useState<string[]>([]);
+  const { tracks } = useSentinel();
+  const { helpProps } = useHelp();
 
-    useEffect(() => {
-        // Cálculo real de congestión basado en tracks activos
-        const activeTracks = tracks.filter(t => !t.isCoasting).length;
-        const density = Math.min(activeTracks * 10, 100);
-        setCongestionLevel(density);
+  const congestionLevel = useMemo(() => {
+    const activeTracks = tracks.filter((t) => !t.isCoasting).length;
+    return Math.min(activeTracks * 10, 100);
+  }, [tracks]);
 
-        if (density > 80) {
-            setPrediction('SATURACIÓN INMINENTE');
-        } else if (density > 50) {
-            setPrediction('TRÁFICO DENSO CITI');
-        } else {
-            setPrediction('FLUJO ESTABLE');
-        }
+  const prediction =
+    congestionLevel > 80
+      ? 'SATURACIÓN INMINENTE'
+      : congestionLevel > 50
+        ? 'TRÁFICO DENSO CITI'
+        : 'FLUJO ESTABLE';
 
-        // Capturar anomalías reales del tracker
-        const currentAnomalies = tracks
-            .filter(t => t.isAnomalous && t.anomalyLabel)
-            .map(t => `${t.anomalyLabel} [KINETIC_${t.id}]`);
+  const anomalies = useMemo(
+    () =>
+      tracks
+        .filter((t) => t.isAnomalous && t.anomalyLabel)
+        .map((t) => `${t.anomalyLabel} [KINETIC_${t.id}]`)
+        .slice(0, 3),
+    [tracks]
+  );
 
-        if (currentAnomalies.length > 0) {
-            setAnomalies(prev => {
-                const combined = [...currentAnomalies, ...prev];
-                const unique = Array.from(new Set(combined));
-                return unique.slice(0, 3);
-            });
-        }
-
-    }, [tracks]);
-
-    return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between"
-                {...helpProps("Panel de analítica predictiva. Calcula densidades y detecta patrones anómalos en el flujo.")}
-            >
-                <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                    <TrendingUp size={14} className="text-cyan-500" /> Analítica Predictiva
-                </h3>
-                <span className="text-[9px] font-mono text-cyan-600/60 uppercase animate-pulse">LIVE_INFERENCE</span>
-            </div>
-
-            <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
-
-                {/* Congestion Meter */}
-                <div className="space-y-2" {...helpProps("Nivel de saturación de la vía basado en el recuento de vehículos activos.")}>
-                    <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400">
-                        <span>Nivel de Congestión</span>
-                        <span className={congestionLevel > 70 ? 'text-red-500' : 'text-cyan-500'}>{congestionLevel}%</span>
-                    </div>
-                    <div className="h-2 bg-black/50 rounded-full overflow-hidden border border-white/5">
-                        <div
-                            className={`h-full transition-all duration-1000 ${congestionLevel > 70 ? 'bg-gradient-to-r from-orange-500 to-red-500' : 'bg-cyan-500'
-                                }`}
-                            style={{ width: `${congestionLevel}%` }}
-                        />
-                    </div>
-                    <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5"
-                        {...helpProps("Predicción del estado del tráfico en los próximos 5 minutos mediante análisis de vectores.")}
-                    >
-                        <span className="text-[9px] text-slate-500 uppercase">Predicción (t+5m)</span>
-                        <span className={`text-[9px] font-black uppercase ${prediction.includes('SATURACIÓN') ? 'text-red-500 animate-pulse' : 'text-emerald-400'
-                            }`}>
-                            {prediction}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Anomalies List */}
-                <div className="space-y-2" {...helpProps("Detección de comportamientos cinemáticos fuera de norma (velocidad, dirección, permanencia).")}>
-                    <h4 className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-2">
-                        <AlertOctagon size={12} className="text-amber-500" /> Alertas de Comportamiento
-                    </h4>
-                    <div className="space-y-1">
-                        {anomalies.length === 0 ? (
-                            <div className="p-2 text-[9px] text-slate-600 italic text-center border border-dashed border-white/5 rounded-lg">
-                                Sin anomalías detectadas
-                            </div>
-                        ) : (
-                            anomalies.map((anom, i) => (
-                                <div key={i} className="flex items-center gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded-lg text-[10px] text-amber-200">
-                                    <Zap size={10} className="text-amber-500 shrink-0" />
-                                    {anom}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* Early Warning Stats */}
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center"
-                        {...helpProps("Puntuación de riesgo acumulado en la zona actual de análisis.")}
-                    >
-                        <span className="block text-[8px] text-slate-500 uppercase mb-1">Risk Score</span>
-                        <span className="text-lg font-black text-cyan-400">0.04</span>
-                    </div>
-                    <div className="bg-black/20 border border-white/5 p-2 rounded-lg text-center"
-                        {...helpProps("Predicción de tiempo estimado para un evento de colisión basado en trayectorias actuales.")}
-                    >
-                        <span className="block text-[8px] text-slate-500 uppercase mb-1">Time-To-Col</span>
-                        <span className="text-lg font-black text-emerald-400">∞</span>
-                    </div>
-                </div>
-
-            </div>
+  return (
+    <div className="space-y-4">
+      <div
+        className="flex items-center justify-between px-1"
+        {...helpProps(
+          'Panel de analítica predictiva. Calcula densidades y detecta patrones anómalos en el flujo.'
+        )}
+      >
+        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] flex items-center gap-2">
+          <TrendingUp size={14} className="text-cyan-500" /> Analítica_Predictiva
+        </h3>
+        <div className="flex items-center gap-1.5 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+          <div className="w-1 h-1 bg-cyan-500 rounded-full animate-pulse" />
+          <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">
+            Live_Inf
+          </span>
         </div>
-    );
+      </div>
+
+      <div className="glass-card rounded-[32px] p-6 space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 hud-grid opacity-10 pointer-events-none" />
+
+        {/* Congestion Meter */}
+        <div
+          className="space-y-3 relative z-10"
+          {...helpProps(
+            'Nivel de saturación de la vía basado en el recuento de vehículos activos.'
+          )}
+        >
+          <div className="flex justify-between items-end text-[9px] uppercase font-black tracking-widest text-slate-500">
+            <span className="italic">Nivel de Congestión</span>
+            <span
+              className={`text-[11px] font-mono font-black ${congestionLevel > 70 ? 'text-red-500 text-glow-cyan' : 'text-cyan-400'}`}
+            >
+              {congestionLevel.toFixed(1)}%
+            </span>
+          </div>
+          <div className="h-3 bg-slate-950 rounded-full overflow-hidden border border-white/5 p-0.5 shadow-inner">
+            <div
+              className={`h-full transition-all duration-1000 rounded-full relative ${
+                congestionLevel > 70
+                  ? 'bg-gradient-to-r from-orange-600 to-red-600'
+                  : 'bg-gradient-to-r from-cyan-600 to-cyan-400'
+              }`}
+              style={{ width: `${congestionLevel}%` }}
+            >
+              <div className="absolute inset-0 bg-white/20 animate-pulse" />
+            </div>
+          </div>
+          <div
+            className="flex justify-between items-center bg-[#020617]/50 p-3 rounded-2xl border border-white/5 transition-all hover:bg-[#020617]/80"
+            {...helpProps(
+              'Predicción del estado del tráfico en los próximos 5 minutos mediante análisis de vectores.'
+            )}
+          >
+            <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest">
+              Predicción (t+5m)
+            </span>
+            <span
+              className={`text-[9px] font-black uppercase tracking-wider ${
+                prediction.includes('SATURACIÓN')
+                  ? 'text-red-500 animate-pulse'
+                  : 'text-emerald-400'
+              }`}
+            >
+              {prediction}
+            </span>
+          </div>
+        </div>
+
+        {/* Anomalies List */}
+        <div
+          className="space-y-3 relative z-10"
+          {...helpProps(
+            'Detección de comportamientos cinemáticos fuera de norma (velocidad, dirección, permanencia).'
+          )}
+        >
+          <h4 className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-2 tracking-[0.2em] italic">
+            <AlertOctagon size={12} className="text-amber-500" /> Alertas_Sistema
+          </h4>
+          <div className="space-y-2 min-h-[60px]">
+            {anomalies.length === 0 ? (
+              <div className="p-4 text-[9px] text-slate-600 italic font-medium text-center border-2 border-dashed border-white/5 rounded-2xl bg-slate-900/10">
+                Sin anomalías detectadas
+              </div>
+            ) : (
+              anomalies.map((anom, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 p-3 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-[9.5px] text-amber-200/90 font-bold uppercase tracking-tight animate-in slide-in-from-right-2"
+                >
+                  <div className="w-5 h-5 rounded-lg bg-amber-500/20 flex items-center justify-center border border-amber-500/20">
+                    <Zap size={10} className="text-amber-500" />
+                  </div>
+                  <span className="flex-1 text-glow-cyan">{anom}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Early Warning Stats */}
+        <div className="grid grid-cols-2 gap-3 relative z-10">
+          <div
+            className="bg-[#020617]/50 border border-white/5 p-4 rounded-2xl text-center group hover:bg-[#020617] transition-all"
+            {...helpProps('Puntuación de riesgo acumulado en la zona actual de análisis.')}
+          >
+            <span className="block text-[8px] text-slate-500 font-black uppercase mb-1.5 tracking-widest">
+              Risk_Score
+            </span>
+            <span className="text-2xl font-black text-cyan-400 font-mono tracking-tighter text-glow-cyan">
+              0.04
+            </span>
+          </div>
+          <div
+            className="bg-[#020617]/50 border border-white/5 p-4 rounded-2xl text-center group hover:bg-[#020617] transition-all"
+            {...helpProps(
+              'Predicción de tiempo estimado para un evento de colisión basado en trayectorias actuales.'
+            )}
+          >
+            <span className="block text-[8px] text-slate-500 font-black uppercase mb-1.5 tracking-widest">
+              Time-To-Col
+            </span>
+            <span className="text-2xl font-black text-emerald-400 font-mono tracking-tighter drop-shadow-[0_0_10px_rgba(52,211,153,0.3)]">
+              ∞
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
