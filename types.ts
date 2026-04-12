@@ -301,3 +301,24 @@ export interface BatchReport {
   infractions: InfractionLog[];
   filename: string;
 }
+
+// Re-export AuditJob types
+export type {
+  AuditJob,
+  AuditJobStatus,
+  AuditJobSnapshot,
+  AuditJobTrackState,
+  AuditJobGeometryState,
+} from './types/auditJob';
+export { createAuditJob, cloneAuditJob } from './types/auditJob';
+
+// Re-export ForensicRule types
+export type { RuleType, ROISequence, ForensicRule } from './types/forensicRules';
+export {
+  FORENSIC_RULES,
+  getRuleById,
+  getRulesForGeometry,
+  findForbiddenTurnRule,
+  matchesOrderedRoiSequence,
+  createForbiddenTurnRule,
+} from './types/forensicRules';

@@ -63,10 +63,11 @@ export const EngineSettings = () => {
                   key={key}
                   onClick={() => setPreset(key)}
                   aria-pressed={currentPreset === key}
-                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${currentPreset === key
-                    ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
-                    : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
-                    }`}
+                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                    currentPreset === key
+                      ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
+                      : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                  }`}
                   {...helpProps(`Activa preset ${data.label}: ${data.description}`)}
                 >
                   <span className="text-[10px] font-black uppercase text-center w-full leading-tight">
@@ -99,7 +100,11 @@ export const EngineSettings = () => {
               onClick={() => setIsAuditEnabled(!isAuditEnabled)}
               role="switch"
               aria-checked={isAuditEnabled}
-              aria-label={isAuditEnabled ? 'Desactivar auditoría forense Gemini' : 'Activar auditoría forense Gemini'}
+              aria-label={
+                isAuditEnabled
+                  ? 'Desactivar auditoría forense Gemini'
+                  : 'Activar auditoría forense Gemini'
+              }
               className={`w-9 h-[18px] rounded-full relative transition-all duration-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isAuditEnabled ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]' : 'bg-slate-800 border border-white/10'}`}
               {...helpProps(
                 isAuditEnabled
@@ -124,10 +129,11 @@ export const EngineSettings = () => {
                   onClick={() => setAuditPreset(key)}
                   aria-pressed={currentAuditPreset === key}
                   disabled={!isAuditEnabled}
-                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${currentAuditPreset === key
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                    : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
-                    }`}
+                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                    currentAuditPreset === key
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                      : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                  }`}
                   {...helpProps(`Auditoría nivel ${data.label}: ${data.description}`)}
                 >
                   <span className="text-[10px] font-black uppercase text-center w-full leading-tight">
@@ -160,7 +166,9 @@ export const EngineSettings = () => {
               onClick={() => setIsPoseEnabled(!isPoseEnabled)}
               role="switch"
               aria-checked={isPoseEnabled}
-              aria-label={isPoseEnabled ? 'Desactivar análisis de pose' : 'Activar análisis de pose'}
+              aria-label={
+                isPoseEnabled ? 'Desactivar análisis de pose' : 'Activar análisis de pose'
+              }
               className={`w-9 h-[18px] rounded-full relative transition-all duration-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isPoseEnabled ? 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-slate-800 border border-white/10'}`}
               {...helpProps(
                 isPoseEnabled
@@ -186,10 +194,11 @@ export const EngineSettings = () => {
                 onClick={() => setKinematicPreset(key)}
                 aria-pressed={currentKinematicPreset === key}
                 disabled={!isPoseEnabled}
-                className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${currentKinematicPreset === key
-                  ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
-                  : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
-                  }`}
+                className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                  currentKinematicPreset === key
+                    ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
+                    : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                }`}
                 {...helpProps(`Modo cinemático ${data.label}: ${data.description}`)}
               >
                 <span className="text-[10px] font-black uppercase text-center w-full leading-tight">

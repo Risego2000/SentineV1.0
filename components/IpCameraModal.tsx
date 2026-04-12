@@ -114,7 +114,11 @@ export const IpCameraModal = ({ onClose }: IpCameraModalProps) => {
           >
             <Monitor size={18} aria-hidden="true" /> Compartir Ventana / App
           </button>
-          <div className="relative mt-6 flex items-center" role="separator" aria-label="Opciones de conexión">
+          <div
+            className="relative mt-6 flex items-center"
+            role="separator"
+            aria-label="Opciones de conexión"
+          >
             <div className="flex-grow border-t border-white/5"></div>
             <span className="flex-shrink mx-4 text-[9px] font-black text-slate-600 uppercase">
               Ó Ingresar URL Directa

@@ -28,7 +28,9 @@ export const InfractionFeed = () => {
           <div className="space-y-1">
             <p className="text-sm font-black uppercase tracking-wider">Gemini API Key requerida</p>
             <p className="text-[11px] text-amber-200/80 leading-snug">
-              Configura <code className="bg-amber-900/50 px-1 py-0.5 rounded">VITE_GOOGLE_GENAI_KEY</code> en <code className="bg-amber-900/50 px-1 py-0.5 rounded">.env.local</code> y reinicia la
+              Configura{' '}
+              <code className="bg-amber-900/50 px-1 py-0.5 rounded">VITE_GOOGLE_GENAI_KEY</code> en{' '}
+              <code className="bg-amber-900/50 px-1 py-0.5 rounded">.env.local</code> y reinicia la
               app para habilitar auditoría forense.
             </p>
           </div>
@@ -44,7 +46,10 @@ export const InfractionFeed = () => {
           Infracciones Detectadas
         </span>
         {logs.length > 0 && (
-          <span className="ml-auto text-xs font-mono bg-red-900/60 text-red-200 px-2 py-0.5 rounded-full" aria-live="polite">
+          <span
+            className="ml-auto text-xs font-mono bg-red-900/60 text-red-200 px-2 py-0.5 rounded-full"
+            aria-live="polite"
+          >
             {logs.length}
           </span>
         )}
@@ -52,7 +57,11 @@ export const InfractionFeed = () => {
 
       <TacticalMetrics />
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/10 min-h-0" role="list" aria-label="Lista de infracciones detectadas">
+      <div
+        className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b border-white/10 min-h-0"
+        role="list"
+        aria-label="Lista de infracciones detectadas"
+      >
         {logs.length === 0 ? (
           <div className="p-8 text-center border-2 border-dashed border-white/5 rounded-[32px] bg-slate-900/20">
             <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center mx-auto mb-4 bg-slate-950 shadow-inner">
@@ -90,7 +99,10 @@ export const InfractionFeed = () => {
                   className="w-full h-full object-contain opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-black/40"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" aria-hidden="true" />
+                <div
+                  className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60"
+                  aria-hidden="true"
+                />
                 <div className="absolute top-3 right-3 px-3 py-1 bg-red-600/90 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg border border-white/20 backdrop-blur-sm">
                   {log.severity}
                 </div>

@@ -1,189 +1,168 @@
-import { AuditJob, InfractionLog, AuditPresetType } from '../types';
+/**
+ * ForensicQueue - Strategic Processing Pipeline
+ *
+ * DEPRECATED: Use ForensicQueueV3 for immutable AuditJob support.
+ * This file is kept for backward compatibility during migration.
+ *
+ * ForensicQueueV3 provides:
+ * - Immutable AuditJob snapshots (all evidence frozen at capture time)
+ * - Formal ForensicRule system (no heuristics based on labels)
+ * - Explicit lifecycle: pending → processing → completed/cleared/failed/aborted
+ * - Abort capability by job ID
+ * - Queue introspection and monitoring
+ */
+
+import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
 import { evidenceDB } from './EvidenceDB';
 import { logger } from './logger';
 import { OCRSynchronizer } from './OCRSynchronizer';
-import { buildForbiddenTurnAudit, matchesOrderedRoiSequence } from './forensicRules';
+import {
+  matchesOrderedRoiSequence,
+  matchesOrderedRoiSequence as legacyMatchesSequence,
+} from '../types/forensicRules';
+import {
+  buildForbiddenTurnAudit,
+  buildForbiddenTurnAudit as legacyBuildForbiddenTurn,
+} from '../types/forensicRules';
+
+// Re-export for backward compatibility
+export { matchesOrderedRoiSequence } from '../types/forensicRules';
+export { buildForbiddenTurnAudit } from '../types/forensicRules';
+
+import { ForensicQueueV3, forensicQueueV3 } from './ForensicQueueV3';
 
 /**
- * ForensicQueue — Strategic Processing Pipeline
- * Consumes immutable AuditJob snapshots so that live-track mutations cannot
- * corrupt in-flight audits.  Ensures sequential Gemini calls to protect API
- * quota and system memory.
- * Version 3.0 — AuditJob-based, deterministic
+ * @deprecated Use ForensicQueueV3 instead
  */
 export class ForensicQueue {
-  private queue: AuditJob[] = [];
+  private queue: {
+    track: Track;
+    line: GeometryLine;
+    evidenceId: string;
+    localTime: string;
+    videoTimeCode: string;
+    playbackTime: number;
+  }[] = [];
   private isProcessing = false;
   private onInfractionDetected?: (log: InfractionLog) => void;
   private idleResolvers: Array<() => void> = [];
 
+  // Dynamic context synced from React
+  private directives: string = '';
+  private auditPreset: AuditPresetType = 'senior';
+
   constructor(callback?: (log: InfractionLog) => void) {
     this.onInfractionDetected = callback;
+    // Sync with V3 instance
+    forensicQueueV3.setCallback(callback || (() => {}));
+  }
+
+  updateContext(directives: string, preset: AuditPresetType) {
+    this.directives = directives;
+    this.auditPreset = preset;
+    forensicQueueV3.updateContext(directives, preset);
   }
 
   /**
-   * Enqueues an immutable AuditJob.
-   * Context (directives, preset) is already embedded in the job snapshot.
+   * @deprecated Use enqueueJob() instead for immutable audit jobs
    */
-  enqueue(job: AuditJob): void {
-    this.queue.push(job);
-    logger.info(
-      'FORENSIC_QUEUE',
-      `Nueva auditoría encolada para Vehículo #${job.trackId} (${job.trackLabel}). Cola: ${this.queue.length}`
+  async enqueue(
+    track: Track,
+    line: GeometryLine,
+    evidenceId: string,
+    localTime: string,
+    videoTimeCode: string,
+    playbackTime: number
+  ) {
+    // Route to V3 for immutable job handling
+    forensicQueueV3.enqueue(
+      {
+        id: track.id,
+        label: track.label,
+        bbox: { ...track.bbox },
+        avgVelocity: track.avgVelocity,
+        velocityHistory: [...(track.velocityHistory || [])],
+        heading: track.heading,
+        dwellTime: track.dwellTime,
+        isAnomalous: track.isAnomalous || false,
+        anomalyLabel: track.anomalyLabel,
+        roiHistory: [...track.roiHistory],
+        tail: [...track.tail],
+      },
+      line,
+      evidenceId,
+      localTime,
+      videoTimeCode,
+      playbackTime
     );
-    this.processNext();
+  }
+
+  /**
+   * Enqueue using immutable AuditJob (V3).
+   */
+  enqueueJob(
+    track: {
+      id: number;
+      label: string;
+      bbox: { x: number; y: number; w: number; h: number };
+      avgVelocity: number;
+      velocityHistory: number[];
+      heading: number;
+      dwellTime: number;
+      isAnomalous: boolean;
+      anomalyLabel?: string;
+      roiHistory: string[];
+      tail: { x: number; y: number }[];
+    },
+    geometry: GeometryLine,
+    evidenceId: string,
+    localTime: string,
+    videoTimeCode: string,
+    playbackTime: number
+  ) {
+    return forensicQueueV3.enqueue(
+      track,
+      geometry,
+      evidenceId,
+      localTime,
+      videoTimeCode,
+      playbackTime
+    );
   }
 
   getPendingCount(): number {
-    return this.queue.length + (this.isProcessing ? 1 : 0);
+    return forensicQueueV3.getPendingCount();
+  }
+
+  getQueue() {
+    return forensicQueueV3.getQueue();
   }
 
   waitForIdle(): Promise<void> {
-    if (this.getPendingCount() === 0) return Promise.resolve();
-    return new Promise((resolve) => this.idleResolvers.push(resolve));
+    return forensicQueueV3.waitForIdle();
   }
 
-  private resolveIdleIfNeeded() {
-    if (this.getPendingCount() === 0 && this.idleResolvers.length > 0) {
-      const resolvers = [...this.idleResolvers];
-      this.idleResolvers = [];
-      resolvers.forEach((r) => r());
-    }
-  }
-
-  private selectTriplet(frames: string[] = [], fallback: string[] = []): string[] {
-    const source = frames.length > 0 ? frames : fallback;
-    if (source.length === 0) return [];
-    if (source.length === 1) return [source[0], source[0], source[0]];
-    if (source.length === 2) return [source[0], source[1], source[1]];
-    return [source[0], source[Math.floor(source.length / 2)], source[source.length - 1]];
-  }
-
-  private async processNext() {
-    if (this.isProcessing || this.queue.length === 0) return;
-
-    this.isProcessing = true;
-    const job = this.queue.shift()!;
-
-    try {
-      const evidence = await evidenceDB.getEvidence(job.evidenceId);
-
-      if (evidence) {
-        const contextSnapshots = this.selectTriplet(
-          evidence.contextSnapshots,
-          evidence.snapshots.filter((_, i) => i % 2 === 0)
-        );
-        const zoomSnapshots = this.selectTriplet(
-          evidence.zoomSnapshots,
-          evidence.snapshots.filter((_, i) => i % 2 === 1)
-        );
-        const plateOCR = await OCRSynchronizer.extractLicensePlate(zoomSnapshots);
-
-        // Build a minimal track-shaped object from the immutable snapshot + evidence
-        const trackForAI = {
-          id: job.trackId,
-          label: job.trackLabel,
-          tail: job.tail,
-          bbox: job.bbox,
-          roiHistory: job.roiHistory,
-          velocity: job.velocity,
-          avgVelocity: job.avgVelocity,
-          heading: job.heading,
-          snapshots: evidence.snapshots,
-          contextSnapshots,
-          zoomSnapshots,
-          videoClip: evidence.clip,
-          // Required by Track interface — safe defaults for fields not in AuditJob
-          conf: 0,
-          hits: 0,
-          age: 0,
-          audited: true,
-          processedLines: [],
-          acceleration: 0,
-          dwellTime: 0,
-          missedFrames: 0,
-          isCoasting: false,
-          kf: { x: 0, y: 0, vx: 0, vy: 0, update() {}, step() {}, getVelocity: () => 0, getHeading: () => 0 },
-        };
-
-        logger.info(
-          'FORENSIC_QUEUE',
-          `Iniciando análisis para Vehículo #${job.trackId} [Preset: ${job.auditPreset}]...`
-        );
-
-        const { AIService } = await import('./aiService');
-        const auditResult = await AIService.analyzeTrajectory(
-          trackForAI as never,
-          job.line,
-          job.directives,
-          job.auditPreset
-        );
-
-        const isForbiddenTurnSequence =
-          job.line.violationKind === 'forbidden_turn_sequence' &&
-          matchesOrderedRoiSequence(job.roiHistory, job.line.roiSequenceIds);
-
-        const finalAuditResult = isForbiddenTurnSequence
-          ? buildForbiddenTurnAudit(trackForAI as never, job.line, auditResult)
-          : auditResult;
-
-        if (finalAuditResult.infraction) {
-          logger.success(
-            'FORENSIC_QUEUE',
-            `INFRACCIÓN CONFIRMADA para Vehículo #${job.trackId} (${finalAuditResult.plate})`
-          );
-
-          const infractionLog: InfractionLog = {
-            ...finalAuditResult,
-            id: Date.now(),
-            plate:
-              finalAuditResult.plate && finalAuditResult.plate !== 'DESCONOCIDO'
-                ? finalAuditResult.plate
-                : plateOCR.plate || 'DESCONOCIDO',
-            image: zoomSnapshots[zoomSnapshots.length - 1] || evidence.snapshots[0],
-            extraSnapshots: contextSnapshots,
-            zoomSnapshots,
-            ocrResults: evidence.ocrResults,
-            plateOcr: plateOCR.plate,
-            plateOcrCandidates: plateOCR.candidates,
-            videoClip: evidence.clip,
-            time: new Date().toLocaleTimeString(),
-            localTime: job.localTime,
-            videoTimeCode: job.videoTimeCode,
-            playbackTime: job.playbackTime,
-          };
-
-          this.onInfractionDetected?.(infractionLog);
-        } else {
-          logger.info(
-            'FORENSIC_QUEUE',
-            `Auditoría finalizada para Vehículo #${job.trackId}: NO INFRACTOR.`
-          );
-        }
-      }
-
-      // Cleanup evidence after audit
-      await evidenceDB.deleteEvidence(job.evidenceId);
-    } catch (error) {
-      logger.error('FORENSIC_QUEUE', `Error procesando auditoría #${job.trackId}`, error);
-      // Lifecycle always reaches a terminal state — never silently stuck
-    } finally {
-      this.isProcessing = false;
-      this.resolveIdleIfNeeded();
-      // Small cooldown between AI calls
-      setTimeout(() => this.processNext(), 1000);
-    }
+  /**
+   * Abort a pending job by ID.
+   */
+  abort(jobId: string): boolean {
+    return forensicQueueV3.abort(jobId);
   }
 
   setCallback(callback: (log: InfractionLog) => void) {
     this.onInfractionDetected = callback;
+    forensicQueueV3.setCallback(callback);
   }
 
-  /** @deprecated Use enqueue(AuditJob) directly */
-  updateContext(_directives: string, _preset: AuditPresetType) {
-    // Context is now embedded in each AuditJob — this method is a no-op kept
-    // for backward compatibility during migration.
+  /**
+   * Clear the queue and reset state.
+   */
+  clear() {
+    forensicQueueV3.clear();
   }
 }
 
 export const forensicQueue = new ForensicQueue();
+
+// Legacy re-exports for backward compatibility
+export { forensicQueueV3 };

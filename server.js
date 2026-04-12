@@ -20,6 +20,9 @@ import {
   validateCameraHost as _validateCameraHost,
 } from './services/serverSecurityUtils.js';
 
+// NEW: Evidence Store API (single source of truth)
+import { createEvidenceStoreRouter } from './services/evidenceStore.js';
+
 loadLocalEnvFile();
 
 const _require = createRequire(import.meta.url);
@@ -471,6 +474,19 @@ app.post(
     }
   }
 );
+
+// NEW: Evidence Store API routes
+app.use('/api/store', createEvidenceStoreRouter());
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: '1.6.0',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
 const __dirname = path.resolve();
 const distPath = path.join(__dirname, 'dist');

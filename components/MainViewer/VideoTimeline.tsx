@@ -46,25 +46,28 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
     setProgress((newTime / videoRef.current.duration) * 100);
   };
 
-  const handleTimelineKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!videoRef.current || !timelineRef.current) return;
-    const v = videoRef.current;
-    const step = e.shiftKey ? 10 : 1; // Shift for bigger jumps
+  const handleTimelineKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!videoRef.current || !timelineRef.current) return;
+      const v = videoRef.current;
+      const step = e.shiftKey ? 10 : 1; // Shift for bigger jumps
 
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      v.currentTime = Math.max(0, v.currentTime - step);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      v.currentTime = Math.min(v.duration || 0, v.currentTime + step);
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      v.currentTime = 0;
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      v.currentTime = v.duration || 0;
-    }
-  }, [videoRef]);
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        v.currentTime = Math.max(0, v.currentTime - step);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        v.currentTime = Math.min(v.duration || 0, v.currentTime + step);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        v.currentTime = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        v.currentTime = v.duration || 0;
+      }
+    },
+    [videoRef]
+  );
 
   // Filter only actual infractions for timeline markers
   const incidentLogs = logs.filter((l) => l.infraction === true);
@@ -105,7 +108,10 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
           <span className="text-xs font-black text-red-500/40 uppercase tracking-[0.3em]">
             Incidents Detected
           </span>
-          <div className="text-xl font-black text-red-500 font-mono tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]" aria-live="polite">
+          <div
+            className="text-xl font-black text-red-500 font-mono tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]"
+            aria-live="polite"
+          >
             {incidentLogs.length.toString().padStart(2, '0')}
           </div>
         </div>
@@ -132,7 +138,10 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
             className="h-full bg-gradient-to-r from-cyan-600/80 to-cyan-400 relative transition-all ease-linear"
             style={{ width: `${progress}%` }}
           >
-            <div className="absolute right-0 top-0 bottom-0 w-px bg-white shadow-[0_0_10px_rgba(255,255,255,1)]" aria-hidden="true" />
+            <div
+              className="absolute right-0 top-0 bottom-0 w-px bg-white shadow-[0_0_10px_rgba(255,255,255,1)]"
+              aria-hidden="true"
+            />
           </div>
         </div>
 
@@ -167,7 +176,10 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
               <div className="w-1 h-1 bg-white rounded-full" aria-hidden="true" />
 
               {/* Tooltip Táctico */}
-              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none" aria-hidden="true">
+              <div
+                className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none"
+                aria-hidden="true"
+              >
                 <span className="text-xs font-black text-white uppercase block">
                   {log.ruleCategory}
                 </span>

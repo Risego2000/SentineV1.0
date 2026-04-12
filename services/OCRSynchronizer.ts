@@ -155,9 +155,9 @@ export const OCRSynchronizer = {
           const y = dateMatch[3];
           dateStr = `${d}/${m}/${y}`;
         } else {
-          // Fallback to current local date if OCR misses the date part but catches the time
-          const now = new Date();
-          dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+          // Forense: NO fabricamos fecha - eso compromete la validez forense
+          dateStr = '??/??/????';
+          console.warn('[OCR] Timecode incomplete - date not detected in OSD');
         }
 
         return `${dateStr}, ${timeStr}`;
