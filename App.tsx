@@ -1,15 +1,8 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React from 'react';
 
 // Components & Modules
-import { Sidebar } from './components/Sidebar';
-import { RightSidebar } from './components/RightSidebar';
-import { MainViewer } from './components/MainViewer/MainViewer';
-import { InfractionModal } from './components/InfractionModal';
-import { IpCameraModal } from './components/IpCameraModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { useSentinel } from './hooks/useSentinel';
-import { useFrameProcessor } from './hooks/useFrameProcessor';
-import { renderScene } from './components/renderSystem';
+import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
 import './index.css';
 
 /**
@@ -17,160 +10,20 @@ import './index.css';
  * Orchestrates global visuals, tactical feedback loop, and system synchronization.
  */
 export const App = () => {
-  const {
-    source,
-    isPlaying,
-    setIsPlaying,
-    geometry,
-    selectedLog,
-    setSelectedLog,
-    isMeshRenderEnabled,
-    addLog,
-    videoRef,
-    onFilesChange: contextOnFilesChange,
-    isBatchMode,
-    loadNextInQueue,
-    finalizeVideoReport,
-    startScreenShare: contextStartScreenShare,
-    startIpFeed: contextStartIpFeed,
-    clearLogs,
-  } = useSentinel();
-
-  const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
-
-  // UI States
-  const [showIpModal, setShowIpModal] = React.useState(false);
-
-  // DOM Refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // --- SYSTEM INITIALIZATION ---
-  useEffect(() => {
-    addLog('CORE', 'Sincronizando Motor Vectorial Sentinel AI... Unidad de Comando Activa.');
-  }, [addLog]);
-
-  /**
-   * Tactical Render Loop.
-   * Synchronizes video processing and forensic visualization.
-   */
-  const loop = useCallback(async () => {
-    const v = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!v || !canvas || source === 'none') return;
-
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx || v.readyState < 2) return;
-
-    try {
-      // Execute frame processing ONLY if playing
-      if (isPlaying) {
-        await processFrame(v, canvas);
-      }
-
-      // Always render the scene (includes tracked entities history/predictions)
-      renderScene(ctx, v, trackerRef.current.tracks, geometry, isMeshRenderEnabled);
-    } catch (err) {
-      // Log but never let a single bad frame kill the entire render loop
-      addLog('ERROR', `Error en frame loop: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [isPlaying, source, geometry, processFrame, isMeshRenderEnabled, videoRef, trackerRef, addLog]);
-
-  useEffect(() => {
-    let anim: number;
-    const frameLoop = async () => {
-      await loop();
-      anim = requestAnimationFrame(frameLoop);
-    };
-    anim = requestAnimationFrame(frameLoop);
-    return () => cancelAnimationFrame(anim);
-  }, [loop]);
-
-  // --- TACTICAL HANDLERS ---
-
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      resetTracker(); // Tactical Reset
-      clearLogs(); // Reset UI
-      contextOnFilesChange(files, videoRef);
-    }
-    e.target.value = '';
-  };
-
-  // Video State Management
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    if (isPlaying) {
-      v.play().catch((error) => {
-        console.error('Transmission Error:', error);
-      });
-    } else {
-      v.pause();
-    }
-
-    const handleEnded = async () => {
-      if (isBatchMode) {
-        addLog('INFO', 'Video finalizado. Transicionando al siguiente en la cola...');
-        await loadNextInQueue();
-      } else {
-        setIsPlaying(false);
-        addLog('INFO', 'Análisis finalizado: Fin de la transmisión de datos.');
-        if (source === 'upload') {
-          await finalizeVideoReport();
-        }
-      }
-    };
-
-    v.addEventListener('ended', handleEnded);
-    return () => v.removeEventListener('ended', handleEnded);
-  }, [
-    isPlaying,
-    isBatchMode,
-    loadNextInQueue,
-    addLog,
-    setIsPlaying,
-    videoRef,
-    source,
-    finalizeVideoReport,
-  ]);
-
   return (
-    <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
-      <Sidebar />
+    <div className="h-screen w-screen bg-[#020617] text-slate-100 flex overflow-hidden font-sans select-none">
+      {/* Left Sidebar Portal Target */}
+      <div id="sidebar-root" className="h-full z-40 shrink-0" />
 
-      <ErrorBoundary onError={(err) => addLog('ERROR', `UI crash: ${err.message}`)}>
-        <MainViewer
-          videoRef={videoRef}
-          canvasRef={canvasRef}
-          onScreenShare={() => {
-            clearLogs();
-            contextStartScreenShare(videoRef);
-          }}
-          onIpCamera={() => setShowIpModal(true)}
-          onUpload={handleFileSelect}
-        />
-      </ErrorBoundary>
+      {/* Central Grid Area */}
+      <div className="flex-1 relative z-10">
+        <ErrorBoundary onError={(err) => console.error(`UI crash: ${err.message}`)}>
+          <MultiViewerGrid />
+        </ErrorBoundary>
+      </div>
 
-      <RightSidebar />
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept="video/*"
-        multiple
-        onChange={onFileChange}
-      />
-
-      {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
-      {showIpModal && <IpCameraModal onClose={() => setShowIpModal(false)} />}
+      {/* Right Sidebar Portal Target */}
+      <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
     </div>
   );
 };

@@ -4,8 +4,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-// @ts-expect-error — JS module without types
-import { isPrivateAddress, sanitizeFilename, isPathWithinDir } from '../services/serverSecurityUtils.js';
+import {
+  isPrivateAddress,
+  sanitizeFilename,
+  isPathWithinDir,
+} from '../services/serverSecurityUtils.ts';
 
 // ─── isPrivateAddress ─────────────────────────────────────────────────────────
 
@@ -14,7 +17,8 @@ describe('isPrivateAddress — IPv4', () => {
   it('blocks class-A private 10.x.x.x', () => expect(isPrivateAddress('10.0.0.1')).toBe(true));
   it('blocks 192.168.x.x', () => expect(isPrivateAddress('192.168.1.100')).toBe(true));
   it('blocks 172.16.x.x (start of range)', () => expect(isPrivateAddress('172.16.0.1')).toBe(true));
-  it('blocks 172.31.x.x (end of range)', () => expect(isPrivateAddress('172.31.255.254')).toBe(true));
+  it('blocks 172.31.x.x (end of range)', () =>
+    expect(isPrivateAddress('172.31.255.254')).toBe(true));
   it('allows 172.15.x.x (below range)', () => expect(isPrivateAddress('172.15.0.1')).toBe(false));
   it('allows 172.32.x.x (above range)', () => expect(isPrivateAddress('172.32.0.1')).toBe(false));
   it('blocks link-local 169.254.x.x', () => expect(isPrivateAddress('169.254.0.1')).toBe(true));

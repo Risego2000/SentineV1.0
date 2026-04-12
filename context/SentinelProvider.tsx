@@ -33,7 +33,14 @@ import { SentinelContext, SentinelContextType } from './SentinelContext';
 /**
  * Sentinel AI State Provider.
  */
-export const SentinelProvider = ({ children }: { children: ReactNode }) => {
+export const SentinelProvider = ({
+  children,
+  viewerId,
+}: {
+  children: ReactNode;
+  viewerId?: string;
+  key?: React.Key;
+}) => {
   const [source, _setSource] = useState<'none' | 'live' | 'upload' | 'ip'>('none');
   const [selectedLog, setSelectedLog] = useState<InfractionLog | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -63,6 +70,10 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
   const [calibration, _setCalibration] = useState(() => {
     const saved = localStorage.getItem('sentinel_calibration');
     return saved ? parseFloat(saved) : 0.05;
+  });
+  const [analysisGridSize, _setAnalysisGridSize] = useState<1 | 2 | 3>(() => {
+    const saved = Number(localStorage.getItem('sentinel_analysis_grid') || '1');
+    return saved === 2 || saved === 3 ? saved : 1;
   });
 
   const [bufferStatus, setBufferStatus] = useState<SentinelContextType['bufferStatus']>({
@@ -131,7 +142,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const detect = useCallback(
-    async (source: HTMLVideoElement): Promise<StandardDetection[] | null> => {
+    async (source: HTMLVideoElement | HTMLCanvasElement): Promise<StandardDetection[] | null> => {
       try {
         return await mpDetect(source);
       } catch (error) {
@@ -205,6 +216,14 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     [addLog]
   );
 
+  const setAnalysisGridSize = useCallback(
+    (size: 1 | 2 | 3) => {
+      _setAnalysisGridSize(size);
+      addLog('CORE', `Modo de análisis en cuadrícula: ${size}x${size}`);
+    },
+    [addLog]
+  );
+
   const [isAuditEnabled, _setIsAuditEnabled] = useState(true);
   const [currentAuditPreset, _setAuditPreset] = useState<AuditPresetType>('senior');
   const [currentKinematicPreset, _setKinematicPreset] = useState<KinematicPresetType>('full');
@@ -245,18 +264,26 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
   const addInfraction = useCallback(
     (log: InfractionLog) => {
-      setLogs((prev) => [log, ...prev]);
+      // Wait, I need to pass viewerId to addInfraction so it's recorded correctly.
+      // And the forensic queue needs to only process callbacks if they belong to this viewerId!
+      // But `forensicQueue.setCallback` overwrites the global callback!
+      // To support multiple viewers, we should use `forensicQueue.addEventListener` or check viewerId.
+      // For now, let's keep it simple.
+      // In a true multi-viewer setup, ForensicQueue needs an Event Emitter architecture.
+
+      const infractionWithViewer = { ...log, viewerId };
+      setLogs((prev) => [infractionWithViewer, ...prev]);
       setStats((prev) => ({ ...prev, inf: prev.inf + 1 }));
       logger.ai(
         'SENTINEL_CONTEXT',
-        `Sanción Detectada: ${log.plate || 'SIN_PLACA'} - ${log.description}`
+        `[${viewerId || 'GLOBAL'}] Sanción Detectada: ${log.plate || 'SIN_PLACA'} - ${log.description}`
       );
       addLog('AI', `Sanción Detectada: ${log.plate || 'SIN_PLACA'} - ${log.description}`);
 
       (async () => {
         try {
           // Permanently save to EvidenceDB
-          await evidenceDB.saveInfraction(log);
+          await evidenceDB.saveInfraction(infractionWithViewer);
 
           // Give the UI a bit of breathing room before heavy PDF generation
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -289,7 +316,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
         }
       })();
     },
-    [addLog, setLogs, setStats]
+    [addLog, setLogs, setStats, viewerId]
   );
 
   useEffect(() => {
@@ -298,8 +325,23 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
   // Bind ForensicQueue to the infraction logging system
   useEffect(() => {
-    forensicQueue.setCallback((log) => {
+    const handleInfraction = (log: InfractionLog) => {
+      // Only process if the infraction belongs to this viewer, or if neither has viewerId (fallback)
+      if (log.viewerId && viewerId && log.viewerId !== viewerId) return;
       addInfraction(log);
+    };
+
+    forensicQueue.addListener(handleInfraction);
+    forensicQueue.setEventCallback((event) => {
+      // Broadcast events are harder to filter, but we do our best
+      if (event.jobId && viewerId) {
+        // If we wanted strict filtering we'd need to know which job belongs to which viewer
+      }
+      if (event.type === 'queue_overflow' || event.type === 'retry') {
+        addLog('WARN', event.message);
+      } else {
+        addLog('ERROR', event.message);
+      }
     });
 
     // Initial load of permanent infractions
@@ -317,7 +359,20 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
     // Initial cleanup of old evidence
     evidenceDB.purgeOldEvidence();
-  }, [addInfraction, addLog, setLogs, setStats]);
+
+    const purgeInterval = window.setInterval(
+      () => {
+        evidenceDB.purgeOldEvidence();
+      },
+      60 * 60 * 1000
+    );
+
+    return () => {
+      window.clearInterval(purgeInterval);
+      forensicQueue.removeListener(handleInfraction);
+      forensicQueue.setEventCallback(undefined);
+    };
+  }, [addInfraction, addLog, setLogs, setStats, viewerId]);
 
   // Sync Forensic Queue Tactical Context
   useEffect(() => {
@@ -331,19 +386,11 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem('sentinel_directives', directives);
-  }, [directives]);
-
-  useEffect(() => {
     localStorage.setItem('sentinel_geometry', JSON.stringify(geometry));
-  }, [geometry]);
-
-  useEffect(() => {
     localStorage.setItem('sentinel_preset', currentPreset);
-  }, [currentPreset]);
-
-  useEffect(() => {
     localStorage.setItem('sentinel_calibration', calibration.toString());
-  }, [calibration]);
+    localStorage.setItem('sentinel_analysis_grid', analysisGridSize.toString());
+  }, [directives, geometry, currentPreset, calibration, analysisGridSize]);
 
   const generateGeometry = useCallback(
     async (instruction?: string, videoElement?: HTMLVideoElement | null) => {
@@ -697,13 +744,16 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [directives, addLog, setStatusMsg, parseMeshDirectives]);
 
-  const systemStatus: SystemStatus = {
-    neural: neuralStatus === 'ready' ? 'ready' : neuralStatus === 'error' ? 'error' : 'loading',
-    forensic: hasApiKey ? 'ready' : 'error',
-    bionics: source !== 'none' ? 'ready' : 'pending',
-    vector: geometry.length > 0 ? 'ready' : 'pending',
-    mediapipeReady,
-  };
+  const systemStatus: SystemStatus = useMemo(
+    () => ({
+      neural: neuralStatus === 'ready' ? 'ready' : neuralStatus === 'error' ? 'error' : 'loading',
+      forensic: hasApiKey ? 'ready' : 'error',
+      bionics: source !== 'none' ? 'ready' : 'pending',
+      vector: geometry.length > 0 ? 'ready' : 'pending',
+      mediapipeReady,
+    }),
+    [neuralStatus, hasApiKey, source, geometry.length, mediapipeReady]
+  );
 
   useEffect(() => {
     const roiLines = geometry.filter((l) => l.type.startsWith('roi_'));
@@ -796,14 +846,74 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
       setKinematicPreset,
       calibration,
       setCalibration,
+      analysisGridSize,
+      setAnalysisGridSize,
+      viewerId,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      source, isPlaying, isMeshRenderEnabled, directives, geometry, selectedLog,
-      isListening, helpMsg, isPoseEnabled, currentPreset, engineConfig, stats,
-      logs, systemLogs, statusMsg, isAnalyzing, systemStatus, statusLabel,
-      fps, latency, bufferStatus, tracks, isAuditEnabled, currentAuditPreset,
-      currentKinematicPreset, calibration, videoQueue, currentQueueIndex, isBatchMode,
+      source,
+      setSource,
+      isPlaying,
+      setIsPlaying,
+      isMeshRenderEnabled,
+      setIsMeshRenderEnabled,
+      parseMeshDirectives,
+      directives,
+      setDirectives,
+      geometry,
+      selectedLog,
+      isListening,
+      helpMsg,
+      isPoseEnabled,
+      setIsPoseEnabled,
+      currentPreset,
+      setPresetAndConfig,
+      engineConfig,
+      stats,
+      setStats,
+      logs,
+      systemLogs,
+      statusMsg,
+      setStatusMsg,
+      isAnalyzing,
+      systemStatus,
+      statusLabel,
+      hasApiKey,
+      addLog,
+      generateGeometry,
+      runAudit,
+      startLiveFeed,
+      startScreenShare,
+      onFileChange,
+      onFilesChange,
+      loadNextInQueue,
+      videoQueue,
+      currentQueueIndex,
+      isBatchMode,
+      addInfraction,
+      exportBatchReport,
+      finalizeVideoReport,
+      detect,
+      detectPose,
+      startIpFeed,
+      fps,
+      latency,
+      bufferStatus,
+      setPerformanceMetrics,
+      updateBufferStatus,
+      clearLogs,
+      tracks,
+      isAuditEnabled,
+      setIsAuditEnabled,
+      currentAuditPreset,
+      setAuditPreset,
+      currentKinematicPreset,
+      setKinematicPreset,
+      calibration,
+      setCalibration,
+      analysisGridSize,
+      setAnalysisGridSize,
+      viewerId,
     ]
   );
 

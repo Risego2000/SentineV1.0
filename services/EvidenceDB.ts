@@ -112,14 +112,10 @@ export class EvidenceDB {
       const store = transaction.objectStore(this.storeName);
 
       // Use the timestamp index for an efficient keyed range query
-      const index = store.indexNames.contains('timestamp')
-        ? store.index('timestamp')
-        : null;
+      const index = store.indexNames.contains('timestamp') ? store.index('timestamp') : null;
 
       const range = IDBKeyRange.upperBound(expiration);
-      const request = index
-        ? index.openCursor(range)
-        : store.openCursor(); // fallback for stores without the index yet
+      const request = index ? index.openCursor(range) : store.openCursor(); // fallback for stores without the index yet
 
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;

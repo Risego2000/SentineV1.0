@@ -3,7 +3,7 @@
  * Once created, this object NEVER mutates. All evidence is captured at creation time.
  */
 
-import { GeometryLine, AuditPresetType, SeverityType } from './index';
+import { GeometryLine, AuditPresetType, SeverityType } from '../types';
 
 export interface AuditJobSnapshot {
   /** Immutable evidence at capture time */
@@ -28,7 +28,7 @@ export interface AuditJobTrackState {
   bboxH: number;
   /** Velocity telemetry snapshot */
   avgVelocity: number; // km/h
-  velocityHistory: number[];
+  velocityHistory: readonly number[];
   /** Heading in radians */
   heading: number;
   /** Residence time in zone (ms) */
@@ -37,9 +37,9 @@ export interface AuditJobTrackState {
   isAnomalous: boolean;
   anomalyLabel?: string;
   /** All ROI entries up to capture (immutable history) */
-  roiHistory: string[];
+  roiHistory: readonly string[];
   /** Tail trail positions (last 50) */
-  tailPositions: { x: number; y: number }[];
+  tailPositions: readonly { x: number; y: number }[];
 }
 
 export interface AuditJobGeometryState {
@@ -52,12 +52,12 @@ export interface AuditJobGeometryState {
   y1: number;
   x2: number;
   y2: number;
-  points?: { x: number; y: number }[];
+  points?: readonly { x: number; y: number }[];
   /** Violation kind (if applicable) */
   violationKind?: string;
   /** ROI sequence for forbidden turns */
-  roiSequenceIds?: string[];
-  roiSequenceLabels?: string[];
+  roiSequenceIds?: readonly string[];
+  roiSequenceLabels?: readonly string[];
   /** Analysis context description */
   analysisContext?: string;
 }
@@ -111,6 +111,8 @@ export interface AuditJob {
   };
   /** Error message if failed */
   errorMessage?: string;
+  /** Viewer instance that created this job */
+  viewerId?: string;
 }
 
 /**
@@ -123,24 +125,26 @@ export function createAuditJob(
     label: string;
     bbox: { x: number; y: number; w: number; h: number };
     avgVelocity: number;
-    velocityHistory: number[];
+    velocityHistory: number[] | readonly number[];
     heading: number;
     dwellTime: number;
     isAnomalous: boolean;
     anomalyLabel?: string;
-    roiHistory: string[];
-    tail: { x: number; y: number }[];
+    roiHistory: string[] | readonly string[];
+    tail: { x: number; y: number }[] | readonly { x: number; y: number }[];
   },
   geometry: GeometryLine,
   snapshot: AuditJobSnapshot,
   directives: string,
   auditPreset: AuditPresetType,
-  ruleId?: string
+  ruleId?: string,
+  viewerId?: string
 ): AuditJob {
   // Create the base job object
   const job: AuditJob = {
     id: `audit_${track.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     createdAt: Date.now(),
+    viewerId,
     // Freeze only the immutable evidence parts
     trackState: Object.freeze({
       id: track.id,

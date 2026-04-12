@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "node server.js",
-    "start": "node server.js",
+    "dev:api": "npx tsx server.js",
+    "start": "npx tsx server.js",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
@@ -48,6 +48,7 @@
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.58.1",
     "vite": "^6.2.0",

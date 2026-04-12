@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import React, { createContext } from 'react';
 import {
   GeometryLine,
   InfractionLog,
@@ -52,7 +52,9 @@ export interface SentinelContextType {
   setTracks: (t: Track[]) => void;
   calibration: number;
   setCalibration: (c: number) => void;
+  analysisGridSize: 1 | 2 | 3;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  viewerId?: string;
 
   // Actions
   setSource: (s: 'none' | 'live' | 'upload' | 'ip') => void;
@@ -71,6 +73,7 @@ export interface SentinelContextType {
   runAudit: (track: Track, line: GeometryLine) => Promise<void>;
   setStatusMsg: (msg: string | null) => void;
   setPerformanceMetrics: (fps: number, latency: number) => void;
+  setAnalysisGridSize: (size: 1 | 2 | 3) => void;
   isAuditEnabled: boolean;
   setIsAuditEnabled: (e: boolean) => void;
   currentAuditPreset: AuditPresetType;
@@ -92,7 +95,7 @@ export interface SentinelContextType {
   addInfraction: (log: InfractionLog) => void;
   exportBatchReport: () => void;
   finalizeVideoReport: () => Promise<void>;
-  detect: (source: HTMLVideoElement) => Promise<StandardDetection[] | null>;
+  detect: (source: HTMLVideoElement | HTMLCanvasElement) => Promise<StandardDetection[] | null>;
   detectPose: (source: HTMLVideoElement) => Promise<PoseResult[] | null>;
   startIpFeed: (
     config: IpCameraConfig,

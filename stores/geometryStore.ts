@@ -32,7 +32,18 @@ interface GeometryState {
   reset: () => void;
 }
 
-const initialState: GeometryState = {
+const initialState: Omit<
+  GeometryState,
+  | 'setLines'
+  | 'addLine'
+  | 'updateLine'
+  | 'removeLine'
+  | 'setSelectedLine'
+  | 'setDrawingMode'
+  | 'setActiveRules'
+  | 'toggleRule'
+  | 'reset'
+> = {
   lines: [],
   activeRules: [...FORENSIC_RULES],
   selectedLineId: null,
@@ -40,7 +51,7 @@ const initialState: GeometryState = {
 };
 
 export const useGeometryStore = create<GeometryState>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set) => ({
     ...initialState,
 
     setLines: (lines) => set({ lines }),

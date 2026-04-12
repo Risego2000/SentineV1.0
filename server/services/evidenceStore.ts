@@ -4,15 +4,9 @@
  */
 
 import express, { Request, Response } from 'express';
-import multer from 'multer';
-import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import crypto from 'crypto';
-import { createRequire } from 'module';
-
-const _require = createRequire(import.meta.url);
 
 interface EvidenceRecord {
   id: string;
@@ -304,7 +298,9 @@ export function createEvidenceStoreRouter() {
           .map((h) => {
             if (h === 'createdAt') return new Date(i.createdAt).toISOString();
             if (h === 'auditResult') return JSON.stringify(i.auditResult);
-            return (i.auditResult as any)?.[h] || (i as any)[h] || '';
+            const auditValue = (i.auditResult as Record<string, unknown>)[h];
+            const recordValue = (i as Record<string, unknown>)[h];
+            return String(auditValue ?? recordValue ?? '');
           })
           .join(',')
       );

@@ -4,9 +4,9 @@
  */
 
 import { create } from 'zustand';
-import { AuditJob, AuditJobStatus, InfractionLog } from '../types';
+import { AuditJob, AuditJobStatus, AuditPresetType, InfractionLog } from '../types';
 import { ForensicRule, FORENSIC_RULES } from '../types/forensicRules';
-import { ForensicQueue, forensicQueue } from '../../services/ForensicQueue';
+import { forensicQueue } from '../../services/ForensicQueue';
 import { logger } from '../../services/logger';
 
 interface ForensicsState {
@@ -22,7 +22,7 @@ interface ForensicsState {
 
   // Directives and presets
   directives: string;
-  auditPreset: string;
+  auditPreset: AuditPresetType;
 
   // Callbacks
   onInfractionDetected?: (log: InfractionLog) => void;
@@ -30,7 +30,7 @@ interface ForensicsState {
 }
 
 interface ForensicsActions {
-  updateContext: (directives: string, preset: string) => void;
+  updateContext: (directives: string, preset: AuditPresetType) => void;
   setRules: (rules: ForensicRule[]) => void;
   toggleRule: (ruleId: string) => void;
   addJob: (job: AuditJob) => void;
@@ -63,7 +63,7 @@ export const createForensicsDomain = () => {
     updateContext: (directives, preset) => {
       logger.info('FORENSICS', `Context updated. Preset: ${preset}`);
       set({ directives, auditPreset: preset });
-      forensicQueue.updateContext(directives, preset as any);
+      forensicQueue.updateContext(directives, preset);
     },
 
     setRules: (rules) => set({ activeRules: rules }),

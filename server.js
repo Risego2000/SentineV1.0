@@ -18,33 +18,84 @@ import {
   sanitizeFilename,
   isPathWithinDir,
   validateCameraHost as _validateCameraHost,
-} from './services/serverSecurityUtils.js';
+} from './services/serverSecurityUtils.ts';
 
 // NEW: Evidence Store API (single source of truth)
-import { createEvidenceStoreRouter } from './services/evidenceStore.js';
+import { createEvidenceStoreRouter } from './server/services/evidenceStore.ts';
 
 loadLocalEnvFile();
 
 const _require = createRequire(import.meta.url);
 const app = express();
-const port = process.env.PORT || 3002;
-const REPORTS_DIR = process.env.REPORTS_DIR || 'C:\\Denuncias';
-const MAX_TRANSCODE_BYTES = Number(process.env.TRANSCODE_MAX_BYTES || 250 * 1024 * 1024);
-const MAX_REPORT_MB = Number(process.env.REPORT_MAX_MB || 100);
-const MAX_TRANSCODE_CONCURRENCY = Number(process.env.TRANSCODE_MAX_CONCURRENCY || 2);
-const RATE_LIMIT_WINDOW_MS = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60_000);
-const RATE_LIMIT_MAX_REQUESTS = Number(process.env.API_RATE_LIMIT_MAX_REQUESTS || 120);
-const API_TOKEN = process.env.SENTINEL_API_TOKEN || '';
-const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001'
-)
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
-const ALLOWED_CAMERA_HOSTS = (process.env.IP_CAMERA_ALLOWED_HOSTS || '')
-  .split(',')
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean);
+const parsePositiveIntEnv = (name, fallback, min = 1, max = Number.MAX_SAFE_INTEGER) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`[ENV] ${name} inválida: "${raw}". Debe ser entero entre ${min} y ${max}.`);
+  }
+  return parsed;
+};
+
+const validateServerEnv = () => {
+  const port = parsePositiveIntEnv('PORT', 3002, 1, 65535);
+  const reportsDir = process.env.REPORTS_DIR || 'C:\\Denuncias';
+  const maxTranscodeBytes = parsePositiveIntEnv(
+    'TRANSCODE_MAX_BYTES',
+    250 * 1024 * 1024,
+    1_000_000,
+    2_000_000_000
+  );
+  const maxReportMb = parsePositiveIntEnv('REPORT_MAX_MB', 100, 1, 2000);
+  const maxTranscodeConcurrency = parsePositiveIntEnv('TRANSCODE_MAX_CONCURRENCY', 2, 1, 16);
+  const rateLimitWindowMs = parsePositiveIntEnv(
+    'API_RATE_LIMIT_WINDOW_MS',
+    60_000,
+    1000,
+    3_600_000
+  );
+  const rateLimitMaxRequests = parsePositiveIntEnv('API_RATE_LIMIT_MAX_REQUESTS', 120, 1, 10_000);
+  const apiToken = process.env.SENTINEL_API_TOKEN || '';
+  const allowedOrigins = (
+    process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001'
+  )
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const allowedCameraHosts = (process.env.IP_CAMERA_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedOrigins.length === 0) {
+    throw new Error('[ENV] ALLOWED_ORIGINS no puede quedar vacío.');
+  }
+
+  return {
+    port,
+    reportsDir,
+    maxTranscodeBytes,
+    maxReportMb,
+    maxTranscodeConcurrency,
+    rateLimitWindowMs,
+    rateLimitMaxRequests,
+    apiToken,
+    allowedOrigins,
+    allowedCameraHosts,
+  };
+};
+
+const env = validateServerEnv();
+const port = env.port;
+const REPORTS_DIR = env.reportsDir;
+const MAX_TRANSCODE_BYTES = env.maxTranscodeBytes;
+const MAX_REPORT_MB = env.maxReportMb;
+const MAX_TRANSCODE_CONCURRENCY = env.maxTranscodeConcurrency;
+const RATE_LIMIT_WINDOW_MS = env.rateLimitWindowMs;
+const RATE_LIMIT_MAX_REQUESTS = env.rateLimitMaxRequests;
+const API_TOKEN = env.apiToken;
+const ALLOWED_ORIGINS = env.allowedOrigins;
+const ALLOWED_CAMERA_HOSTS = env.allowedCameraHosts;
 
 const progressMap = new Map();
 const ipCameraSessions = new Map();
@@ -477,16 +528,6 @@ app.post(
 
 // NEW: Evidence Store API routes
 app.use('/api/store', createEvidenceStoreRouter());
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    version: '1.6.0',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
 
 const __dirname = path.resolve();
 const distPath = path.join(__dirname, 'dist');

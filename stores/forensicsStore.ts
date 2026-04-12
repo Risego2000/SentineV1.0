@@ -37,7 +37,7 @@ interface ForensicsState {
 }
 
 export const useForensicsStore = create<ForensicsState>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set) => ({
     jobs: [],
     processingJobId: null,
     totalProcessed: 0,

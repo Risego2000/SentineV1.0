@@ -152,7 +152,7 @@ export const useNeuralCore = ({
    * Primary Object Detection Logic.
    */
   const detect = useCallback(
-    async (source: HTMLVideoElement): Promise<StandardDetection[]> => {
+    async (source: HTMLVideoElement | HTMLCanvasElement): Promise<StandardDetection[]> => {
       if (status !== 'ready' || !mediaPipeRef.current) return [];
 
       const ts = performance.now();
@@ -162,7 +162,10 @@ export const useNeuralCore = ({
       if (mpts <= objTimestampRef.current) mpts = objTimestampRef.current + 0.001;
       objTimestampRef.current = mpts;
 
-      if (source.videoWidth === 0 || source.videoHeight === 0 || source.readyState < 2) return [];
+      const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
+      const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
+      const readyState = source instanceof HTMLVideoElement ? source.readyState : 2;
+      if (width === 0 || height === 0 || readyState < 2) return [];
 
       try {
         const mpResult = mediaPipeRef.current.detectForVideo(source, mpts);
@@ -191,10 +194,10 @@ export const useNeuralCore = ({
               label,
               score: category.score,
               box: {
-                x: b.originX / source.videoWidth,
-                y: b.originY / source.videoHeight,
-                w: b.width / source.videoWidth,
-                h: b.height / source.videoHeight,
+                x: b.originX / width,
+                y: b.originY / height,
+                w: b.width / width,
+                h: b.height / height,
               },
             } as StandardDetection;
           })

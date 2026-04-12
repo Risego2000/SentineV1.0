@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   GeometryLine,
   InfractionLog,
@@ -25,8 +25,12 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
+  const aiServiceModuleRef = useRef<Promise<typeof import('../services/aiService')> | null>(null);
   const getAIService = useCallback(async () => {
-    const module = await import('../services/aiService');
+    if (!aiServiceModuleRef.current) {
+      aiServiceModuleRef.current = import('../services/aiService');
+    }
+    const module = await aiServiceModuleRef.current;
     return module.AIService;
   }, []);
 

@@ -6,6 +6,7 @@
 import { evidenceDB } from '../services/EvidenceDB';
 import { VideoBufferService } from '../services/videoRecorder';
 import { forensicQueue } from '../services/ForensicQueue';
+import { OCRSynchronizer } from '../services/OCRSynchronizer';
 import { Track, GeometryLine } from '../types';
 import { ForensicRule } from '../types/forensicRules';
 
@@ -31,6 +32,7 @@ const DEFAULT_POLICY: CapturePolicy = {
   priorityMode: 'first',
   autoAbortOnExit: true,
 };
+const MAX_SNAPSHOTS_PER_TARGET = 6;
 
 /**
  * Evidence Capture Manager
@@ -129,43 +131,53 @@ export class EvidenceCaptureManager {
     track: Track,
     geometry: GeometryLine,
     video: HTMLVideoElement,
-    frameCount: number
+    viewerId?: string
   ): Promise<void> {
     const target = this.findTarget(track.id);
     if (!target) return;
 
     const key = target.key;
 
-    // Capture final snapshot
-    this.captureSnapshot(video, track, 'final', key);
+    try {
+      // Capture final snapshot
+      this.captureSnapshot(video, track, 'final', key);
 
-    // Get all captured evidence
-    const recorder = this.recorders.get(key);
-    const clip = recorder ? await recorder.getClip() : undefined;
+      // Get all captured evidence
+      const recorder = this.recorders.get(key);
+      const clip = recorder ? await recorder.getClip() : undefined;
 
-    const snapshots = this.getSnapshots(key);
-    const contextSnapshots = snapshots.filter((_, i) => i % 2 === 0);
-    const zoomSnapshots = snapshots.filter((_, i) => i % 2 === 1);
+      const snapshots = this.getSnapshots(key);
+      const contextSnapshots = snapshots.filter((_, i) => i % 2 === 0);
+      const zoomSnapshots = snapshots.filter((_, i) => i % 2 === 1);
 
-    // Get timecode
-    const localTime = new Date().toLocaleString();
-    const videoTimeCode = await this.extractTimecode(video);
+      // Get timecode
+      const localTime = new Date().toLocaleString();
+      const videoTimeCode = await this.extractTimecode(video);
 
-    // Save to EvidenceDB
-    const evidenceId = key;
-    await evidenceDB.saveEvidence(evidenceId, {
-      snapshots: [...snapshots],
-      contextSnapshots,
-      zoomSnapshots,
-      ocrResults: [],
-      clip,
-    });
+      // Save to EvidenceDB
+      const evidenceId = key;
+      await evidenceDB.saveEvidence(evidenceId, {
+        snapshots: [...snapshots],
+        contextSnapshots,
+        zoomSnapshots,
+        ocrResults: [],
+        clip,
+      });
 
-    // Enqueue for audit
-    forensicQueue.enqueue(track, geometry, evidenceId, localTime, videoTimeCode, video.currentTime);
-
-    // Cleanup
-    this.cleanup(key);
+      // Enqueue for audit
+      forensicQueue.enqueueJob(
+        track,
+        geometry,
+        evidenceId,
+        localTime,
+        videoTimeCode,
+        video.currentTime,
+        viewerId
+      );
+    } finally {
+      // Always release recorder + snapshots even if persistence/audit fails.
+      this.cleanup(key);
+    }
   }
 
   /**
@@ -183,7 +195,7 @@ export class EvidenceCaptureManager {
    * Abort all active captures.
    */
   abortAll(reason: string): void {
-    for (const [key, target] of this.targets) {
+    for (const target of this.targets.values()) {
       console.warn(`[CAPTURE] Aborted for Track #${target.trackId}: ${reason}`);
     }
     this.clear();
@@ -264,6 +276,9 @@ export class EvidenceCaptureManager {
       // Store snapshots
       const storage = this.snapshotStorage.get(targetKey) || [];
       storage.push({ type, data: contextFrame }, { type, data: zoomFrame });
+      if (storage.length > MAX_SNAPSHOTS_PER_TARGET) {
+        storage.splice(0, storage.length - MAX_SNAPSHOTS_PER_TARGET);
+      }
       this.snapshotStorage.set(targetKey, storage);
     } catch (error) {
       console.error(`[CAPTURE] Snapshot error for ${type}:`, error);
@@ -280,7 +295,6 @@ export class EvidenceCaptureManager {
   }
 
   private async extractTimecode(video: HTMLVideoElement): Promise<string> {
-    const { OCRSynchronizer } = await import('../services/OCRSynchronizer');
     return OCRSynchronizer.extractTimecode(video);
   }
 

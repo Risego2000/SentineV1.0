@@ -7,10 +7,19 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
-import { Track, GeometryLine, StandardDetection } from '../types';
-import { forensicQueue } from '../services/ForensicQueue';
+import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
 import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
+
+const MAX_TAIL_POINTS = 50;
+const MIN_FINALIZE_DELAY_MS = 1200;
+const MAX_FINALIZE_DELAY_MS = 3600;
+
+const getFinalizeDelayMs = (track: Track) => {
+  const velocityFactor = Math.max(0, Math.min(60, track.avgVelocity || 0));
+  const dynamicDelay = MIN_FINALIZE_DELAY_MS + velocityFactor * 20;
+  return Math.max(MIN_FINALIZE_DELAY_MS, Math.min(MAX_FINALIZE_DELAY_MS, dynamicDelay));
+};
 
 /**
  * Sentinel AI Frame Processor Hook.
@@ -27,6 +36,7 @@ export const useFrameProcessor = () => {
     setTracks,
     isAuditEnabled,
     updateBufferStatus,
+    viewerId,
   } = useSentinel();
 
   const trackerRef = useRef<ByteTracker>(new ByteTracker());
@@ -35,9 +45,13 @@ export const useFrameProcessor = () => {
   const isProcessingRef = useRef<boolean>(false);
   const evidenceManagerRef = useRef<EvidenceCaptureManager | null>(null);
   const lastProcessTimeRef = useRef<number>(0);
+  const tileCanvasesRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const finalizeTimersRef = useRef<Map<number, number>>(new Map());
 
   // Initialize EvidenceCaptureManager
   useEffect(() => {
+    const timers = finalizeTimersRef.current;
+    const canvases = tileCanvasesRef.current;
     evidenceManagerRef.current = new EvidenceCaptureManager({
       maxSimultaneous: 3,
       priorityMode: 'first',
@@ -49,6 +63,9 @@ export const useFrameProcessor = () => {
     });
 
     return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      timers.clear();
+      canvases.clear();
       evidenceManagerRef.current?.abortAll('Component unmount');
     };
   }, [updateBufferStatus]);
@@ -86,7 +103,7 @@ export const useFrameProcessor = () => {
 
       return true;
     },
-    [isAuditEnabled, findRulesForGeometry]
+    [isAuditEnabled]
   );
 
   /**
@@ -138,36 +155,52 @@ export const useFrameProcessor = () => {
       video: HTMLVideoElement,
       canvas: HTMLCanvasElement,
       track: Track,
-      line: GeometryLine
-    ) => {
+      line: GeometryLine,
+      viewerId?: string
+    ): Promise<boolean> => {
       const manager = evidenceManagerRef.current;
-      if (!manager || !manager.isCapturing(track.id)) return;
+      if (!manager || !manager.isCapturing(track.id)) return false;
 
-      await manager.finalizeCapture(track, line, video, frameCountRef.current);
-      track.auditStatus = 'pending';
-      updateBufferStatus({
-        state: 'idle',
-        activeTracks: Math.max(0, manager.getActiveCount() - 1),
-      });
-    },
-    [updateBufferStatus]
-  );
-
-  /**
-   * Aborts capture for a track.
-   */
-  const abortCapture = useCallback(
-    (trackId: number, reason: string) => {
-      const manager = evidenceManagerRef.current;
-      if (manager) {
-        manager.abortCapture(trackId, reason);
+      try {
+        await manager.finalizeCapture(track, line, video, viewerId);
+        track.auditStatus = 'pending';
         updateBufferStatus({
           state: 'idle',
           activeTracks: Math.max(0, manager.getActiveCount() - 1),
         });
+        return true;
+      } catch (error) {
+        // Rollback so track can be audited again if capture persistence failed.
+        track.audited = false;
+        track.auditStatus = 'failed';
+        manager.abortCapture(
+          track.id,
+          `Finalize failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+        updateBufferStatus({
+          state: 'idle',
+          activeTracks: Math.max(0, manager.getActiveCount() - 1),
+        });
+        return false;
       }
     },
     [updateBufferStatus]
+  );
+
+  const scheduleFinalizeCapture = useCallback(
+    (video: HTMLVideoElement, canvas: HTMLCanvasElement, track: Track, line: GeometryLine) => {
+      const existing = finalizeTimersRef.current.get(track.id);
+      if (existing) {
+        window.clearTimeout(existing);
+      }
+      const delay = getFinalizeDelayMs(track);
+      const timerId = window.setTimeout(async () => {
+        finalizeTimersRef.current.delete(track.id);
+        await finalizeCapture(video, canvas, track, line, viewerId);
+      }, delay);
+      finalizeTimersRef.current.set(track.id, timerId);
+    },
+    [finalizeCapture, viewerId]
   );
 
   /**
@@ -175,20 +208,21 @@ export const useFrameProcessor = () => {
    */
   const processTrackResults = useCallback(
     (activeTracks: Track[], v: HTMLVideoElement, canvas: HTMLCanvasElement): void => {
-      if (!v || !canvas || v.videoWidth === 0) return;
+      if (!v || !canvas || v.videoWidth === 0 || v.videoHeight === 0 || v.readyState < 2) return;
 
       const scale = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight);
       const dW = v.videoWidth * scale;
       const dH = v.videoHeight * scale;
       const oX = (canvas.width - dW) / 2;
       const oY = (canvas.height - dH) / 2;
+      let newDetections = 0;
 
       activeTracks.forEach((t: Track) => {
         // Stats counting
         const minHits = t.label === 'person' ? 4 : 2;
         if (t.hits >= minHits && !seenTrackIds.current.has(t.id)) {
           seenTrackIds.current.add(t.id);
-          setStats((prev) => ({ ...prev, det: prev.det + 1 }));
+          newDetections += 1;
         }
 
         // Calculate centroid
@@ -200,8 +234,7 @@ export const useFrameProcessor = () => {
         const normY = (cy - oY) / dH;
         const lastT = t.tail[t.tail.length - 1];
         if (!lastT || Math.hypot(lastT.x - normX, lastT.y - normY) > 0.001) {
-          t.tail.push({ x: normX, y: normY });
-          if (t.tail.length > 50) t.tail.shift();
+          t.tail = [...t.tail, { x: normX, y: normY }].slice(-MAX_TAIL_POINTS);
         }
 
         // Check mid-capture for active suspects
@@ -225,7 +258,7 @@ export const useFrameProcessor = () => {
           // LINE INTERSECTION LOGIC
           if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
             let isInfraction = true;
-            let infractionLabel = line.label;
+            const infractionLabel = line.label;
 
             // STOP LINE: requires dwellTime > 3000ms
             if (line.type === 'stop_line' && t.dwellTime > 3000) {
@@ -238,9 +271,7 @@ export const useFrameProcessor = () => {
               t.crossedLine = true;
 
               // Schedule finalization
-              setTimeout(() => {
-                finalizeCapture(v, canvas, t, line);
-              }, 2000);
+              scheduleFinalizeCapture(v, canvas, t, line);
             } else {
               t.processedLines.push(line.id);
             }
@@ -260,10 +291,10 @@ export const useFrameProcessor = () => {
               if (!t.processedLines.includes(line.id + '_box')) {
                 t.processedLines.push(line.id + '_box');
                 triggerCapture(v, canvas, t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
-
-                setTimeout(() => {
-                  finalizeCapture(v, canvas, t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' });
-                }, 2000);
+                scheduleFinalizeCapture(v, canvas, t, {
+                  ...line,
+                  label: 'BLOQUEO_INTERSECCIÓN',
+                });
               }
             } else if (!inZone && t.lastZoneId === line.id) {
               t.lastZoneId = undefined;
@@ -281,17 +312,17 @@ export const useFrameProcessor = () => {
               // General ROI: immediate audit
               if (line.type === 'roi_general' && isAuditEnabled) {
                 triggerCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
-
-                setTimeout(() => {
-                  finalizeCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
-                }, 2000);
+                scheduleFinalizeCapture(v, canvas, t, {
+                  ...line,
+                  label: `ZONA_ANÁLISIS_${line.label}`,
+                });
               }
 
               // Forbidden turn: check sequence
               if (line.type === 'roi_turn' && isAuditEnabled) {
                 const uniqueRois = [...new Set(t.roiHistory)];
-                if (uniqueRois.length >= 2) {
-                  const turnRule = findForbiddenTurnRule(uniqueRois);
+                const turnRule = findForbiddenTurnRule(uniqueRois);
+                if (uniqueRois.length >= 2 && turnRule) {
                   const turnLabels = uniqueRois.map(
                     (id) => geometry.find((g) => g.id === id)?.label || id
                   );
@@ -303,22 +334,23 @@ export const useFrameProcessor = () => {
                     roiSequenceIds: uniqueRois,
                     roiSequenceLabels: turnLabels,
                   });
-
-                  setTimeout(() => {
-                    finalizeCapture(v, canvas, t, {
-                      ...line,
-                      label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
-                      violationKind: 'forbidden_turn_sequence',
-                      roiSequenceIds: uniqueRois,
-                      roiSequenceLabels: turnLabels,
-                    });
-                  }, 2000);
+                  scheduleFinalizeCapture(v, canvas, t, {
+                    ...line,
+                    label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
+                    violationKind: 'forbidden_turn_sequence',
+                    roiSequenceIds: uniqueRois,
+                    roiSequenceLabels: turnLabels,
+                  });
                 }
               }
             }
           }
         });
       });
+
+      if (newDetections > 0) {
+        setStats((prev) => ({ ...prev, det: prev.det + newDetections }));
+      }
     },
     [
       geometry,
@@ -327,7 +359,7 @@ export const useFrameProcessor = () => {
       shouldTriggerCapture,
       triggerCapture,
       checkMidCapture,
-      finalizeCapture,
+      scheduleFinalizeCapture,
     ]
   );
 
@@ -349,7 +381,8 @@ export const useFrameProcessor = () => {
         trackerRef.current.step();
 
         if (frameCountRef.current % (engineConfig.detectionSkip || 1) === 0) {
-          const results: StandardDetection[] = await detect(v);
+          const rawResults = await detect(v);
+          const results = Array.isArray(rawResults) ? rawResults : [];
 
           const activeTracks = trackerRef.current.update(
             results,
@@ -375,7 +408,7 @@ export const useFrameProcessor = () => {
         isProcessingRef.current = false;
       }
     },
-    [detect, detectPose, engineConfig, isPoseEnabled, processTrackResults, setTracks]
+    [detectPose, engineConfig, isPoseEnabled, processTrackResults, detect, setTracks]
   );
 
   /**
@@ -384,6 +417,9 @@ export const useFrameProcessor = () => {
   const resetTracker = useCallback((): void => {
     trackerRef.current.reset();
     seenTrackIds.current.clear();
+    finalizeTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    finalizeTimersRef.current.clear();
+    tileCanvasesRef.current.clear();
     evidenceManagerRef.current?.abortAll('Tracker reset');
     setTracks([]);
     frameCountRef.current = 0;

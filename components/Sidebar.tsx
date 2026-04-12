@@ -5,6 +5,7 @@ import { EngineSettings } from './Sidebar/EngineSettings';
 import { SecurityProtocol } from './Sidebar/SecurityProtocol';
 import { ProtocolSelector } from './Sidebar/ProtocolSelector';
 import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
+import { LayoutControls } from './Sidebar/LayoutControls';
 export const Sidebar = memo(() => {
   return (
     <aside className="w-80 border-r border-white/10 flex flex-col bg-[#020617]/95 z-50 shrink-0 h-screen overflow-hidden">
@@ -22,6 +23,7 @@ export const Sidebar = memo(() => {
 
       <div className="flex-1 p-5 space-y-8 overflow-y-auto custom-scrollbar">
         <SystemStatus />
+        <LayoutControls />
         <EngineSettings />
         <SecurityProtocol />
         <ProtocolSelector />

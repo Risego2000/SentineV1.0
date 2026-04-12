@@ -13,39 +13,19 @@
  */
 
 import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
-import { evidenceDB } from './EvidenceDB';
-import { logger } from './logger';
-import { OCRSynchronizer } from './OCRSynchronizer';
-import {
-  matchesOrderedRoiSequence,
-  matchesOrderedRoiSequence as legacyMatchesSequence,
-} from '../types/forensicRules';
-import {
-  buildForbiddenTurnAudit,
-  buildForbiddenTurnAudit as legacyBuildForbiddenTurn,
-} from '../types/forensicRules';
 
 // Re-export for backward compatibility
 export { matchesOrderedRoiSequence } from '../types/forensicRules';
 export { buildForbiddenTurnAudit } from '../types/forensicRules';
 
-import { ForensicQueueV3, forensicQueueV3 } from './ForensicQueueV3';
+import { forensicQueueV3 } from './ForensicQueueV3';
+import type { ForensicQueueEvent } from './ForensicQueueV3';
 
 /**
  * @deprecated Use ForensicQueueV3 instead
  */
 export class ForensicQueue {
-  private queue: {
-    track: Track;
-    line: GeometryLine;
-    evidenceId: string;
-    localTime: string;
-    videoTimeCode: string;
-    playbackTime: number;
-  }[] = [];
-  private isProcessing = false;
   private onInfractionDetected?: (log: InfractionLog) => void;
-  private idleResolvers: Array<() => void> = [];
 
   // Dynamic context synced from React
   private directives: string = '';
@@ -118,7 +98,8 @@ export class ForensicQueue {
     evidenceId: string,
     localTime: string,
     videoTimeCode: string,
-    playbackTime: number
+    playbackTime: number,
+    viewerId?: string
   ) {
     return forensicQueueV3.enqueue(
       track,
@@ -126,7 +107,8 @@ export class ForensicQueue {
       evidenceId,
       localTime,
       videoTimeCode,
-      playbackTime
+      playbackTime,
+      viewerId
     );
   }
 
@@ -152,6 +134,19 @@ export class ForensicQueue {
   setCallback(callback: (log: InfractionLog) => void) {
     this.onInfractionDetected = callback;
     forensicQueueV3.setCallback(callback);
+  }
+
+  addListener(callback: (log: InfractionLog) => void) {
+    this.onInfractionDetected = callback;
+    forensicQueueV3.addListener(callback);
+  }
+
+  removeListener(callback: (log: InfractionLog) => void) {
+    forensicQueueV3.removeListener(callback);
+  }
+
+  setEventCallback(callback?: (event: ForensicQueueEvent) => void) {
+    forensicQueueV3.setEventCallback(callback);
   }
 
   /**
