@@ -13,7 +13,8 @@ import { HelpCapsule } from './HelpCapsule';
 interface MainViewerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  onLive: () => void;
+  onScreenShare: () => void;
+  onIpCamera: () => void;
   onUpload: () => void;
 }
 
@@ -21,7 +22,7 @@ interface MainViewerProps {
  * MainViewer modularizado.
  * Estructura optimizada para renderizado fluido.
  */
-export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainViewerProps) => {
+export const MainViewer = memo(({ videoRef, canvasRef, onScreenShare, onIpCamera, onUpload }: MainViewerProps) => {
   const { source, isAnalyzing } = useSentinel();
   const [aspectRatio, setAspectRatio] = React.useState<number>(16 / 9);
 
@@ -53,7 +54,8 @@ export const MainViewer = memo(({ videoRef, canvasRef, onLive, onUpload }: MainV
       {/* Capa de Información (HUD) y Acciones */}
       <NeuralStatusHUD />
       <HeaderActions
-        onLive={onLive}
+        onScreenShare={onScreenShare}
+        onIpCamera={onIpCamera}
         onUpload={onUpload}
         activeMode={source === 'upload' ? 'video' : source}
       />

@@ -22,6 +22,11 @@ import { CacheService } from '../services/cacheService';
 import { forensicQueue } from '../services/ForensicQueue';
 import { evidenceDB } from '../services/EvidenceDB';
 import { ReportService } from '../services/ReportService';
+import {
+  createIpCameraSession,
+  isSupportedIpCameraUrl,
+  sanitizeCameraUrlForLogs,
+} from '../services/ipCameraService';
 
 import { SentinelContext, SentinelContextType } from './SentinelContext';
 
@@ -150,7 +155,7 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const setSource = useCallback(
-    (s: 'none' | 'live' | 'upload') => {
+    (s: 'none' | 'live' | 'upload' | 'ip') => {
       _setSource(s);
       addLog('CORE', `Fuente de video cambiada a: ${s.toUpperCase()}`);
     },
@@ -607,24 +612,19 @@ export const SentinelProvider = ({ children }: { children: ReactNode }) => {
       if (!videoRef.current) return;
 
       try {
-        setStatusMsg('CONECTANDO_IP...');
-        addLog('CORE', `Conectando a cámara IP: ${config.url}`);
-
-        // Construir URL con credenciales si existen
-        let finalUrl = config.url;
-        if (config.username && config.password) {
-          try {
-            const urlObj = new URL(config.url);
-            urlObj.username = config.username;
-            urlObj.password = config.password;
-            finalUrl = urlObj.toString();
-          } catch {
-            // Fallback simple si URL no es válida para el constructor
-            addLog('WARN', 'Error al procesar credenciales en la URL. Usando URL base.');
-          }
+        if (!isSupportedIpCameraUrl(config.url)) {
+          throw new Error(
+            'La cámara IP debe usar HTTP o HTTPS. RTSP directo no es reproducible de forma segura en el navegador.'
+          );
         }
 
-        videoRef.current.src = finalUrl;
+        setStatusMsg('CONECTANDO_IP...');
+        addLog('CORE', `Conectando a cámara IP: ${sanitizeCameraUrlForLogs(config.url)}`);
+
+        const { streamUrl } = await createIpCameraSession(config);
+
+        videoRef.current.srcObject = null;
+        videoRef.current.src = streamUrl;
         videoRef.current.onloadeddata = () => {
           addLog('SUCCESS', 'Conexión IP establecida. Transmisión activa.');
           setStatusMsg('SISTEMA_LISTO');

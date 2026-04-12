@@ -30,7 +30,8 @@ export const App = () => {
     isBatchMode,
     loadNextInQueue,
     finalizeVideoReport,
-    startLiveFeed: contextStartLiveFeed,
+    startScreenShare: contextStartScreenShare,
+    startIpFeed: contextStartIpFeed,
     clearLogs,
   } = useSentinel();
 
@@ -141,10 +142,11 @@ export const App = () => {
       <MainViewer
         videoRef={videoRef}
         canvasRef={canvasRef}
-        onLive={() => {
+        onScreenShare={() => {
           clearLogs();
-          contextStartLiveFeed(videoRef);
+          contextStartScreenShare(videoRef);
         }}
+        onIpCamera={() => setShowIpModal(true)}
         onUpload={handleFileSelect}
       />
 

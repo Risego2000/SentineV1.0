@@ -7,6 +7,21 @@ import { Track, GeometryLine, StandardDetection } from '../types';
 import { evidenceDB } from '../services/EvidenceDB';
 import { forensicQueue } from '../services/ForensicQueue';
 import { OCRSynchronizer } from '../services/OCRSynchronizer';
+import { resetTrackAuditState } from '../services/trackAuditState';
+
+const getOrderedTurnSequence = (track: Track, geometry: GeometryLine[]) => {
+  const turnIds = track.roiHistory.filter((id, index, history) => {
+    if (history.indexOf(id) !== index) return false;
+    const roi = geometry.find((candidate) => candidate.id === id);
+    return roi?.type === 'roi_turn';
+  });
+
+  const turnLabels = turnIds.map(
+    (id) => geometry.find((candidate) => candidate.id === id)?.label || id
+  );
+
+  return { turnIds, turnLabels };
+};
 
 /**
  * Sentinel AI Frame Processor Hook.
@@ -100,6 +115,25 @@ export const useFrameProcessor = () => {
     track.hasMidFrame = false;
   }, []);
 
+  const abortTrackEvidence = useCallback(
+    (track: Track, line: GeometryLine, reason: string) => {
+      console.warn(`[FORENSIC] Captura abortada para ID:${track.id}. ${reason}`);
+      clearTrackEvidence(track);
+      resetTrackAuditState(track, line);
+      updateBufferStatus({ state: 'idle', activeTracks: 0 });
+
+      if (suspectRef.current?.trackId === track.id) {
+        suspectRef.current = null;
+      }
+
+      if (recorderRef.current) {
+        recorderRef.current.stop();
+        recorderRef.current = null;
+      }
+    },
+    [clearTrackEvidence, updateBufferStatus]
+  );
+
   const activateSuspect = useCallback(
     (video: HTMLVideoElement, track: Track, line: GeometryLine) => {
       if (
@@ -181,44 +215,61 @@ export const useFrameProcessor = () => {
 
   const finalizeTrackEvidence = useCallback(
     async (video: HTMLVideoElement, track: Track, line: GeometryLine, evidenceId: string) => {
-      captureMidIfNeeded(video, track);
-      updateBufferStatus({ state: 'capturing' });
-      const finalCaptured = captureSnapshot(video, track, 'final');
-      if (!finalCaptured) return;
+      try {
+        captureMidIfNeeded(video, track);
+        updateBufferStatus({ state: 'capturing' });
+        const finalCaptured = captureSnapshot(video, track, 'final');
+        if (!finalCaptured) {
+          abortTrackEvidence(track, line, 'No se pudo capturar el frame final.');
+          return;
+        }
 
-      const snapshots = [...track.snapshots];
-      const contextSnapshots = [...(track.contextSnapshots || [])];
-      const zoomSnapshots = [...(track.zoomSnapshots || [])];
-      const clip = recorderRef.current ? await recorderRef.current.getClip() : undefined;
-      const localTime = new Date().toLocaleString();
-      const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
+        const snapshots = [...track.snapshots];
+        const contextSnapshots = [...(track.contextSnapshots || [])];
+        const zoomSnapshots = [...(track.zoomSnapshots || [])];
+        const clip = recorderRef.current ? await recorderRef.current.getClip() : undefined;
+        const localTime = new Date().toLocaleString();
+        const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
 
-      // INDIVIDUAL OCR PROCESSING FOR EACH STAGE
-      const ocrResults = [];
-      for (const zoom of zoomSnapshots) {
-        const res = await OCRSynchronizer.extractLicensePlate([zoom]);
-        ocrResults.push(res.plate || 'NO_OCR');
+        // INDIVIDUAL OCR PROCESSING FOR EACH STAGE
+        const ocrResults = [];
+        for (const zoom of zoomSnapshots) {
+          const res = await OCRSynchronizer.extractLicensePlate([zoom]);
+          ocrResults.push(res.plate || 'NO_OCR');
+        }
+
+        await evidenceDB.saveEvidence(evidenceId, {
+          snapshots,
+          contextSnapshots,
+          zoomSnapshots,
+          ocrResults,
+          clip,
+        });
+
+        updateBufferStatus({ state: 'idle', activeTracks: 0 });
+        clearTrackEvidence(track);
+        suspectRef.current = null;
+        if (recorderRef.current) {
+          recorderRef.current.stop();
+          recorderRef.current = null;
+        }
+
+        forensicQueue.enqueue(track, line, evidenceId, localTime, videoTimeCode, video.currentTime);
+      } catch (error) {
+        abortTrackEvidence(
+          track,
+          line,
+          error instanceof Error ? error.message : 'Error desconocido guardando evidencia.'
+        );
       }
-
-      await evidenceDB.saveEvidence(evidenceId, {
-        snapshots,
-        contextSnapshots,
-        zoomSnapshots,
-        ocrResults,
-        clip,
-      });
-
-      updateBufferStatus({ state: 'idle', activeTracks: 0 });
-      clearTrackEvidence(track);
-      suspectRef.current = null;
-      if (recorderRef.current) {
-        recorderRef.current.stop();
-        recorderRef.current = null;
-      }
-
-      forensicQueue.enqueue(track, line, evidenceId, localTime, videoTimeCode, video.currentTime);
     },
-    [captureMidIfNeeded, captureSnapshot, clearTrackEvidence, updateBufferStatus]
+    [
+      abortTrackEvidence,
+      captureMidIfNeeded,
+      captureSnapshot,
+      clearTrackEvidence,
+      updateBufferStatus,
+    ]
   );
 
   /**
@@ -400,14 +451,11 @@ export const useFrameProcessor = () => {
 
                   // Case B: Forbidden Turn ROI - Sequential Logic
                   if (line.type === 'roi_turn' && isAuditEnabled) {
-                    const turnROIs = t.roiHistory.filter((id) => {
-                      const l = geometry.find((gl) => gl.id === id);
-                      return l?.type === 'roi_turn';
-                    });
+                    const { turnIds, turnLabels } = getOrderedTurnSequence(t, geometry);
 
-                    if (turnROIs.length >= 2) {
+                    if (turnIds.length >= 2) {
                       console.log(
-                        `[FORENSIC] ID:${t.id} - GIRO PROHIBIDO DETECTADO (${turnROIs.length} zonas). Iniciando auditoría...`
+                        `[FORENSIC] ID:${t.id} - GIRO PROHIBIDO DETECTADO (${turnIds.length} zonas). Iniciando auditoría...`
                       );
                       t.audited = true;
                       t.auditStatus = 'processing';
@@ -416,7 +464,14 @@ export const useFrameProcessor = () => {
                         await finalizeTrackEvidence(
                           v,
                           t,
-                          { ...line, label: 'GIRO_PROHIBIDO_MULTI_ZONA' },
+                          {
+                            ...line,
+                            label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
+                            violationKind: 'forbidden_turn_sequence',
+                            roiSequenceIds: turnIds,
+                            roiSequenceLabels: turnLabels,
+                            analysisContext: `Secuencia prohibida detectada para el mismo vehículo: ${turnLabels.join(' -> ')}.`,
+                          },
                           evidenceId
                         );
                       })();

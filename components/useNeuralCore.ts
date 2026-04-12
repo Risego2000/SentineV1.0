@@ -43,6 +43,14 @@ export const useNeuralCore = ({
   const objTimestampRef = useRef<number>(0);
   const poseTimestampRef = useRef<number>(0);
 
+  const releasePose = useCallback(() => {
+    if (!poseLandmarkerRef.current) return;
+    logger.core('NEURAL_CORE', 'Hibernando módulo de Pose...');
+    poseLandmarkerRef.current.close();
+    poseLandmarkerRef.current = null;
+    poseTimestampRef.current = 0;
+  }, []);
+
   /**
    * Initializes the base Object Detection engine.
    */
@@ -131,16 +139,14 @@ export const useNeuralCore = ({
   useEffect(() => {
     if (isPoseEnabled && status === 'ready') {
       initPose();
+    } else if (!isPoseEnabled) {
+      releasePose();
     }
 
     return () => {
-      if (!isPoseEnabled && poseLandmarkerRef.current) {
-        logger.core('NEURAL_CORE', 'Hibernando módulo de Pose...');
-        poseLandmarkerRef.current.close();
-        poseLandmarkerRef.current = null;
-      }
+      releasePose();
     };
-  }, [isPoseEnabled, status]);
+  }, [isPoseEnabled, status, releasePose]);
 
   /**
    * Primary Object Detection Logic.

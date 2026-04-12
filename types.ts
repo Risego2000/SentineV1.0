@@ -33,6 +33,10 @@ export interface GeometryLine {
   points?: { x: number; y: number }[]; // For polygons/complex areas
   label: string;
   type: EntityType;
+  violationKind?: 'forbidden_turn_sequence';
+  roiSequenceIds?: string[];
+  roiSequenceLabels?: string[];
+  analysisContext?: string;
 }
 
 /**

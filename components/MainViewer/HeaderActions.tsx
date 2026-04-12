@@ -1,46 +1,70 @@
 import React from 'react';
-import { Signal, Upload } from 'lucide-react';
+import { Monitor, Globe, Upload } from 'lucide-react';
 import { useHelp } from '../../hooks/useHelp';
 
 interface HeaderActionsProps {
-  onLive: () => void;
+  onScreenShare: () => void;
+  onIpCamera: () => void;
   onUpload: () => void;
-  activeMode: 'video' | 'live' | 'none';
+  activeMode: 'video' | 'live' | 'ip' | 'none';
 }
 
-export const HeaderActions = ({ onLive, onUpload, activeMode }: HeaderActionsProps) => {
+export const HeaderActions = ({ onScreenShare, onIpCamera, onUpload, activeMode }: HeaderActionsProps) => {
   const { helpProps } = useHelp();
 
+  const isActive = (mode: HeaderActionsProps['activeMode']) => activeMode === mode;
+
   return (
-    <div className="absolute top-6 right-6 z-40 flex flex-row gap-4 pointer-events-auto items-center">
+    <div className="absolute top-6 right-6 z-40 flex flex-row gap-3 pointer-events-auto items-center" role="toolbar" aria-label="Seleccionar fuente de video">
       <button
-        onClick={onLive}
-        className={`h-14 px-8 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-3 min-w-[180px] group ${
-          activeMode === 'live'
-            ? 'bg-cyan-500 text-black shadow-cyan-500/20'
-            : 'bg-black/40 border border-white/5 text-slate-600 hover:bg-cyan-950/30 hover:text-cyan-700 hover:border-cyan-900/30'
-        }`}
+        onClick={onScreenShare}
+        role="button"
+        aria-pressed={isActive('live')}
+        aria-label="Compartir ventana o aplicación en pantalla"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[160px] group focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('live')
+            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
+            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
+          }`}
         {...helpProps(
-          'Conecta con flujos de video en tiempo real mediante protocolos RTSP o WebRTC.'
+          'Comparte una ventana de navegador, aplicación o toda la pantalla para análisis en tiempo real.'
         )}
       >
-        <Signal size={16} className={activeMode === 'live' ? 'animate-pulse' : ''} />
-        CÁMARA IP
+        <Monitor size={14} className={isActive('live') ? 'animate-pulse' : ''} />
+        Compartir Ventana
+      </button>
+
+      <button
+        onClick={onIpCamera}
+        role="button"
+        aria-pressed={isActive('ip')}
+        aria-label="Conectar cámara IP remota"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('ip')
+            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
+            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
+          }`}
+        {...helpProps(
+          'Conecta una cámara IP remota vía HTTP/HTTPS usando URL directa o stream remoto.'
+        )}
+      >
+        <Globe size={14} className={isActive('ip') ? 'animate-pulse' : ''} />
+        Cámara IP
       </button>
 
       <button
         onClick={onUpload}
-        className={`h-14 px-8 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-3 min-w-[180px] ${
-          activeMode === 'video'
-            ? 'bg-cyan-500 text-black shadow-cyan-500/20'
-            : 'bg-black/40 border border-white/5 text-slate-600 hover:bg-slate-900/60 hover:text-slate-400'
-        }`}
+        role="button"
+        aria-pressed={isActive('video')}
+        aria-label="Subir archivo de video local"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('video')
+            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
+            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-slate-900/60 hover:text-slate-300 hover:border-white/20'
+          }`}
         {...helpProps(
           'Carga un archivo de video local para realizar un análisis forense diferido.'
         )}
       >
-        <Upload size={16} />
-        Cargar Video
+        <Upload size={14} />
+        Subir Video
       </button>
     </div>
   );

@@ -2,6 +2,7 @@ import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
 import { evidenceDB } from './EvidenceDB';
 import { logger } from './logger';
 import { OCRSynchronizer } from './OCRSynchronizer';
+import { buildForbiddenTurnAudit, matchesOrderedRoiSequence } from './forensicRules';
 
 /**
  * ForensicQueue - Strategic Processing Pipeline
@@ -136,19 +137,25 @@ export class ForensicQueue {
             this.directives,
             this.auditPreset
           );
+          const isForbiddenTurnSequence =
+            line.violationKind === 'forbidden_turn_sequence' &&
+            matchesOrderedRoiSequence(track.roiHistory, line.roiSequenceIds);
+          const finalAuditResult = isForbiddenTurnSequence
+            ? buildForbiddenTurnAudit(track, line, auditResult)
+            : auditResult;
 
-          if (auditResult.infraction) {
+          if (finalAuditResult.infraction) {
             logger.success(
               'FORENSIC_QUEUE',
-              `INFRACCIÓN CONFIRMADA para Vehículo #${track.id} (${auditResult.plate})`
+              `INFRACCIÓN CONFIRMADA para Vehículo #${track.id} (${finalAuditResult.plate})`
             );
 
             const infractionLog: InfractionLog = {
-              ...auditResult,
+              ...finalAuditResult,
               id: Date.now(),
               plate:
-                auditResult.plate && auditResult.plate !== 'DESCONOCIDO'
-                  ? auditResult.plate
+                finalAuditResult.plate && finalAuditResult.plate !== 'DESCONOCIDO'
+                  ? finalAuditResult.plate
                   : plateOCR.plate || 'DESCONOCIDO',
               image: zoomSnapshots[zoomSnapshots.length - 1] || evidence.snapshots[0],
               extraSnapshots: contextSnapshots,
