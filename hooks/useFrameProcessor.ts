@@ -434,8 +434,9 @@ export const useFrameProcessor = () => {
 
       isProcessingRef.current = true;
       try {
-        // Auto-initialize recorder
-        if (!recorderRef.current && canvas) {
+        // Auto-initialize recorder ONLY if there is an active suspect
+        if (!recorderRef.current && canvas && suspectRef.current) {
+          console.log('[RECORDER] Activating forensic buffer (Vehicle detected in ROI A)');
           recorderRef.current = new VideoBufferService(canvas);
           recorderRef.current.start();
         }
