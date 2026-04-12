@@ -117,6 +117,19 @@ export const useFrameProcessor = () => {
       const previousTrack = trackerRef.current.tracks.find(
         (candidate) => candidate.id === suspectRef.current?.trackId
       );
+      const isStartROI =
+        line.label.toUpperCase().includes('A') ||
+        line.label.toUpperCase().includes('DETEC') ||
+        line.label.toUpperCase().includes('START') ||
+        line.label.toUpperCase().includes('INICIO');
+
+      if (!isStartROI) {
+        console.log(
+          `[FORENSIC] ID:${track.id} hit ${line.label}, but it is not a START ROI. Recording ignored.`
+        );
+        return;
+      }
+
       if (previousTrack && !previousTrack.audited) {
         clearTrackEvidence(previousTrack);
       }
@@ -198,6 +211,10 @@ export const useFrameProcessor = () => {
       updateBufferStatus({ state: 'idle', activeTracks: 0 });
       clearTrackEvidence(track);
       suspectRef.current = null;
+      if (recorderRef.current) {
+        recorderRef.current.stop();
+        recorderRef.current = null;
+      }
 
       forensicQueue.enqueue(track, line, evidenceId, localTime, videoTimeCode, video.currentTime);
     },
@@ -495,6 +512,10 @@ export const useFrameProcessor = () => {
     setTracks([]);
     frameCountRef.current = 0;
     updateBufferStatus({ state: 'idle', activeTracks: 0, seconds: 0 });
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
   }, [setTracks, updateBufferStatus]);
 
   return { processFrame, trackerRef, seenTrackIds, resetTracker };
