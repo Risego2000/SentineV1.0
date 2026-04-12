@@ -253,6 +253,44 @@ export interface Point {
 }
 
 /**
+ * Immutable snapshot of forensic evidence captured at infraction-detection time.
+ * The ForensicQueue consumes AuditJob objects so that later mutations of the
+ * originating Track cannot affect the audit result.
+ */
+export interface AuditJob {
+  /** Copy of track.id at capture time */
+  trackId: number;
+  /** Copy of track.label at capture time */
+  trackLabel: string;
+  /** Snapshot of movement tail (normalised 0-1 coords) */
+  tail: { x: number; y: number }[];
+  /** Snapshot of bounding box */
+  bbox: TrackBBox;
+  /** Snapshot of ROI entry sequence */
+  roiHistory: string[];
+  /** Telemetry snapshot */
+  velocity: number;
+  avgVelocity: number;
+  heading: number;
+  /** The geometry line/zone that triggered the infraction */
+  line: GeometryLine;
+  /** Key into EvidenceDB where frames + clip are stored */
+  evidenceId: string;
+  /** Wall-clock time string at capture (e.g. "12:02:48") */
+  localTime: string;
+  /** Timecode extracted from OSD via OCR */
+  videoTimeCode: string;
+  /** Video playback position in seconds */
+  playbackTime: number;
+  /** Unix ms timestamp when the job was created */
+  capturedAt: number;
+  /** Audit preset active at capture time */
+  auditPreset: AuditPresetType;
+  /** Directives string active at capture time */
+  directives: string;
+}
+
+/**
  * Report summary for a batch of videos.
  */
 export interface BatchReport {

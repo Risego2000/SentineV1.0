@@ -112,9 +112,9 @@ export class ByteTracker {
       t.bbox.y = t.kf.y - t.bbox.h / 2;
       t.isCoasting = true;
 
-      // Append predicted centroid to tail for fluid visuals
+      // Append predicted centroid to tail for fluid visuals — bounded, no O(n) shift
       t.tail.push({ x: t.kf.x, y: t.kf.y });
-      if (t.tail.length > 100) t.tail.shift();
+      if (t.tail.length > 50) t.tail = t.tail.slice(-50);
     });
     return this.tracks;
   }
@@ -198,6 +198,9 @@ export class ByteTracker {
           t.dwellTime = 0;
         }
 
+        // Save previous heading BEFORE overwriting t.heading for correct delta
+        const prevHeading = t.heading;
+
         t.acceleration = deltaV;
         t.velocity = newVelocity;
         t.heading = newHeading;
@@ -205,7 +208,10 @@ export class ByteTracker {
         // --- ANOMALY DETECTION ---
         const isPanicBrake = deltaV < -0.05;
         const isSuddenAccel = deltaV > 0.05;
-        const isErraticSteer = Math.abs(newHeading - t.heading) > 1.0;
+        // Wrap-around-safe heading delta (handles ±π boundary)
+        let headingDelta = Math.abs(newHeading - prevHeading);
+        if (headingDelta > Math.PI) headingDelta = 2 * Math.PI - headingDelta;
+        const isErraticSteer = headingDelta > 1.0;
 
         t.isAnomalous = t.hits > 10 && (isPanicBrake || isSuddenAccel || isErraticSteer);
 
@@ -234,9 +240,9 @@ export class ByteTracker {
         t.missedFrames = 0;
         t.isCoasting = false;
 
-        // Update tail
+        // Update tail — bounded, no O(n) shift
         t.tail.push({ x: cx, y: cy });
-        if (t.tail.length > 50) t.tail.shift();
+        if (t.tail.length > 50) t.tail = t.tail.slice(-50);
       }
     }
 
@@ -289,6 +295,7 @@ export class ByteTracker {
           missedFrames: 0,
           isCoasting: false,
           labelHistory: [d.label],
+          roiHistory: [],
         });
       }
     });

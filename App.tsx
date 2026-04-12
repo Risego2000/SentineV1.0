@@ -6,6 +6,7 @@ import { RightSidebar } from './components/RightSidebar';
 import { MainViewer } from './components/MainViewer/MainViewer';
 import { InfractionModal } from './components/InfractionModal';
 import { IpCameraModal } from './components/IpCameraModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useSentinel } from './hooks/useSentinel';
 import { useFrameProcessor } from './hooks/useFrameProcessor';
 import { renderScene } from './components/renderSystem';
@@ -61,14 +62,19 @@ export const App = () => {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx || v.readyState < 2) return;
 
-    // Execute frame processing ONLY if playing
-    if (isPlaying) {
-      await processFrame(v, canvas);
-    }
+    try {
+      // Execute frame processing ONLY if playing
+      if (isPlaying) {
+        await processFrame(v, canvas);
+      }
 
-    // Always render the scene (includes tracked entities history/predictions)
-    renderScene(ctx, v, trackerRef.current.tracks, geometry, isMeshRenderEnabled);
-  }, [isPlaying, source, geometry, processFrame, isMeshRenderEnabled, videoRef, trackerRef]);
+      // Always render the scene (includes tracked entities history/predictions)
+      renderScene(ctx, v, trackerRef.current.tracks, geometry, isMeshRenderEnabled);
+    } catch (err) {
+      // Log but never let a single bad frame kill the entire render loop
+      addLog('ERROR', `Error en frame loop: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [isPlaying, source, geometry, processFrame, isMeshRenderEnabled, videoRef, trackerRef, addLog]);
 
   useEffect(() => {
     let anim: number;
@@ -139,16 +145,18 @@ export const App = () => {
     <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans select-none">
       <Sidebar />
 
-      <MainViewer
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        onScreenShare={() => {
-          clearLogs();
-          contextStartScreenShare(videoRef);
-        }}
-        onIpCamera={() => setShowIpModal(true)}
-        onUpload={handleFileSelect}
-      />
+      <ErrorBoundary onError={(err) => addLog('ERROR', `UI crash: ${err.message}`)}>
+        <MainViewer
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          onScreenShare={() => {
+            clearLogs();
+            contextStartScreenShare(videoRef);
+          }}
+          onIpCamera={() => setShowIpModal(true)}
+          onUpload={handleFileSelect}
+        />
+      </ErrorBoundary>
 
       <RightSidebar />
 

@@ -8,7 +8,10 @@ const escapeCsvCell = (value: unknown): string => {
   return `"${formulaSafe.replace(/"/g, '""')}"`;
 };
 
-const REPORTS_DIR = 'C:\\Denuncias';
+// REPORTS_DIR is intentionally NOT defined on the client — report saving goes
+// through the backend API (/api/reports/save), which reads REPORTS_DIR from
+// its own environment variable.  This constant was removed to avoid leaking
+// the server-side path into the frontend bundle.
 
 const formatTimestamp = (date = new Date()): string =>
   date.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
