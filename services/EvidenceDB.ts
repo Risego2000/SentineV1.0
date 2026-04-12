@@ -16,13 +16,24 @@ export class EvidenceDB {
 
   private init(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, 2);
+      // Version 3: adds 'timestamp' index on evidences store for fast purge queries
+      const request = indexedDB.open(this.dbName, 3);
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+
         if (!db.objectStoreNames.contains(this.storeName)) {
-          db.createObjectStore(this.storeName, { keyPath: 'id' });
+          const evidenceStore = db.createObjectStore(this.storeName, { keyPath: 'id' });
+          evidenceStore.createIndex('timestamp', 'timestamp', { unique: false });
+        } else {
+          // Migration: add index to existing store if missing
+          const tx = (event.target as IDBOpenDBRequest).transaction!;
+          const evidenceStore = tx.objectStore(this.storeName);
+          if (!evidenceStore.indexNames.contains('timestamp')) {
+            evidenceStore.createIndex('timestamp', 'timestamp', { unique: false });
+          }
         }
+
         if (!db.objectStoreNames.contains(this.logStoreName)) {
           db.createObjectStore(this.logStoreName, { keyPath: 'id' });
         }
@@ -89,7 +100,8 @@ export class EvidenceDB {
   }
 
   /**
-   * Cleans up evidence older than 24 hours to prevent disk bloat.
+   * Cleans up evidence older than 24 hours using the timestamp index
+   * (O(log n) range scan instead of a full-table cursor).
    */
   async purgeOldEvidence(): Promise<void> {
     if (!this.db) await this.init();
@@ -98,12 +110,21 @@ export class EvidenceDB {
     return new Promise((resolve) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
-      const request = store.openCursor();
+
+      // Use the timestamp index for an efficient keyed range query
+      const index = store.indexNames.contains('timestamp')
+        ? store.index('timestamp')
+        : null;
+
+      const range = IDBKeyRange.upperBound(expiration);
+      const request = index
+        ? index.openCursor(range)
+        : store.openCursor(); // fallback for stores without the index yet
 
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
         if (cursor) {
-          if (cursor.value.timestamp < expiration) {
+          if (!index || cursor.value.timestamp < expiration) {
             cursor.delete();
           }
           cursor.continue();
@@ -111,6 +132,8 @@ export class EvidenceDB {
           resolve();
         }
       };
+
+      request.onerror = () => resolve(); // non-fatal
     });
   }
 

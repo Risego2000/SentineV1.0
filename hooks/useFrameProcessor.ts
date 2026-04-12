@@ -3,29 +3,49 @@ import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { VideoBufferService } from '../services/videoRecorder';
-import { Track, GeometryLine, StandardDetection } from '../types';
+import { Track, GeometryLine, StandardDetection, AuditJob } from '../types';
 import { evidenceDB } from '../services/EvidenceDB';
 import { forensicQueue } from '../services/ForensicQueue';
 import { OCRSynchronizer } from '../services/OCRSynchronizer';
 import { resetTrackAuditState } from '../services/trackAuditState';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 const getOrderedTurnSequence = (track: Track, geometry: GeometryLine[]) => {
   const turnIds = track.roiHistory.filter((id, index, history) => {
     if (history.indexOf(id) !== index) return false;
-    const roi = geometry.find((candidate) => candidate.id === id);
+    const roi = geometry.find((c) => c.id === id);
     return roi?.type === 'roi_turn';
   });
 
   const turnLabels = turnIds.map(
-    (id) => geometry.find((candidate) => candidate.id === id)?.label || id
+    (id) => geometry.find((c) => c.id === id)?.label || id
   );
 
   return { turnIds, turnLabels };
 };
 
+// ─── Per-track evidence session ───────────────────────────────────────────────
+
+interface EvidenceSession {
+  lineId: string;
+  startedAt: number;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
 /**
  * Sentinel AI Frame Processor Hook.
  * Orchestrates detection, tracking, zone analysis, and forensic audit triggering.
+ *
+ * Key design decisions:
+ *  - Per-track evidence sessions (Map) prevent concurrent infractions from
+ *    overwriting each other's captured frames.
+ *  - AuditJob snapshots are immutable: later track mutations cannot corrupt
+ *    an in-flight Gemini audit.
+ *  - setStats is batched per frame to avoid unnecessary React commits.
+ *  - Recorder lifecycle is tied to active session count; try/finally in every
+ *    evidence path guarantees cleanup even on error.
  */
 export const useFrameProcessor = () => {
   const {
@@ -38,6 +58,8 @@ export const useFrameProcessor = () => {
     setTracks,
     isAuditEnabled,
     updateBufferStatus,
+    currentAuditPreset,
+    directives,
   } = useSentinel();
 
   const trackerRef = useRef<ByteTracker>(new ByteTracker());
@@ -45,22 +67,21 @@ export const useFrameProcessor = () => {
   const frameCountRef = useRef<number>(0);
   const isProcessingRef = useRef<boolean>(false);
   const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const recorderRef = useRef<VideoBufferService | null>(null);
-  const suspectRef = useRef<{ trackId: number; lineId: string; startedAt: number } | null>(null);
 
-  /**
-   * Captures a tactical snapshot (context + zoom) for forensic analysis.
-   */
+  // Per-track evidence sessions — replaces the old global suspectRef
+  const evidenceSessionsRef = useRef<Map<number, EvidenceSession>>(new Map());
+  // Single shared canvas recorder — starts when any session is active
+  const recorderRef = useRef<VideoBufferService | null>(null);
+
+  // ─── Snapshot capture ───────────────────────────────────────────────────────
+
   const captureSnapshot = useCallback(
     (
       video: HTMLVideoElement,
       track: Track,
       type: 'initial' | 'mid' | 'final' = 'final'
     ): boolean => {
-      if (!video || video.readyState < 2) {
-        console.warn('Video no está listo para captura');
-        return false;
-      }
+      if (!video || video.readyState < 2) return false;
 
       if (!snapshotCanvasRef.current) {
         snapshotCanvasRef.current = document.createElement('canvas');
@@ -70,9 +91,6 @@ export const useFrameProcessor = () => {
       if (!ctxS) return false;
 
       try {
-        console.log(`[FORENSIC] Capturando snapshot ${type.toUpperCase()} para ID:${track.id}`);
-
-        // 1. CAPTURE FULL SCENE (Context)
         sC.width = 1280;
         sC.height = 720;
         ctxS.drawImage(video, 0, 0, 1280, 720);
@@ -80,7 +98,7 @@ export const useFrameProcessor = () => {
         track.snapshots.push(contextFrame);
         track.contextSnapshots = [...(track.contextSnapshots || []), contextFrame].slice(-3);
 
-        // 2. CAPTURE TACTICAL ZOOM (Vehicle/License Plate Detail)
+        // Tactical zoom
         const zoomPad = 0.5;
         const videoW = video.videoWidth;
         const videoH = video.videoHeight;
@@ -99,13 +117,14 @@ export const useFrameProcessor = () => {
         if (type === 'mid') track.hasMidFrame = true;
 
         return true;
-      } catch (error) {
-        console.error(`Error capturando snapshot ${type}:`, error);
+      } catch {
         return false;
       }
     },
     []
   );
+
+  // ─── Session lifecycle helpers ──────────────────────────────────────────────
 
   const clearTrackEvidence = useCallback((track: Track) => {
     track.snapshots = [];
@@ -115,66 +134,49 @@ export const useFrameProcessor = () => {
     track.hasMidFrame = false;
   }, []);
 
+  const stopRecorderIfIdle = useCallback(() => {
+    if (evidenceSessionsRef.current.size === 0 && recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+      updateBufferStatus({ state: 'idle', activeTracks: 0 });
+    }
+  }, [updateBufferStatus]);
+
   const abortTrackEvidence = useCallback(
     (track: Track, line: GeometryLine, reason: string) => {
-      console.warn(`[FORENSIC] Captura abortada para ID:${track.id}. ${reason}`);
       clearTrackEvidence(track);
       resetTrackAuditState(track, line);
-      updateBufferStatus({ state: 'idle', activeTracks: 0 });
-
-      if (suspectRef.current?.trackId === track.id) {
-        suspectRef.current = null;
-      }
-
-      if (recorderRef.current) {
-        recorderRef.current.stop();
-        recorderRef.current = null;
-      }
+      evidenceSessionsRef.current.delete(track.id);
+      updateBufferStatus({ activeTracks: evidenceSessionsRef.current.size });
+      stopRecorderIfIdle();
     },
-    [clearTrackEvidence, updateBufferStatus]
+    [clearTrackEvidence, stopRecorderIfIdle, updateBufferStatus]
   );
 
   const activateSuspect = useCallback(
     (video: HTMLVideoElement, track: Track, line: GeometryLine) => {
-      if (
-        suspectRef.current &&
-        suspectRef.current.trackId === track.id &&
-        suspectRef.current.lineId === line.id
-      ) {
-        return;
-      }
+      // Skip if this track+line combo is already being monitored
+      const existing = evidenceSessionsRef.current.get(track.id);
+      if (existing && existing.lineId === line.id) return;
 
-      // Record frame count for mid-point calculation
-      track.firstHitFrame = frameCountRef.current;
-      track.roiAId = line.id;
-
-      const previousTrack = trackerRef.current.tracks.find(
-        (candidate) => candidate.id === suspectRef.current?.trackId
-      );
       const isStartROI =
         line.label.toUpperCase().includes('A') ||
         line.label.toUpperCase().includes('DETEC') ||
         line.label.toUpperCase().includes('START') ||
         line.label.toUpperCase().includes('INICIO');
 
-      if (!isStartROI) {
-        console.log(
-          `[FORENSIC] ID:${track.id} hit ${line.label}, but it is not a START ROI. Recording ignored.`
-        );
-        return;
-      }
+      if (!isStartROI) return;
 
-      if (previousTrack && !previousTrack.audited) {
-        clearTrackEvidence(previousTrack);
-      }
+      track.firstHitFrame = frameCountRef.current;
+      track.roiAId = line.id;
 
       clearTrackEvidence(track);
-      suspectRef.current = {
-        trackId: track.id,
+      evidenceSessionsRef.current.set(track.id, {
         lineId: line.id,
         startedAt: Date.now(),
-      };
-      updateBufferStatus({ state: 'recording', activeTracks: 1 });
+      });
+
+      updateBufferStatus({ state: 'recording', activeTracks: evidenceSessionsRef.current.size });
       captureSnapshot(video, track, 'initial');
     },
     [captureSnapshot, clearTrackEvidence, updateBufferStatus]
@@ -184,28 +186,21 @@ export const useFrameProcessor = () => {
     (video: HTMLVideoElement, track: Track) => {
       if (!track.hasInitialFrame || track.hasMidFrame) return;
 
-      // DELAYED / MID-POINT LOGIC
-      // If we hit ROI A, we wait for either a distance midpoint or a time fallback
       const elapsedFrames = frameCountRef.current - (track.firstHitFrame || 0);
-
-      // If turn logic: try to find the likely destination ROI B
       const turnLines = geometry.filter((g) => g.type === 'roi_turn');
       const otherROI = turnLines.find((l) => l.id !== track.roiAId);
 
       let isMidpoint = false;
       if (otherROI && track.tail.length > 0) {
-        // Spatial midpoint heuristic between ROI A and ROI B
         const roiALine = geometry.find((g) => g.id === track.roiAId);
         if (roiALine) {
           const midX = (roiALine.x1 + otherROI.x1) / 2;
           const midY = (roiALine.y1 + otherROI.y1) / 2;
           const currentPos = track.tail[track.tail.length - 1];
-          const distToMid = Math.hypot(currentPos.x - midX, currentPos.y - midY);
-          if (distToMid < 0.1) isMidpoint = true;
+          if (Math.hypot(currentPos.x - midX, currentPos.y - midY) < 0.1) isMidpoint = true;
         }
       }
 
-      // Fallback: capture after ~1 second (30 frames) if no midpoint detected spatially
       if (isMidpoint || elapsedFrames > 30) {
         captureSnapshot(video, track, 'mid');
       }
@@ -213,26 +208,40 @@ export const useFrameProcessor = () => {
     [captureSnapshot, geometry]
   );
 
+  // ─── Evidence finalisation ──────────────────────────────────────────────────
+
   const finalizeTrackEvidence = useCallback(
     async (video: HTMLVideoElement, track: Track, line: GeometryLine, evidenceId: string) => {
       try {
         captureMidIfNeeded(video, track);
         updateBufferStatus({ state: 'capturing' });
+
         const finalCaptured = captureSnapshot(video, track, 'final');
         if (!finalCaptured) {
           abortTrackEvidence(track, line, 'No se pudo capturar el frame final.');
           return;
         }
 
+        // Take immutable copies before async gaps
         const snapshots = [...track.snapshots];
         const contextSnapshots = [...(track.contextSnapshots || [])];
         const zoomSnapshots = [...(track.zoomSnapshots || [])];
-        const clip = recorderRef.current ? await recorderRef.current.getClip() : undefined;
+        const tailSnapshot = track.tail.map((p) => ({ ...p }));
+        const bboxSnapshot = { ...track.bbox };
+        const roiHistorySnapshot = [...track.roiHistory];
+
+        let clip: string | undefined;
+        try {
+          clip = recorderRef.current ? await recorderRef.current.getClip() : undefined;
+        } catch {
+          clip = undefined;
+        }
+
         const localTime = new Date().toLocaleString();
         const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
 
-        // INDIVIDUAL OCR PROCESSING FOR EACH STAGE
-        const ocrResults = [];
+        // OCR per zoom stage
+        const ocrResults: string[] = [];
         for (const zoom of zoomSnapshots) {
           const res = await OCRSynchronizer.extractLicensePlate([zoom]);
           ocrResults.push(res.plate || 'NO_OCR');
@@ -246,21 +255,40 @@ export const useFrameProcessor = () => {
           clip,
         });
 
-        updateBufferStatus({ state: 'idle', activeTracks: 0 });
-        clearTrackEvidence(track);
-        suspectRef.current = null;
-        if (recorderRef.current) {
-          recorderRef.current.stop();
-          recorderRef.current = null;
-        }
+        // Build immutable AuditJob — ForensicQueue processes only this snapshot
+        const job: AuditJob = {
+          trackId: track.id,
+          trackLabel: track.label,
+          tail: tailSnapshot,
+          bbox: bboxSnapshot,
+          roiHistory: roiHistorySnapshot,
+          velocity: track.velocity,
+          avgVelocity: track.avgVelocity,
+          heading: track.heading,
+          line,
+          evidenceId,
+          localTime,
+          videoTimeCode,
+          playbackTime: video.currentTime,
+          capturedAt: Date.now(),
+          auditPreset: currentAuditPreset,
+          directives,
+        };
 
-        forensicQueue.enqueue(track, line, evidenceId, localTime, videoTimeCode, video.currentTime);
+        forensicQueue.enqueue(job);
       } catch (error) {
         abortTrackEvidence(
           track,
           line,
           error instanceof Error ? error.message : 'Error desconocido guardando evidencia.'
         );
+        return;
+      } finally {
+        // Always clean up this track's session and shared resources
+        clearTrackEvidence(track);
+        evidenceSessionsRef.current.delete(track.id);
+        updateBufferStatus({ activeTracks: evidenceSessionsRef.current.size });
+        stopRecorderIfIdle();
       }
     },
     [
@@ -268,13 +296,15 @@ export const useFrameProcessor = () => {
       captureMidIfNeeded,
       captureSnapshot,
       clearTrackEvidence,
+      currentAuditPreset,
+      directives,
+      stopRecorderIfIdle,
       updateBufferStatus,
     ]
   );
 
-  /**
-   * Orchestrates zone-based logic and infraction detection for active tracks.
-   */
+  // ─── Zone / infraction logic ───────────────────────────────────────────────
+
   const processTrackResults = useCallback(
     (activeTracks: Track[], v: HTMLVideoElement, canvas: HTMLCanvasElement): void => {
       if (!v || !canvas || v.videoWidth === 0) return;
@@ -285,230 +315,178 @@ export const useFrameProcessor = () => {
       const oX = (canvas.width - dW) / 2;
       const oY = (canvas.height - dH) / 2;
 
+      // Accumulate stat deltas for a single React commit at the end of the frame
+      let newDetections = 0;
+
       activeTracks.forEach((t: Track) => {
-        // Stats counting (Detections)
-        // Reduced minHits to 2 for faster confirmation
         const minHits = t.label === 'person' ? 4 : 2;
         if (t.hits >= minHits && !seenTrackIds.current.has(t.id)) {
           seenTrackIds.current.add(t.id);
-          setStats((prev) => ({ ...prev, det: prev.det + 1 }));
+          newDetections++;
         }
 
-        // Using Vehicle Centroid for consistent zone interaction
         const cx = t.bbox.x * dW + (t.bbox.w * dW) / 2 + oX;
         const cy = t.bbox.y * dH + (t.bbox.h * dH) / 2 + oY;
-
-        // Tail Enrichment for rendering synchronization
         const normX = (cx - oX) / dW;
         const normY = (cy - oY) / dH;
 
+        // Tail update — bounded array, avoid O(n) shift
         const lastT = t.tail[t.tail.length - 1];
         if (!lastT || Math.hypot(lastT.x - normX, lastT.y - normY) > 0.001) {
           t.tail.push({ x: normX, y: normY });
-          if (t.tail.length > 50) t.tail.shift();
+          if (t.tail.length > 50) t.tail = t.tail.slice(-50);
         }
 
         if (t.audited) return;
 
         geometry.forEach((line: GeometryLine) => {
-          if (!t.processedLines.includes(line.id)) {
-            if (t.tail && t.tail.length >= 2) {
-              const p1 = t.tail[t.tail.length - 2];
-              const p1x = p1.x * dW + oX;
-              const p1y = p1.y * dH + oY;
-              const lx1 = line.x1 * dW + oX;
-              const ly1 = line.y1 * dH + oY;
-              const lx2 = line.x2 * dW + oX;
-              const ly2 = line.y2 * dH + oY;
+          if (t.processedLines.includes(line.id)) return;
+          if (!t.tail || t.tail.length < 2) return;
 
-              // 1. VECTORIAL LINE LOGIC (STOP, FORBIDDEN, LANE)
-              if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
-                console.log(`[FORENSIC] ID:${t.id} (${t.label}) - Interacción en ${line.label}`);
+          const p1 = t.tail[t.tail.length - 2];
+          const p1x = p1.x * dW + oX;
+          const p1y = p1.y * dH + oY;
+          const lx1 = line.x1 * dW + oX;
+          const ly1 = line.y1 * dH + oY;
+          const lx2 = line.x2 * dW + oX;
+          const ly2 = line.y2 * dH + oY;
 
-                let isInfraction = true;
-                let infractionLabel = line.label || 'INFRACCIÓN';
+          // 1. Vectorial line (stop, forbidden, lane divider)
+          if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
+            let isInfraction = true;
+            let infractionLabel = line.label || 'INFRACCIÓN';
 
-                // STOP HEURISTIC (Requires dwellTime > 3000ms)
-                if (line.type === 'stop_line') {
-                  if (t.dwellTime > 3000) {
-                    isInfraction = false;
-                    console.log(`[AUDIT] ID:${t.id} - Stop Validado (${t.dwellTime}ms)`);
-                  } else {
-                    infractionLabel = 'VIOLACIÓN_STOP';
-                    console.log(`[AUDIT] ID:${t.id} - Violación STOP.`);
-                  }
-                }
+            if (line.type === 'stop_line') {
+              if (t.dwellTime > 3000) {
+                isInfraction = false;
+              } else {
+                infractionLabel = 'VIOLACIÓN_STOP';
+              }
+            }
 
-                if (isInfraction) {
-                  if (isAuditEnabled) {
-                    activateSuspect(v, t, line);
-                    console.log(
-                      `[FORENSIC] ID:${t.id} - Infracción detectada en ${infractionLabel}. Iniciando captura...`
+            if (isInfraction && isAuditEnabled) {
+              activateSuspect(v, t, line);
+              t.processedLines.push(line.id);
+              t.crossedLine = true;
+              t.audited = true;
+              t.auditStatus = 'processing';
+              const evidenceId = `ev_${t.id}_${Date.now()}`;
+              captureMidIfNeeded(v, t);
+
+              (async () => {
+                await finalizeTrackEvidence(v, t, { ...line, label: infractionLabel }, evidenceId);
+              })();
+            } else {
+              t.processedLines.push(line.id);
+            }
+          }
+
+          // Mid capture for active sessions
+          const session = evidenceSessionsRef.current.get(t.id);
+          if (session && session.lineId === line.id && !t.audited) {
+            captureMidIfNeeded(v, t);
+          }
+
+          // 2. Area logic (box junction / polygons)
+          if (line.type === 'box_junction' && line.points) {
+            const inZone = isPointInPoly({ x: normX, y: normY }, line.points);
+            if (inZone) {
+              if (!t.processedLines.includes(`${line.id}_candidate`)) {
+                activateSuspect(v, t, line);
+                t.processedLines.push(`${line.id}_candidate`);
+              }
+              t.lastZoneId = line.id;
+              captureMidIfNeeded(v, t);
+
+              if (t.dwellTime > 5000 && !t.processedLines.includes(`${line.id}_box`) && isAuditEnabled) {
+                t.processedLines.push(`${line.id}_box`);
+                t.audited = true;
+                t.auditStatus = 'processing';
+                const evidenceId = `ev_${t.id}_box_${Date.now()}`;
+                (async () => {
+                  await finalizeTrackEvidence(v, t, { ...line, label: 'BLOQUEO_INTERSECCIÓN' }, evidenceId);
+                })();
+              }
+            } else if (t.lastZoneId === line.id) {
+              t.lastZoneId = undefined;
+            }
+          }
+
+          // 3. ROI logic (auto-audit & sequential turns)
+          if ((line.type === 'roi_general' || line.type === 'roi_turn') && line.points) {
+            const inROI = isPointInPoly({ x: normX, y: normY }, line.points);
+            if (!t.roiHistory) t.roiHistory = [];
+
+            if (inROI && !t.processedLines.includes(line.id)) {
+              t.processedLines.push(line.id);
+              t.roiHistory.push(line.id);
+              activateSuspect(v, t, line);
+              captureMidIfNeeded(v, t);
+
+              if (line.type === 'roi_general' && isAuditEnabled) {
+                t.audited = true;
+                t.auditStatus = 'processing';
+                const evidenceId = `ev_${t.id}_roi_${Date.now()}`;
+                (async () => {
+                  await finalizeTrackEvidence(v, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` }, evidenceId);
+                })();
+              }
+
+              if (line.type === 'roi_turn' && isAuditEnabled) {
+                const { turnIds, turnLabels } = getOrderedTurnSequence(t, geometry);
+                if (turnIds.length >= 2) {
+                  t.audited = true;
+                  t.auditStatus = 'processing';
+                  const evidenceId = `ev_${t.id}_turn_${Date.now()}`;
+                  (async () => {
+                    await finalizeTrackEvidence(
+                      v,
+                      t,
+                      {
+                        ...line,
+                        label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
+                        violationKind: 'forbidden_turn_sequence',
+                        roiSequenceIds: turnIds,
+                        roiSequenceLabels: turnLabels,
+                        analysisContext: `Secuencia prohibida: ${turnLabels.join(' -> ')}.`,
+                      },
+                      evidenceId
                     );
-                    t.processedLines.push(line.id);
-                    t.crossedLine = true;
-                    t.audited = true;
-                    t.auditStatus = 'processing';
-
-                    const evidenceId = `ev_${t.id}_${Date.now()}`;
-
-                    if (!t.hasMidFrame) {
-                      captureMidIfNeeded(v, t);
-                    }
-
-                    (async () => {
-                      await finalizeTrackEvidence(
-                        v,
-                        t,
-                        { ...line, label: infractionLabel },
-                        evidenceId
-                      );
-                    })();
-                  } else {
-                    t.processedLines.push(line.id);
-                  }
-                } else {
-                  t.processedLines.push(line.id);
+                  })();
                 }
               }
-
-              if (
-                suspectRef.current?.trackId === t.id &&
-                suspectRef.current.lineId === line.id &&
-                !t.audited
-              ) {
-                captureMidIfNeeded(v, t);
-              }
-
-              // 2. AREA LOGIC (BOX JUNCTION / POLYGONS)
-              if (line.type === 'box_junction' && line.points) {
-                const inZone = isPointInPoly({ x: normX, y: normY }, line.points);
-                if (inZone) {
-                  if (!t.processedLines.includes(`${line.id}_candidate`)) {
-                    activateSuspect(v, t, line);
-                    t.processedLines.push(`${line.id}_candidate`);
-                  }
-
-                  t.lastZoneId = line.id;
-                  captureMidIfNeeded(v, t);
-
-                  // Intersection Block Heuristic (Dwell > 5s)
-                  if (
-                    t.dwellTime > 5000 &&
-                    !t.processedLines.includes(line.id + '_box') &&
-                    isAuditEnabled
-                  ) {
-                    console.log(`[FORENSIC] ID:${t.id} - BLOQUEO DETECTADO.`);
-                    t.processedLines.push(line.id + '_box');
-                    t.audited = true;
-                    t.auditStatus = 'processing';
-
-                    const evidenceId = `ev_${t.id}_box_${Date.now()}`;
-                    (async () => {
-                      await finalizeTrackEvidence(
-                        v,
-                        t,
-                        { ...line, label: 'BLOQUEO_INTERSECCIÓN' },
-                        evidenceId
-                      );
-                    })();
-                  }
-                } else if (t.lastZoneId === line.id) {
-                  t.lastZoneId = undefined;
-                }
-              }
-
-              // 3. ROI LOGIC (AUTO-AUDIT & SEQUENTIAL TURNS)
-              if ((line.type === 'roi_general' || line.type === 'roi_turn') && line.points) {
-                const inROI = isPointInPoly({ x: normX, y: normY }, line.points);
-
-                // Initialize history if missing
-                if (!t.roiHistory) t.roiHistory = [];
-
-                if (inROI && !t.processedLines.includes(line.id)) {
-                  t.processedLines.push(line.id);
-                  t.roiHistory.push(line.id);
-                  activateSuspect(v, t, line);
-                  captureMidIfNeeded(v, t);
-
-                  // Case A: General ROI - Immediate Audit
-                  if (line.type === 'roi_general' && isAuditEnabled) {
-                    console.log(
-                      `[FORENSIC] ID:${t.id} - VEHÍCULO EN ROI GENERAL (${line.label}). Iniciando auditoría...`
-                    );
-                    t.audited = true;
-                    t.auditStatus = 'processing';
-                    const evidenceId = `ev_${t.id}_roi_${Date.now()}`;
-                    (async () => {
-                      await finalizeTrackEvidence(
-                        v,
-                        t,
-                        { ...line, label: `ZONA_ANÁLISIS_${line.label}` },
-                        evidenceId
-                      );
-                    })();
-                  }
-
-                  // Case B: Forbidden Turn ROI - Sequential Logic
-                  if (line.type === 'roi_turn' && isAuditEnabled) {
-                    const { turnIds, turnLabels } = getOrderedTurnSequence(t, geometry);
-
-                    if (turnIds.length >= 2) {
-                      console.log(
-                        `[FORENSIC] ID:${t.id} - GIRO PROHIBIDO DETECTADO (${turnIds.length} zonas). Iniciando auditoría...`
-                      );
-                      t.audited = true;
-                      t.auditStatus = 'processing';
-                      const evidenceId = `ev_${t.id}_turn_${Date.now()}`;
-                      (async () => {
-                        await finalizeTrackEvidence(
-                          v,
-                          t,
-                          {
-                            ...line,
-                            label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
-                            violationKind: 'forbidden_turn_sequence',
-                            roiSequenceIds: turnIds,
-                            roiSequenceLabels: turnLabels,
-                            analysisContext: `Secuencia prohibida detectada para el mismo vehículo: ${turnLabels.join(' -> ')}.`,
-                          },
-                          evidenceId
-                        );
-                      })();
-                    } else {
-                      console.log(
-                        `[FORENSIC] ID:${t.id} - Entrada en Zona de Giro ${line.label}. Esperando secuencia...`
-                      );
-                    }
-                  }
-                }
-              } else if (
-                suspectRef.current?.trackId === t.id &&
-                suspectRef.current.lineId === line.id &&
-                !t.audited
-              ) {
-                captureMidIfNeeded(v, t);
-              }
+            } else if (evidenceSessionsRef.current.has(t.id) && !t.audited) {
+              captureMidIfNeeded(v, t);
             }
           }
         });
       });
+
+      // Single batched stat update for this entire frame
+      if (newDetections > 0) {
+        setStats((prev) => ({ ...prev, det: prev.det + newDetections }));
+      }
     },
-    [geometry, setStats, activateSuspect, captureMidIfNeeded, finalizeTrackEvidence, isAuditEnabled]
+    [
+      geometry,
+      setStats,
+      activateSuspect,
+      captureMidIfNeeded,
+      finalizeTrackEvidence,
+      isAuditEnabled,
+    ]
   );
 
-  /**
-   * Primary frame processing entry point.
-   */
+  // ─── Primary frame entry point ─────────────────────────────────────────────
+
   const processFrame = useCallback(
     async (v: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> => {
       if (!v || v.paused || v.ended || isProcessingRef.current) return;
 
       isProcessingRef.current = true;
       try {
-        // Auto-initialize recorder ONLY if there is an active suspect
-        if (!recorderRef.current && canvas && suspectRef.current) {
-          console.log('[RECORDER] Activating forensic buffer (Vehicle detected in ROI A)');
+        // Auto-start shared recorder when any session is active
+        if (!recorderRef.current && canvas && evidenceSessionsRef.current.size > 0) {
           recorderRef.current = new VideoBufferService(canvas);
           recorderRef.current.start();
         }
@@ -518,7 +496,6 @@ export const useFrameProcessor = () => {
 
         if (frameCountRef.current % (engineConfig.detectionSkip || 1) === 0) {
           const results: StandardDetection[] = await detect(v);
-
           const activeTracks = trackerRef.current.update(
             results,
             engineConfig.persistence,
@@ -529,19 +506,15 @@ export const useFrameProcessor = () => {
           processTrackResults(trackerRef.current.tracks, v, canvas);
         }
 
-        if (isPoseEnabled) {
-          await detectPose(v);
-        }
+        if (isPoseEnabled) await detectPose(v);
 
-        // Sync with Global Context (Throttled update)
+        // Throttled global state sync (every 5 frames)
         if (frameCountRef.current % 5 === 0) {
           setTracks([...trackerRef.current.tracks]);
           if (recorderRef.current) {
             updateBufferStatus({ seconds: recorderRef.current.getBufferSeconds() });
           }
         }
-      } catch (e) {
-        console.error('ProcessFrame Error:', e);
       } finally {
         isProcessingRef.current = false;
       }
@@ -557,13 +530,12 @@ export const useFrameProcessor = () => {
     ]
   );
 
-  /**
-   * Resets the entire tracking system.
-   */
+  // ─── Reset ──────────────────────────────────────────────────────────────────
+
   const resetTracker = useCallback((): void => {
     trackerRef.current.reset();
     seenTrackIds.current.clear();
-    suspectRef.current = null;
+    evidenceSessionsRef.current.clear();
     setTracks([]);
     frameCountRef.current = 0;
     updateBufferStatus({ state: 'idle', activeTracks: 0, seconds: 0 });

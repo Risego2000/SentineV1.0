@@ -6,8 +6,6 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import dns from 'dns/promises';
-import net from 'net';
 import { Readable } from 'stream';
 import { createRequire } from 'module';
 import {
@@ -15,6 +13,12 @@ import {
   generateGeometryWithGemini,
   loadLocalEnvFile,
 } from './services/aiServer.js';
+import {
+  isPrivateAddress,
+  sanitizeFilename,
+  isPathWithinDir,
+  validateCameraHost as _validateCameraHost,
+} from './services/serverSecurityUtils.js';
 
 loadLocalEnvFile();
 
@@ -146,40 +150,9 @@ const safeUnlink = (filePath) => {
   }
 };
 
-const finalizeFilename = (requestedFilename, extension) => {
-  const safeFilename = String(requestedFilename)
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-    .replace(/\s+/g, '_');
-
-  return safeFilename.toLowerCase().endsWith(extension)
-    ? safeFilename
-    : `${safeFilename}${extension}`;
-};
-
-const isPrivateAddress = (address) => {
-  if (!net.isIP(address)) return true;
-  if (address === '127.0.0.1' || address === '::1') return true;
-  if (address.startsWith('10.') || address.startsWith('192.168.')) return true;
-  if (address.startsWith('169.254.')) return true;
-  if (address.startsWith('172.')) {
-    const secondOctet = Number(address.split('.')[1]);
-    return secondOctet >= 16 && secondOctet <= 31;
-  }
-  return false;
-};
-
-const validateCameraHost = async (hostname) => {
-  if (!hostname) {
-    throw new Error('Host de cámara IP no válido.');
-  }
-
-  if (ALLOWED_CAMERA_HOSTS.length > 0) {
-    return ALLOWED_CAMERA_HOSTS.includes(hostname.toLowerCase());
-  }
-
-  const results = await dns.lookup(hostname, { all: true });
-  return results.length > 0 && !results.some(({ address }) => isPrivateAddress(address));
-};
+// Delegate to shared, testable security utilities
+const finalizeFilename = sanitizeFilename;
+const validateCameraHost = (hostname) => _validateCameraHost(hostname, ALLOWED_CAMERA_HOSTS);
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
@@ -453,11 +426,15 @@ app.post(
   (req, res) => {
     try {
       fs.mkdirSync(REPORTS_DIR, { recursive: true });
-      const finalFilename = finalizeFilename(
+      const safeFilename = finalizeFilename(
         req.query.filename || `Sentinel_Report_${Date.now()}.pdf`,
         '.pdf'
       );
-      const targetPath = path.join(REPORTS_DIR, finalFilename);
+      const targetPath = path.join(REPORTS_DIR, safeFilename);
+      if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
+        res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });
+        return;
+      }
       fs.writeFileSync(targetPath, req.body);
       res.json({ saved: true, path: targetPath });
     } catch (error) {
@@ -475,11 +452,15 @@ app.post(
   (req, res) => {
     try {
       fs.mkdirSync(REPORTS_DIR, { recursive: true });
-      const finalFilename = finalizeFilename(
+      const safeFilename = finalizeFilename(
         req.query.filename || `Evidence_${Date.now()}.webm`,
         '.webm'
       );
-      const targetPath = path.join(REPORTS_DIR, finalFilename);
+      const targetPath = path.join(REPORTS_DIR, safeFilename);
+      if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
+        res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });
+        return;
+      }
       fs.writeFileSync(targetPath, req.body);
       res.json({ saved: true, path: targetPath });
     } catch (error) {
@@ -506,6 +487,19 @@ if (fs.existsSync(distPath)) {
     `[SENTINEL_CORE] Directorio 'dist' no encontrado. El servidor operará solo como API.`
   );
 }
+
+// ─── Health endpoint ──────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    activeTranscodes,
+    pendingAudits: 0,
+    ffmpegAvailable: ffmpegPath !== 'ffmpeg',
+    reportsDir: REPORTS_DIR,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.listen(port, () => {
   console.log(`[SENTINEL_SYSTEM] Activo en: http://localhost:${port}`);
