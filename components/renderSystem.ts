@@ -253,45 +253,48 @@ export const renderScene = (
         if (uniqueRois.length >= 2) {
           const roiAId = uniqueRois[0];
           const roiBId = uniqueRois[uniqueRois.length - 1];
-          
-          const roiALabel = geometry.find(g => g.id === roiAId)?.label || 'ROI_A';
-          const roiBLabel = geometry.find(g => g.id === roiBId)?.label || 'ROI_B';
-          
+
+          const roiALabel = geometry.find((g) => g.id === roiAId)?.label || 'ROI_A';
+          const roiBLabel = geometry.find((g) => g.id === roiBId)?.label || 'ROI_B';
+
           const roiString = `VECTOR: ${roiALabel} ➔ ${roiBLabel}`;
-          
+
           ctx.fillStyle = 'rgba(239, 68, 68, 0.95)'; // Red background
           ctx.font = 'black 9px monospace';
           const roiWidth = ctx.measureText(roiString).width;
-          
+
           // Badge background
           ctx.fillRect(x, y - 32, roiWidth + 12, 14);
-          
+
           // Gloss effect
           ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
           ctx.fillRect(x, y - 32, roiWidth + 12, 7);
-          
+
           // Text
           ctx.fillStyle = '#fff';
           ctx.fillText(roiString, x + 6, y - 22);
-          
+
           // 3.5.1 DRAW VISUAL VECTOR CONNECTION
-          const roiA = geometry.find(g => g.id === roiAId);
-          const roiB = geometry.find(g => g.id === roiBId);
-          
+          const roiA = geometry.find((g) => g.id === roiAId);
+          const roiB = geometry.find((g) => g.id === roiBId);
+
           if (roiA && roiB) {
             // Get centers of ROIs or midpoints of lines
             const getPos = (g: GeometryLine) => {
               if (g.points && g.points.length > 0) {
                 const sumX = g.points.reduce((acc, p) => acc + p.x, 0);
                 const sumY = g.points.reduce((acc, p) => acc + p.y, 0);
-                return { x: (sumX / g.points.length) * width, y: (sumY / g.points.length) * height };
+                return {
+                  x: (sumX / g.points.length) * width,
+                  y: (sumY / g.points.length) * height,
+                };
               }
               return { x: ((g.x1 + g.x2) / 2) * width, y: ((g.y1 + g.y2) / 2) * height };
             };
-            
+
             const posA = getPos(roiA);
             const posB = getPos(roiB);
-            
+
             ctx.beginPath();
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';

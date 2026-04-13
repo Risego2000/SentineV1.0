@@ -27,9 +27,7 @@ export const MultiViewerGrid = () => {
       {activeViewers.map((viewerId) => (
         <SentinelProvider key={viewerId} viewerId={viewerId}>
           <div
-            className={`relative overflow-hidden rounded-xl border-2 transition-colors ${
-              gridSize === 1 ? 'h-full' : 'h-[350px] lg:h-full'
-            } ${
+            className={`relative overflow-hidden rounded-xl border-2 transition-colors h-full min-h-0 ${
               focusedViewerId === viewerId
                 ? 'border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
                 : 'border-white/5 opacity-80 hover:opacity-100'
