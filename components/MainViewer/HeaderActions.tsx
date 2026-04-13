@@ -1,6 +1,7 @@
 import React from 'react';
 import { Monitor, Globe, Upload } from 'lucide-react';
 import { useHelp } from '../../hooks/useHelp';
+import { useLayoutStore } from '../../stores/layoutStore';
 
 interface HeaderActionsProps {
   onScreenShare: () => void;
@@ -16,70 +17,112 @@ export const HeaderActions = ({
   activeMode,
 }: HeaderActionsProps) => {
   const { helpProps } = useHelp();
+  const { gridSize } = useLayoutStore();
+  const compact = gridSize >= 2;
+  const mini = gridSize >= 3;
+  const isActive = (m: HeaderActionsProps['activeMode']) => activeMode === m;
 
-  const isActive = (mode: HeaderActionsProps['activeMode']) => activeMode === mode;
+  if (mini)
+    return (
+      <div className="absolute top-1.5 right-1.5 z-40 flex flex-row gap-1 pointer-events-auto">
+        {(
+          [
+            {
+              icon: <Monitor size={11} className={isActive('live') ? 'animate-pulse' : ''} />,
+              fn: onScreenShare,
+              mode: 'live' as const,
+              lbl: 'Compartir',
+            },
+            {
+              icon: <Globe size={11} className={isActive('ip') ? 'animate-pulse' : ''} />,
+              fn: onIpCamera,
+              mode: 'ip' as const,
+              lbl: 'Camara IP',
+            },
+            { icon: <Upload size={11} />, fn: onUpload, mode: 'video' as const, lbl: 'Video' },
+          ] as const
+        ).map(({ icon, fn, mode, lbl }) => (
+          <button
+            key={mode}
+            onClick={fn}
+            title={lbl}
+            aria-label={lbl}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${isActive(mode) ? 'bg-cyan-500 text-black' : 'bg-black/60 border border-white/10 text-slate-400 hover:bg-cyan-950/60 hover:text-cyan-300'}`}
+          >
+            {icon}
+          </button>
+        ))}
+      </div>
+    );
+
+  if (compact)
+    return (
+      <div className="absolute top-3 right-3 z-40 flex flex-row gap-2 pointer-events-auto items-center">
+        <button
+          onClick={onScreenShare}
+          aria-label="Compartir ventana"
+          className={`h-9 px-3 rounded-full font-black text-[9px] uppercase tracking-wider transition-all shadow-lg flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-black focus:ring-offset-2 ${isActive('live') ? 'bg-cyan-500 text-black' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'}`}
+          {...helpProps('Compartir ventana')}
+        >
+          <Monitor size={12} className={isActive('live') ? 'animate-pulse' : ''} />
+          <span className="hidden sm:inline">Ventana</span>
+        </button>
+        <button
+          onClick={onIpCamera}
+          aria-label="Camara IP"
+          className={`h-9 px-3 rounded-full font-black text-[9px] uppercase tracking-wider transition-all shadow-lg flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-black focus:ring-offset-2 ${isActive('ip') ? 'bg-cyan-500 text-black' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'}`}
+          {...helpProps('Camara IP')}
+        >
+          <Globe size={12} className={isActive('ip') ? 'animate-pulse' : ''} />
+          <span className="hidden sm:inline">IP</span>
+        </button>
+        <button
+          onClick={onUpload}
+          aria-label="Subir video"
+          className={`h-9 px-3 rounded-full font-black text-[9px] uppercase tracking-wider transition-all shadow-lg flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-black focus:ring-offset-2 ${isActive('video') ? 'bg-cyan-500 text-black' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-slate-900/60 hover:text-slate-300 hover:border-white/20'}`}
+          {...helpProps('Subir video')}
+        >
+          <Upload size={12} />
+          <span className="hidden sm:inline">Video</span>
+        </button>
+      </div>
+    );
 
   return (
     <div
-      className="header-actions absolute top-3 right-3 md:top-6 md:right-6 z-40 flex flex-row gap-2 md:gap-3 pointer-events-auto items-center"
+      className="absolute top-6 right-6 z-40 flex flex-row gap-3 pointer-events-auto items-center"
       role="toolbar"
-      aria-label="Seleccionar fuente de video"
+      aria-label="Seleccionar fuente"
     >
       <button
         onClick={onScreenShare}
-        role="button"
         aria-pressed={isActive('live')}
-        aria-label="Compartir ventana o aplicación en pantalla"
-        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[8rem] md:min-w-[160px] group focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
-          isActive('live')
-            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
-            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
-        }`}
-        {...helpProps(
-          'Comparte una ventana de navegador, aplicación o toda la pantalla para análisis en tiempo real.'
-        )}
+        aria-label="Compartir ventana"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[160px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('live') ? 'bg-cyan-500 text-black shadow-cyan-500/30' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'}`}
+        {...helpProps('Comparte una ventana para analisis en tiempo real.')}
       >
         <Monitor size={14} className={isActive('live') ? 'animate-pulse' : ''} />
-        <span className="hidden sm:inline">Compartir Ventana</span>
-        <span className="inline sm:hidden">Pantalla</span>
+        Compartir Ventana
       </button>
-
       <button
         onClick={onIpCamera}
-        role="button"
         aria-pressed={isActive('ip')}
-        aria-label="Conectar cámara IP remota"
-        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[7rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
-          isActive('ip')
-            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
-            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
-        }`}
-        {...helpProps(
-          'Conecta una cámara IP remota vía HTTP/HTTPS usando URL directa o stream remoto.'
-        )}
+        aria-label="Conectar camara IP"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('ip') ? 'bg-cyan-500 text-black shadow-cyan-500/30' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'}`}
+        {...helpProps('Conecta camara IP via HTTP/HTTPS.')}
       >
         <Globe size={14} className={isActive('ip') ? 'animate-pulse' : ''} />
-        <span className="hidden sm:inline">Cámara IP</span>
-        <span className="inline sm:hidden">Cámara</span>
+        Camara IP
       </button>
-
       <button
         onClick={onUpload}
-        role="button"
         aria-pressed={isActive('video')}
-        aria-label="Subir archivo de video local"
-        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[7rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
-          isActive('video')
-            ? 'bg-cyan-500 text-black shadow-cyan-500/30'
-            : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-slate-900/60 hover:text-slate-300 hover:border-white/20'
-        }`}
-        {...helpProps(
-          'Carga un archivo de video local para realizar un análisis forense diferido.'
-        )}
+        aria-label="Subir video"
+        className={`h-12 px-5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${isActive('video') ? 'bg-cyan-500 text-black shadow-cyan-500/30' : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-slate-900/60 hover:text-slate-300 hover:border-white/20'}`}
+        {...helpProps('Carga archivo de video para analisis forense.')}
       >
         <Upload size={14} />
-        <span className="hidden sm:inline">Subir Video</span>
-        <span className="inline sm:hidden">Video</span>
+        Subir Video
       </button>
     </div>
   );
