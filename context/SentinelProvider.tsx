@@ -44,9 +44,6 @@ export const SentinelProvider = ({
   const [source, _setSource] = useState<'none' | 'live' | 'upload' | 'ip'>('none');
   const [selectedLog, setSelectedLog] = useState<InfractionLog | null>(null);
   const [isListening, setIsListening] = useState(false);
-  const [helpMsg, setHelpMsg] = useState<string | null>(
-    'Bienvenido a Sentinel AI. Pase el ratón sobre los elementos para obtener ayuda.'
-  );
   const [isPoseEnabled, _setIsPoseEnabled] = useState(false);
   const [currentPreset, setPreset] = useState<PresetType>(() => {
     const saved = localStorage.getItem('sentinel_preset') as PresetType;
@@ -78,8 +75,10 @@ export const SentinelProvider = ({
 
   const [bufferStatus, setBufferStatus] = useState<SentinelContextType['bufferStatus']>({
     state: 'idle',
+    phase: 'standby',
     seconds: 0,
     activeTracks: 0,
+    capturedPhotos: 0,
   });
 
   const updateBufferStatus = useCallback((status: Partial<SentinelContextType['bufferStatus']>) => {
@@ -343,19 +342,6 @@ export const SentinelProvider = ({
         addLog('ERROR', event.message);
       }
     });
-
-    // Initial load of permanent infractions
-    (async () => {
-      const savedInfractions = await evidenceDB.getAllInfractions();
-      if (savedInfractions.length > 0) {
-        setLogs(savedInfractions.sort((a, b) => b.id - a.id));
-        setStats((prev) => ({ ...prev, inf: savedInfractions.length }));
-        addLog(
-          'INFO',
-          `Recuperadas ${savedInfractions.length} denuncias desde almacenamiento permanente.`
-        );
-      }
-    })();
 
     // Initial cleanup of old evidence
     evidenceDB.purgeOldEvidence();
@@ -796,8 +782,7 @@ export const SentinelProvider = ({
       setSelectedLog,
       isListening,
       setIsListening,
-      helpMsg,
-      setHelpMsg,
+
       isPoseEnabled,
       setIsPoseEnabled,
       currentPreset,
@@ -863,7 +848,6 @@ export const SentinelProvider = ({
       geometry,
       selectedLog,
       isListening,
-      helpMsg,
       isPoseEnabled,
       setIsPoseEnabled,
       currentPreset,

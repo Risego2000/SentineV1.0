@@ -28,8 +28,6 @@ export interface SentinelContextType {
   geometry: GeometryLine[];
   selectedLog: InfractionLog | null;
   isListening: boolean;
-  helpMsg: string | null;
-  setHelpMsg: (msg: string | null) => void;
   isPoseEnabled: boolean;
   currentPreset: PresetType;
   engineConfig: EngineConfig;
@@ -45,8 +43,14 @@ export interface SentinelContextType {
   latency: number;
   bufferStatus: {
     state: 'idle' | 'recording' | 'capturing' | 'saving';
+    /** Two-phase forbidden-turn flow: roi_a = waiting for ROI B, confirmed = both crossed */
+    phase: 'standby' | 'roi_a' | 'confirmed' | 'discarded' | 'saving';
     seconds: number;
     activeTracks: number;
+    roiALabel?: string;
+    roiBLabel?: string;
+    capturedPhotos: number;
+    plateCandidate?: string;
   };
   tracks: Track[];
   setTracks: (t: Track[]) => void;
@@ -103,6 +107,7 @@ export interface SentinelContextType {
   ) => Promise<void>;
   updateBufferStatus: (status: Partial<SentinelContextType['bufferStatus']>) => void;
   clearLogs: () => void;
+  viewerId?: string;
 }
 
 export const SentinelContext = createContext<SentinelContextType | undefined>(undefined);

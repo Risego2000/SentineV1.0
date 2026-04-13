@@ -1,6 +1,8 @@
 /**
- * Evidence Capture System - Multi-track support
- * Supports simultaneous evidence capture for multiple vehicles.
+ * Evidence Capture System - Two-phase ROI forbidden-turn support.
+ * Phase 1 (ROI A): start 20s circular buffer + capture ROI_A photos.
+ * Phase 2 (ROI B): capture ROI_B photos + mid-path photos, then finalize.
+ * If ROI B never comes: discard (buffer is overwritten by next activation).
  */
 
 import { evidenceDB } from '../services/EvidenceDB';
@@ -19,11 +21,8 @@ export interface EvidenceCaptureTarget {
 }
 
 export interface CapturePolicy {
-  /** Maximum simultaneous captures */
   maxSimultaneous: number;
-  /** Priority mode: 'first' | 'highest_velocity' | 'closest_to_exit' */
   priorityMode: 'first' | 'highest_velocity' | 'closest_to_exit';
-  /** Auto-abort if track exits view */
   autoAbortOnExit: boolean;
 }
 
@@ -32,15 +31,20 @@ const DEFAULT_POLICY: CapturePolicy = {
   priorityMode: 'first',
   autoAbortOnExit: true,
 };
-const MAX_SNAPSHOTS_PER_TARGET = 6;
 
-/**
- * Evidence Capture Manager
- * Manages simultaneous evidence capture for multiple tracks.
- */
+/** Semantic snapshot labels for the forbidden-turn evidence package */
+type SnapshotLabel = 'roi_a' | 'mid' | 'roi_b';
+
+interface SnapshotEntry {
+  label: SnapshotLabel;
+  kind: 'general' | 'detail';
+  data: string; // base64 JPEG
+}
+
 export class EvidenceCaptureManager {
   private targets: Map<string, EvidenceCaptureTarget> = new Map();
   private recorders: Map<string, VideoBufferService> = new Map();
+  private snapshotStorage: Map<string, SnapshotEntry[]> = new Map();
   private snapshotCanvas: HTMLCanvasElement | null = null;
   private policy: CapturePolicy;
   private onBufferUpdate?: (targetId: string, seconds: number) => void;
@@ -62,72 +66,93 @@ export class EvidenceCaptureManager {
    */
   shouldCapture(trackId: number, geometryId: string): boolean {
     const key = this.getTargetKey(trackId, geometryId);
-    if (this.targets.has(key)) return false; // Already capturing
-    if (this.targets.size >= this.policy.maxSimultaneous) return false; // Max reached
+    if (this.targets.has(key)) return false;
+    if (this.targets.size >= this.policy.maxSimultaneous) return false;
     return true;
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // TWO-PHASE TURN CAPTURE
+  // ─────────────────────────────────────────────────────────────────
+
   /**
-   * Start capturing evidence for a track.
+   * PHASE 1 — ROI A entry.
+   * Starts the 20s circular buffer and captures FOTO_GENERAL_ROI_A + FOTO_DETALLE_ROI_A.
+   * Does NOT set track.audited so ROI B can still be detected.
    */
-  startCapture(
+  startTurnCapture(
     track: Track,
-    geometry: GeometryLine,
-    rule: ForensicRule | undefined,
+    roiALine: GeometryLine,
     video: HTMLVideoElement,
     canvas: HTMLCanvasElement,
     frameCount: number
   ): string | null {
-    const key = this.getTargetKey(track.id, geometry.id);
+    const key = this.getTargetKey(track.id, roiALine.id);
 
-    if (!this.shouldCapture(track.id, geometry.id)) {
-      return null;
+    // If already capturing for this track+geometry, skip
+    if (this.targets.has(key)) return null;
+
+    // Evict oldest pending (discard) if at max — the buffer overwrites
+    if (this.targets.size >= this.policy.maxSimultaneous) {
+      const oldestKey = [...this.targets.keys()][0];
+      this.cleanup(oldestKey);
     }
 
-    // Create target
     const target: EvidenceCaptureTarget = {
       trackId: track.id,
-      geometryId: geometry.id,
-      ruleId: rule?.id,
+      geometryId: roiALine.id,
       startedAt: Date.now(),
       frameCount,
     };
     this.targets.set(key, target);
 
-    // Initialize recorder
+    // Start 20s circular buffer
     const recorder = new VideoBufferService(canvas);
+    recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
     recorder.start();
     this.recorders.set(key, recorder);
 
-    // Capture initial snapshot
-    this.captureSnapshot(video, track, 'initial', key);
+    // Capture ROI A photos (general scene + vehicle detail)
+    this.captureNamedSnapshot(video, track, 'roi_a', key);
 
-    console.log(`[CAPTURE] Started for Track #${track.id}, Geometry ${geometry.label}`);
     return key;
   }
 
   /**
-   * Capture mid-point evidence if needed.
+   * Mid-path capture — between ROI A and ROI B.
+   * Captures FOTO_GENERAL_DESARROLLO + FOTO_DETALLE_DESARROLLO.
    */
-  captureMidIfNeeded(
-    track: Track,
-    video: HTMLVideoElement,
-    midPointFrame: number,
-    frameCount: number
-  ): void {
+  captureMidTurn(track: Track, video: HTMLVideoElement): void {
     const target = this.findTarget(track.id);
     if (!target) return;
-
-    const elapsed = frameCount - target.frameCount;
-    if (elapsed >= 30 && !this.hasMidCapture(target.key)) {
-      this.captureSnapshot(video, track, 'mid', target.key);
-    }
+    if (this.hasMidCapture(target.key)) return;
+    this.captureNamedSnapshot(video, track, 'mid', target.key);
   }
 
   /**
-   * Finalize and enqueue evidence for audit.
+   * PHASE 2 — ROI B entry (infraction confirmed).
+   * Captures FOTO_GENERAL_ROI_B + FOTO_DETALLE_ROI_B.
    */
-  async finalizeCapture(
+  captureRoiB(track: Track, roiBLine: GeometryLine, video: HTMLVideoElement): void {
+    const target = this.findTarget(track.id);
+    if (!target) return;
+    this.captureNamedSnapshot(video, track, 'roi_b', target.key);
+  }
+
+  /**
+   * Discard a pending turn capture (ROI A only, no ROI B).
+   * The buffer is overwritten by the next activation.
+   */
+  discardTurnCapture(trackId: number, reason: string): void {
+    const target = this.findTarget(trackId);
+    if (!target) return;
+    this.cleanup(target.key);
+  }
+
+  /**
+   * Finalize a confirmed forbidden-turn infraction and enqueue for audit.
+   */
+  async finalizeTurnCapture(
     track: Track,
     geometry: GeometryLine,
     video: HTMLVideoElement,
@@ -139,32 +164,44 @@ export class EvidenceCaptureManager {
     const key = target.key;
 
     try {
-      // Capture final snapshot
-      this.captureSnapshot(video, track, 'final', key);
+      // Ensure we have a mid capture (fallback if mid was never triggered)
+      if (!this.hasMidCapture(key)) {
+        this.captureNamedSnapshot(video, track, 'mid', key);
+      }
 
-      // Get all captured evidence
       const recorder = this.recorders.get(key);
       const clip = recorder ? await recorder.getClip() : undefined;
 
-      const snapshots = this.getSnapshots(key);
-      const contextSnapshots = snapshots.filter((_, i) => i % 2 === 0);
-      const zoomSnapshots = snapshots.filter((_, i) => i % 2 === 1);
+      const snapshots = this.snapshotStorage.get(key) || [];
 
-      // Get timecode
+      // Run OCR on all detail frames to get plate candidates
+      const detailFrames = snapshots
+        .filter((s) => s.kind === 'detail')
+        .map((s) => s.data)
+        .slice(0, 3);
+      let ocrResults: string[] = [];
+      if (detailFrames.length > 0) {
+        try {
+          const plate = await OCRSynchronizer.extractLicensePlateFromBase64(detailFrames);
+          if (plate) ocrResults = [plate];
+        } catch {
+          // OCR is best-effort
+        }
+      }
+
       const localTime = new Date().toLocaleString();
-      const videoTimeCode = await this.extractTimecode(video);
+      const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
 
-      // Save to EvidenceDB
+      // Persist to EvidenceDB with semantic structure
       const evidenceId = key;
       await evidenceDB.saveEvidence(evidenceId, {
-        snapshots: [...snapshots],
-        contextSnapshots,
-        zoomSnapshots,
-        ocrResults: [],
+        snapshots: snapshots.map((s) => s.data),
+        contextSnapshots: snapshots.filter((s) => s.kind === 'general').map((s) => s.data),
+        zoomSnapshots: snapshots.filter((s) => s.kind === 'detail').map((s) => s.data),
+        ocrResults,
         clip,
       });
 
-      // Enqueue for audit
       forensicQueue.enqueueJob(
         track,
         geometry,
@@ -175,53 +212,98 @@ export class EvidenceCaptureManager {
         viewerId
       );
     } finally {
-      // Always release recorder + snapshots even if persistence/audit fails.
       this.cleanup(key);
     }
   }
 
-  /**
-   * Abort capture for a track.
-   */
-  abortCapture(trackId: number, reason: string): void {
-    const target = this.findTarget(trackId);
-    if (!target) return;
+  // ─────────────────────────────────────────────────────────────────
+  // LEGACY SINGLE-PHASE CAPTURE (for roi_general and line crossings)
+  // ─────────────────────────────────────────────────────────────────
 
-    console.warn(`[CAPTURE] Aborted for Track #${trackId}: ${reason}`);
-    this.cleanup(target.key);
+  startCapture(
+    track: Track,
+    geometry: GeometryLine,
+    rule: ForensicRule | undefined,
+    video: HTMLVideoElement,
+    canvas: HTMLCanvasElement,
+    frameCount: number
+  ): string | null {
+    const key = this.getTargetKey(track.id, geometry.id);
+    if (!this.shouldCapture(track.id, geometry.id)) return null;
+
+    const target: EvidenceCaptureTarget = {
+      trackId: track.id,
+      geometryId: geometry.id,
+      ruleId: rule?.id,
+      startedAt: Date.now(),
+      frameCount,
+    };
+    this.targets.set(key, target);
+
+    const recorder = new VideoBufferService(canvas);
+    recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
+    recorder.start();
+    this.recorders.set(key, recorder);
+
+    this.captureNamedSnapshot(video, track, 'roi_a', key);
+    return key;
   }
 
-  /**
-   * Abort all active captures.
-   */
+  captureMidIfNeeded(
+    track: Track,
+    video: HTMLVideoElement,
+    _midPointFrame: number,
+    frameCount: number
+  ): void {
+    const target = this.findTarget(track.id);
+    if (!target) return;
+    const elapsed = frameCount - target.frameCount;
+    if (elapsed >= 30 && !this.hasMidCapture(target.key)) {
+      this.captureNamedSnapshot(video, track, 'mid', target.key);
+    }
+  }
+
+  async finalizeCapture(
+    track: Track,
+    geometry: GeometryLine,
+    video: HTMLVideoElement,
+    viewerId?: string
+  ): Promise<void> {
+    return this.finalizeTurnCapture(track, geometry, video, viewerId);
+  }
+
+  abortCapture(trackId: number, reason: string): void {
+    this.discardTurnCapture(trackId, reason);
+  }
+
   abortAll(reason: string): void {
     for (const target of this.targets.values()) {
-      console.warn(`[CAPTURE] Aborted for Track #${target.trackId}: ${reason}`);
+      console.warn(`[CAPTURE] Aborted Track #${target.trackId}: ${reason}`);
     }
     this.clear();
   }
 
-  /**
-   * Get active capture count.
-   */
   getActiveCount(): number {
     return this.targets.size;
   }
 
-  /**
-   * Check if a track is being captured.
-   */
   isCapturing(trackId: number): boolean {
     return this.findTarget(trackId) !== null;
   }
 
-  /**
-   * Get buffer status for a capture.
-   */
   getBufferSeconds(targetId: string): number {
-    const recorder = this.recorders.get(targetId);
-    return recorder?.getBufferSeconds() || 0;
+    return this.recorders.get(targetId)?.getBufferSeconds() || 0;
   }
+
+  getSnapshotCount(trackId: number): number {
+    const target = this.findTarget(trackId);
+    if (!target) return 0;
+    return this.snapshotStorage.get(target.key)?.length || 0;
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PRIVATE
+  // ─────────────────────────────────────────────────────────────────
 
   private getTargetKey(trackId: number, geometryId: string): string {
     return `${trackId}_${geometryId}`;
@@ -229,19 +311,19 @@ export class EvidenceCaptureManager {
 
   private findTarget(trackId: number): (EvidenceCaptureTarget & { key: string }) | null {
     for (const [key, target] of this.targets) {
-      if (target.trackId === trackId) {
-        return { ...target, key };
-      }
+      if (target.trackId === trackId) return { ...target, key };
     }
     return null;
   }
 
-  private snapshotStorage: Map<string, { type: string; data: string }[]> = new Map();
-
-  private captureSnapshot(
+  /**
+   * Capture a named snapshot pair: general (full scene) + detail (vehicle crop).
+   * Both are 1920×1080 high-quality JPEG.
+   */
+  private captureNamedSnapshot(
     video: HTMLVideoElement,
     track: Track,
-    type: 'initial' | 'mid' | 'final',
+    label: SnapshotLabel,
     targetKey: string
   ): void {
     if (!video || video.readyState < 2) return;
@@ -254,62 +336,52 @@ export class EvidenceCaptureManager {
     if (!ctx) return;
 
     try {
-      // 1. FULL SCENE (Context)
-      canvas.width = 1280;
-      canvas.height = 720;
-      ctx.drawImage(video, 0, 0, 1280, 720);
-      const contextFrame = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+      const W = 1920;
+      const H = 1080;
 
-      // 2. ZOOM (Vehicle detail)
-      const zoomPad = 0.5;
+      // General frame — full scene
+      canvas.width = W;
+      canvas.height = H;
+      ctx.drawImage(video, 0, 0, W, H);
+      const generalData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+
+      // Detail frame — vehicle crop with padding
+      const pad = 0.5;
       const vW = video.videoWidth;
       const vH = video.videoHeight;
-      const zX = Math.max(0, track.bbox.x - (track.bbox.w * zoomPad) / 2) * vW;
-      const zY = Math.max(0, track.bbox.y - (track.bbox.h * zoomPad) / 2) * vH;
-      const zW = Math.min(1, track.bbox.w * (1 + zoomPad)) * vW;
-      const zH = Math.min(1, track.bbox.h * (1 + zoomPad)) * vH;
+      const zX = Math.max(0, (track.bbox.x - (track.bbox.w * pad) / 2)) * vW;
+      const zY = Math.max(0, (track.bbox.y - (track.bbox.h * pad) / 2)) * vH;
+      const zW = Math.min(1, track.bbox.w * (1 + pad)) * vW;
+      const zH = Math.min(1, track.bbox.h * (1 + pad)) * vH;
 
-      ctx.clearRect(0, 0, 1280, 720);
-      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, 1280, 720);
-      const zoomFrame = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, W, H);
+      const detailData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
 
-      // Store snapshots
       const storage = this.snapshotStorage.get(targetKey) || [];
-      storage.push({ type, data: contextFrame }, { type, data: zoomFrame });
-      if (storage.length > MAX_SNAPSHOTS_PER_TARGET) {
-        storage.splice(0, storage.length - MAX_SNAPSHOTS_PER_TARGET);
-      }
+      storage.push(
+        { label, kind: 'general', data: generalData },
+        { label, kind: 'detail', data: detailData }
+      );
       this.snapshotStorage.set(targetKey, storage);
-    } catch (error) {
-      console.error(`[CAPTURE] Snapshot error for ${type}:`, error);
+    } catch (err) {
+      console.error(`[CAPTURE] Snapshot error (${label}):`, err);
     }
   }
 
   private hasMidCapture(key: string): boolean {
-    const storage = this.snapshotStorage.get(key) || [];
-    return storage.some((s) => s.type === 'mid');
-  }
-
-  private getSnapshots(key: string): string[] {
-    return (this.snapshotStorage.get(key) || []).map((s) => s.data);
-  }
-
-  private async extractTimecode(video: HTMLVideoElement): Promise<string> {
-    return OCRSynchronizer.extractTimecode(video);
+    return (this.snapshotStorage.get(key) || []).some((s) => s.label === 'mid');
   }
 
   private cleanup(key: string): void {
-    const recorder = this.recorders.get(key);
-    recorder?.stop();
+    this.recorders.get(key)?.stop();
     this.recorders.delete(key);
     this.targets.delete(key);
     this.snapshotStorage.delete(key);
   }
 
   private clear(): void {
-    for (const recorder of this.recorders.values()) {
-      recorder.stop();
-    }
+    for (const recorder of this.recorders.values()) recorder.stop();
     this.recorders.clear();
     this.targets.clear();
     this.snapshotStorage.clear();

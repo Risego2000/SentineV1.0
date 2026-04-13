@@ -9,7 +9,7 @@ import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
-import { ForensicRule, getRulesForGeometry } from '../types/forensicRules';
+import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
 
 const MAX_TAIL_POINTS = 50;
 const MIN_FINALIZE_DELAY_MS = 1200;
@@ -161,7 +161,13 @@ export const useFrameProcessor = () => {
         track.auditStatus = 'pending';
         updateBufferStatus({
           state: 'idle',
+          phase: 'standby',
+          seconds: 0,
           activeTracks: Math.max(0, manager.getActiveCount() - 1),
+          capturedPhotos: 0,
+          roiALabel: undefined,
+          roiBLabel: undefined,
+          plateCandidate: undefined,
         });
         return true;
       } catch (error) {
@@ -232,7 +238,16 @@ export const useFrameProcessor = () => {
           t.tail = [...t.tail, { x: normX, y: normY }].slice(-MAX_TAIL_POINTS);
         }
 
-        // Check mid-capture for active suspects
+        // Mid-path turn capture — ~30 frames after ROI A, before ROI B
+        if (t.roiATurnCaptureKey && !t.forbiddenTurnCaptured && !t.hasMidFrame) {
+          const framesSinceA = frameCountRef.current - (t.firstHitFrame || 0);
+          if (framesSinceA >= 30) {
+            evidenceManagerRef.current?.captureMidTurn(t, v);
+            t.hasMidFrame = true;
+            updateBufferStatus({ capturedPhotos: 4 });
+          }
+        }
+        // Check mid-capture for active suspects (non-turn captures)
         checkMidCapture(v, t);
 
         if (t.audited) return;
@@ -250,7 +265,7 @@ export const useFrameProcessor = () => {
           const lx2 = line.x2 * dW + oX;
           const ly2 = line.y2 * dH + oY;
 
-          // LINE INTERSECTION LOGIC — skip ROI and polygon-detected types
+          // LINE INTERSECTION LOGIC â skip ROI and polygon-detected types
           const isLineGeometry = !['roi_general', 'roi_turn', 'box_junction'].includes(line.type);
           if (isLineGeometry && lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
             let isInfraction = true;
@@ -297,7 +312,7 @@ export const useFrameProcessor = () => {
             }
           }
 
-          // ROI LOGIC
+          // ROI LOGIC — two-phase forbidden-turn flow
           if ((line.type === 'roi_general' || line.type === 'roi_turn') && line.points) {
             const inROI = isPointInPoly({ x: normX, y: normY }, line.points);
 
@@ -305,41 +320,59 @@ export const useFrameProcessor = () => {
               t.processedLines.push(line.id);
               t.roiHistory.push(line.id);
 
-              // General ROI: immediate audit
+              // GENERAL ROI: immediate audit (unchanged)
               if (line.type === 'roi_general' && isAuditEnabled) {
                 triggerCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
-                scheduleFinalizeCapture(v, canvas, t, {
-                  ...line,
-                  label: `ZONA_ANÁLISIS_${line.label}`,
-                });
+                scheduleFinalizeCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
               }
 
-              // Forbidden turn: any vehicle that traverses 2+ roi_turn zones in sequence = infraction
+              // FORBIDDEN TURN — two-phase
               if (line.type === 'roi_turn' && isAuditEnabled) {
                 const uniqueTurnRois = [...new Set(t.roiHistory)].filter(
                   (id) => geometry.find((g) => g.id === id)?.type === 'roi_turn'
                 );
 
+                // PHASE 1: ROI A — start 20s buffer, do NOT set t.audited (must reach ROI B)
+                if (uniqueTurnRois.length === 1 && !t.roiATurnCaptureKey) {
+                  const manager = evidenceManagerRef.current;
+                  const key = manager?.startTurnCapture(t, line, v, canvas, frameCountRef.current);
+                  if (key) {
+                    t.roiATurnCaptureKey = key;
+                    t.firstHitFrame = frameCountRef.current;
+                    updateBufferStatus({
+                      state: 'recording',
+                      phase: 'roi_a',
+                      roiALabel: line.label,
+                      capturedPhotos: 2,
+                      activeTracks: manager?.getActiveCount() ?? 0,
+                    });
+                  }
+                }
+
+                // PHASE 2: ROI B — confirm infraction, finalize evidence
                 if (uniqueTurnRois.length >= 2 && !t.forbiddenTurnCaptured) {
                   t.forbiddenTurnCaptured = true;
+                  t.audited = true;
+                  t.auditStatus = 'processing';
+                  const manager = evidenceManagerRef.current;
+                  manager?.captureRoiB(t, line, v);
                   const turnLabels = uniqueTurnRois.map(
                     (id) => geometry.find((g) => g.id === id)?.label || id
                   );
-
-                  triggerCapture(v, canvas, t, {
+                  const confirmedLine: GeometryLine = {
                     ...line,
                     label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
                     violationKind: 'forbidden_turn_sequence',
                     roiSequenceIds: uniqueTurnRois,
                     roiSequenceLabels: turnLabels,
+                  };
+                  updateBufferStatus({
+                    phase: 'confirmed',
+                    roiBLabel: line.label,
+                    capturedPhotos: manager?.getSnapshotCount(t.id) ?? 6,
+                    activeTracks: manager?.getActiveCount() ?? 0,
                   });
-                  scheduleFinalizeCapture(v, canvas, t, {
-                    ...line,
-                    label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
-                    violationKind: 'forbidden_turn_sequence',
-                    roiSequenceIds: uniqueTurnRois,
-                    roiSequenceLabels: turnLabels,
-                  });
+                  scheduleFinalizeCapture(v, canvas, t, confirmedLine);
                 }
               }
             }
@@ -359,6 +392,7 @@ export const useFrameProcessor = () => {
       triggerCapture,
       checkMidCapture,
       scheduleFinalizeCapture,
+      updateBufferStatus,
     ]
   );
 

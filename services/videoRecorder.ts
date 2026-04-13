@@ -9,6 +9,7 @@ export class VideoBufferService {
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
   private readonly maxSeconds = 21; // 20 seg + 1 seg pre-roll
+  private bufferCallback?: (seconds: number) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     try {
@@ -25,11 +26,16 @@ export class VideoBufferService {
           if (this.chunks.length > this.maxSeconds) {
             this.chunks.shift();
           }
+          this.bufferCallback?.(this.chunks.length);
         }
       };
     } catch (e) {
       logger.error('RECORDER', 'Error al inicializar MediaRecorder', e);
     }
+  }
+
+  setBufferCallback(callback: (seconds: number) => void) {
+    this.bufferCallback = callback;
   }
 
   start() {
