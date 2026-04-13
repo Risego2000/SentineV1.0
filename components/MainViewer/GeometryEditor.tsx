@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { GeometryLine, EntityType, Point } from '../../types';
 import { Ban, ShieldAlert, GitCommitVertical, Box, Scale } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
@@ -226,7 +227,7 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
         )}
       </svg>
 
-      {showMenu && (
+      {showMenu && ReactDOM.createPortal(
         <div
           className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[9999] max-h-[80vh] overflow-y-auto custom-scrollbar"
           style={{
@@ -383,7 +384,8 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
           >
             Cancelar
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
