@@ -29,8 +29,20 @@ export const loadLocalEnvFile = (cwd = process.cwd()) => {
   if (envLoaded) return;
   envLoaded = true;
 
-  const envPath = path.join(cwd, '.env.local');
-  if (!fs.existsSync(envPath)) return;
+  // Walk up the directory tree to find .env.local (supports git worktrees)
+  let envPath = null;
+  let searchDir = cwd;
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(searchDir, '.env.local');
+    if (fs.existsSync(candidate)) {
+      envPath = candidate;
+      break;
+    }
+    const parent = path.dirname(searchDir);
+    if (parent === searchDir) break;
+    searchDir = parent;
+  }
+  if (!envPath) return;
 
   const content = fs.readFileSync(envPath, 'utf8');
   for (const rawLine of content.split(/\r?\n/)) {

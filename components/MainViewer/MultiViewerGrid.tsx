@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { SentinelProvider } from '../../context/SentinelProvider';
 import { SentinelViewer } from './SentinelViewer';
@@ -55,7 +55,10 @@ export const MultiViewerGrid = () => {
 };
 
 const Portal = ({ children, targetId }: { children: React.ReactNode; targetId: string }) => {
-  const target = document.getElementById(targetId);
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.getElementById(targetId));
+  }, [targetId]);
   if (!target) return null;
   return createPortal(children, target);
 };

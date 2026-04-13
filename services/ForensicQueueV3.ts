@@ -22,6 +22,7 @@ import { OCRSynchronizer } from './OCRSynchronizer';
  */
 interface QueueItem {
   job: AuditJob;
+  evidenceId: string;
   resolvedAt?: number;
   currentStatus: AuditJob['status'];
   retries: number;
@@ -152,6 +153,7 @@ export class ForensicQueueV3 {
 
     const queueItem: QueueItem = {
       job,
+      evidenceId,
       currentStatus: 'pending',
       resolvedAt: Date.now(),
       retries: 0,
@@ -241,8 +243,8 @@ export class ForensicQueueV3 {
     current.currentStatus = 'processing';
 
     try {
-      // Fetch evidence from IndexedDB
-      const evidence = await evidenceDB.getEvidence(current.job.id);
+      // Fetch evidence from IndexedDB using the original capture key
+      const evidence = await evidenceDB.getEvidence(current.evidenceId);
 
       if (!evidence) {
         const didRequeue = this.requeueWithRetry(

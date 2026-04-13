@@ -113,6 +113,7 @@ export interface Track {
   isCoasting: boolean; // Prediction mode without visual confirmation
   labelHistory?: string[]; // Class smoothing history (majority vote)
   roiHistory: string[]; // Sequential ROI entries [ROI A, ROI B...]
+  forbiddenTurnCaptured?: boolean; // Prevents re-triggering on 3rd+ roi_turn zone
   hasInitialFrame?: boolean;
   hasMidFrame?: boolean;
   firstHitFrame?: number; // Frame count when ROI A was first hit

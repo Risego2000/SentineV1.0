@@ -9,7 +9,7 @@ import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
-import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
+import { ForensicRule, getRulesForGeometry } from '../types/forensicRules';
 
 const MAX_TAIL_POINTS = 50;
 const MIN_FINALIZE_DELAY_MS = 1200;
@@ -318,12 +318,15 @@ export const useFrameProcessor = () => {
                 });
               }
 
-              // Forbidden turn: check sequence
+              // Forbidden turn: any vehicle that traverses 2+ roi_turn zones in sequence = infraction
               if (line.type === 'roi_turn' && isAuditEnabled) {
-                const uniqueRois = [...new Set(t.roiHistory)];
-                const turnRule = findForbiddenTurnRule(uniqueRois);
-                if (uniqueRois.length >= 2 && turnRule) {
-                  const turnLabels = uniqueRois.map(
+                const uniqueTurnRois = [...new Set(t.roiHistory)].filter(
+                  (id) => geometry.find((g) => g.id === id)?.type === 'roi_turn'
+                );
+
+                if (uniqueTurnRois.length >= 2 && !t.forbiddenTurnCaptured) {
+                  t.forbiddenTurnCaptured = true;
+                  const turnLabels = uniqueTurnRois.map(
                     (id) => geometry.find((g) => g.id === id)?.label || id
                   );
 
@@ -331,14 +334,14 @@ export const useFrameProcessor = () => {
                     ...line,
                     label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
                     violationKind: 'forbidden_turn_sequence',
-                    roiSequenceIds: uniqueRois,
+                    roiSequenceIds: uniqueTurnRois,
                     roiSequenceLabels: turnLabels,
                   });
                   scheduleFinalizeCapture(v, canvas, t, {
                     ...line,
                     label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
                     violationKind: 'forbidden_turn_sequence',
-                    roiSequenceIds: uniqueRois,
+                    roiSequenceIds: uniqueTurnRois,
                     roiSequenceLabels: turnLabels,
                   });
                 }
