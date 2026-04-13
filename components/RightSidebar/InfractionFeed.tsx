@@ -1,16 +1,15 @@
 import React from 'react';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, FileText } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
 
 import { TacticalMetrics } from './TacticalMetrics';
-import { InfractionLog } from '../../types';
 
 export const InfractionFeed = () => {
   const { logs, setSelectedLog, hasApiKey } = useSentinel();
   const { helpProps } = useHelp();
 
-  const handleLogKeyDown = (log: InfractionLog) => (e: React.KeyboardEvent) => {
+  const handleLogKeyDown = (log: any) => (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setSelectedLog(log);
@@ -39,21 +38,16 @@ export const InfractionFeed = () => {
       )}
 
       <div
-        className="p-6 border-b border-white/10 flex items-center gap-4 bg-cyan-950/10 shrink-0"
+        className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0"
         {...helpProps('Flujo de infracciones confirmadas por la Unidad Forense Gemini IA.')}
       >
-        <ShieldAlert className="text-cyan-500 w-10 h-10" aria-hidden="true" />
-        <div className="flex flex-col">
-          <span className="text-xl font-black italic text-white uppercase leading-none">
-            INFRACCIONES
-          </span>
-          <span className="text-xs font-black tracking-[0.4em] text-cyan-500/60 uppercase leading-none">
-            DETECTADAS
-          </span>
-        </div>
+        <FileText className="text-red-400 shrink-0" size={18} aria-hidden="true" />
+        <span className="text-sm font-bold text-red-100 uppercase tracking-wider">
+          Infracciones Detectadas
+        </span>
         {logs.length > 0 && (
           <span
-            className="ml-auto text-xs font-mono bg-cyan-900/60 text-cyan-200 px-2 py-0.5 rounded-full"
+            className="ml-auto text-xs font-mono bg-red-900/60 text-red-200 px-2 py-0.5 rounded-full"
             aria-live="polite"
           >
             {logs.length}

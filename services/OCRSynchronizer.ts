@@ -63,44 +63,6 @@ export const OCRSynchronizer = {
     return genericMatches?.[0] || '';
   },
 
-  parseTimecodeText(text: string): string {
-    const normalized = text.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-    const timeMatch = normalized.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-    if (!timeMatch) return normalized;
-
-    const datePatterns = [
-      /(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/, // DD/MM/YYYY or DD-MM-YYYY
-      /(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/, // YYYY/MM/DD or YYYY-MM-DD
-    ];
-
-    let dateStr = '';
-    for (const pattern of datePatterns) {
-      const match = normalized.match(pattern);
-      if (match) {
-        if (pattern === datePatterns[0]) {
-          const d = match[1].padStart(2, '0');
-          const m = match[2].padStart(2, '0');
-          const y = match[3];
-          dateStr = `${d}/${m}/${y}`;
-        } else {
-          const y = match[1];
-          const m = match[2].padStart(2, '0');
-          const d = match[3].padStart(2, '0');
-          dateStr = `${d}/${m}/${y}`;
-        }
-        break;
-      }
-    }
-
-    if (!dateStr) {
-      console.warn('[OCR] Timecode incomplete - date not detected in OSD');
-      return `??/??/????, ${timeMatch[0]}`;
-    }
-
-    return `${dateStr}, ${timeMatch[0]}`;
-  },
-
   async extractLicensePlate(zoomFrames: string[]): Promise<PlateOCRResult> {
     if (!zoomFrames.length) return { plate: '', candidates: [] };
 
@@ -176,28 +138,32 @@ export const OCRSynchronizer = {
       // Remove common OCR noise/prefixes if they appear before the first number
       cleanedText = cleanedText.replace(/^[^0-9]+/, '');
 
-      const parsed = this.parseTimecodeText(cleanedText);
-      if (!parsed.includes('??/??/????')) return parsed;
+      // Flexible date match: finds 3 groups of numbers (2, 2, 4 digits typically)
+      // This handles 12-11-2025, 12/11/2025, or even 12.11.2025
+      const dateMatch = cleanedText.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
 
-      // Fallback scan on a larger top region if the first pass did not capture the date.
-      const fallbackCanvas = document.createElement('canvas');
-      const fallbackW = video.videoWidth * 0.8;
-      const fallbackH = video.videoHeight * 0.15;
-      fallbackCanvas.width = fallbackW;
-      fallbackCanvas.height = fallbackH;
-      const fallbackCtx = fallbackCanvas.getContext('2d');
-      if (fallbackCtx) {
-        fallbackCtx.drawImage(video, 0, 0, fallbackW, fallbackH, 0, 0, fallbackW, fallbackH);
-        const fallbackResult = await worker.recognize(fallbackCanvas);
-        let fallbackText = fallbackResult.data.text.trim();
-        fallbackText = fallbackText.replace(/^[^0-9]+/, '');
-        const fallbackParsed = this.parseTimecodeText(fallbackText);
-        if (!fallbackParsed.includes('??/??/????')) {
-          return fallbackParsed;
+      // Strict time match: HH:MM:SS
+      const timeMatch = cleanedText.match(/(\d{2}):(\d{2}):(\d{2})/);
+
+      if (timeMatch) {
+        const timeStr = timeMatch[0];
+        let dateStr = '';
+
+        if (dateMatch) {
+          const d = dateMatch[1].padStart(2, '0');
+          const m = dateMatch[2].padStart(2, '0');
+          const y = dateMatch[3];
+          dateStr = `${d}/${m}/${y}`;
+        } else {
+          // Forense: NO fabricamos fecha - eso compromete la validez forense
+          dateStr = '??/??/????';
+          console.warn('[OCR] Timecode incomplete - date not detected in OSD');
         }
+
+        return `${dateStr}, ${timeStr}`;
       }
 
-      return parsed;
+      return cleanedText;
     } catch (e) {
       console.error('[OCR] Error extracting timecode:', e);
       return '';

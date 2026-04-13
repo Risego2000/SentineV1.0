@@ -12,28 +12,15 @@ export interface LayoutState {
   // Array of active viewer IDs
   activeViewers: string[];
 
-  // Global help message
-  helpMsg: string | null;
-
-  // Sidebar visibility (especially for mobile)
-  isSidebarOpen: boolean;
-  isRightSidebarOpen: boolean;
-
   // Actions
   setGridSize: (size: GridSize) => void;
   setFocusedViewer: (id: string) => void;
-  setHelpMsg: (msg: string | null) => void;
-  toggleSidebar: () => void;
-  toggleRightSidebar: () => void;
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
   gridSize: 1,
   focusedViewerId: 'visor_0',
   activeViewers: ['visor_0'],
-  helpMsg: 'Bienvenido a Sentinel AI. Pase el ratón sobre los elementos para obtener ayuda.',
-  isSidebarOpen: false,
-  isRightSidebarOpen: false,
 
   setGridSize: (size) =>
     set((state) => {
@@ -51,7 +38,4 @@ export const useLayoutStore = create<LayoutState>((set) => ({
     }),
 
   setFocusedViewer: (id) => set({ focusedViewerId: id }),
-  setHelpMsg: (msg) => set({ helpMsg: msg }),
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-  toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
 }));

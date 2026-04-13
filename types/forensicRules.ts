@@ -3,7 +3,7 @@
  * Rules are explicit, declarative configurations - not heuristics based on labels.
  */
 
-import { SeverityType } from './index';
+import { EntityType, SeverityType } from './index';
 
 export type RuleType =
   | 'line_crossing' // Simple line intersection

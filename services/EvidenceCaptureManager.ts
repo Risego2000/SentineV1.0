@@ -48,8 +48,6 @@ export class EvidenceCaptureManager {
   private snapshotCanvas: HTMLCanvasElement | null = null;
   private policy: CapturePolicy;
   private onBufferUpdate?: (targetId: string, seconds: number) => void;
-  private turnTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private onAutoFinalize?: (trackId: number) => void;
 
   constructor(policy: Partial<CapturePolicy> = {}) {
     this.policy = { ...DEFAULT_POLICY, ...policy };
@@ -61,10 +59,6 @@ export class EvidenceCaptureManager {
 
   setBufferCallback(callback: (targetId: string, seconds: number) => void) {
     this.onBufferUpdate = callback;
-  }
-
-  setAutoFinalizeCallback(callback: (trackId: number) => void) {
-    this.onAutoFinalize = callback;
   }
 
   /**
@@ -121,24 +115,6 @@ export class EvidenceCaptureManager {
     // Capture ROI A photos (general scene + vehicle detail)
     this.captureNamedSnapshot(video, track, 'roi_a', key);
 
-    // NUEVO: Temporizador de 20s para "Sospecha de Giro"
-    const timer = setTimeout(async () => {
-      const currentTarget = this.targets.get(key);
-      if (!currentTarget) return;
-
-      console.warn(`[CAPTURE] ROI B Timeout for Track #${track.id}. Saving as suspicion.`);
-      const suspectedLine: GeometryLine = {
-        ...roiALine,
-        label: `SOSPECHA_GIRO_${roiALine.label}`,
-        violationKind: 'turn_suspicion',
-      };
-
-      await this.finalizeTurnCapture(track, suspectedLine, video);
-      this.onAutoFinalize?.(track.id);
-    }, 20000);
-
-    this.turnTimers.set(key, timer);
-
     return key;
   }
 
@@ -186,12 +162,6 @@ export class EvidenceCaptureManager {
     if (!target) return;
 
     const key = target.key;
-
-    // Limpiar temporizador al finalizar (ya sea por ROI B o por timeout)
-    if (this.turnTimers.has(key)) {
-      clearTimeout(this.turnTimers.get(key));
-      this.turnTimers.delete(key);
-    }
 
     try {
       // Ensure we have a mid capture (fallback if mid was never triggered)
@@ -404,10 +374,6 @@ export class EvidenceCaptureManager {
   }
 
   private cleanup(key: string): void {
-    if (this.turnTimers.has(key)) {
-      clearTimeout(this.turnTimers.get(key));
-      this.turnTimers.delete(key);
-    }
     this.recorders.get(key)?.stop();
     this.recorders.delete(key);
     this.targets.delete(key);

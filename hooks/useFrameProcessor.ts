@@ -62,34 +62,11 @@ export const useFrameProcessor = () => {
       updateBufferStatus({ seconds });
     });
 
-    evidenceManagerRef.current.setAutoFinalizeCallback((trackId) => {
-      const track = trackerRef.current.tracks.find((t) => t.id === trackId);
-      if (track) {
-        track.audited = true;
-        track.auditStatus = 'pending';
-        track.roiATurnCaptureKey = undefined;
-        track.firstHitFrame = undefined;
-        track.hasMidFrame = undefined;
-      }
-
-      updateBufferStatus({
-        state: 'idle',
-        phase: 'standby',
-        seconds: 0,
-        activeTracks: evidenceManagerRef.current?.getActiveCount() ?? 0,
-        capturedPhotos: 0,
-        roiALabel: undefined,
-        roiBLabel: undefined,
-        plateCandidate: undefined,
-      });
-    });
-
     return () => {
       timers.forEach((timerId) => window.clearTimeout(timerId));
       timers.clear();
       canvases.clear();
       evidenceManagerRef.current?.abortAll('Component unmount');
-      evidenceManagerRef.current = null;
     };
   }, [updateBufferStatus]);
 
@@ -352,18 +329,19 @@ export const useFrameProcessor = () => {
                 });
               }
 
-              // FORBIDDEN TURN — two-phase sequence detection
+              // FORBIDDEN TURN — two-phase
               if (line.type === 'roi_turn' && isAuditEnabled) {
-                // PHASE 1: First ROI_Turn detected — this is ROI A
-                if (!t.roiATurnCaptureKey && t.roiHistory.filter(id =>
-                  geometry.find((g) => g.id === id)?.type === 'roi_turn'
-                ).length === 1) {
+                const uniqueTurnRois = [...new Set(t.roiHistory)].filter(
+                  (id) => geometry.find((g) => g.id === id)?.type === 'roi_turn'
+                );
+
+                // PHASE 1: ROI A — start 20s buffer, do NOT set t.audited (must reach ROI B)
+                if (uniqueTurnRois.length === 1 && !t.roiATurnCaptureKey) {
                   const manager = evidenceManagerRef.current;
                   const key = manager?.startTurnCapture(t, line, v, canvas, frameCountRef.current);
                   if (key) {
                     t.roiATurnCaptureKey = key;
                     t.firstHitFrame = frameCountRef.current;
-                    t.roiAId = line.id; // Track which ROI is A
                     updateBufferStatus({
                       state: 'recording',
                       phase: 'roi_a',
@@ -373,37 +351,30 @@ export const useFrameProcessor = () => {
                     });
                   }
                 }
-                // PHASE 2: Second DIFFERENT ROI_Turn detected — this is ROI B (infraction confirmed)
-                else if (t.roiATurnCaptureKey && !t.forbiddenTurnCaptured && line.id !== t.roiAId) {
+
+                // PHASE 2: ROI B — confirm infraction, finalize evidence
+                if (uniqueTurnRois.length >= 2 && !t.forbiddenTurnCaptured) {
                   t.forbiddenTurnCaptured = true;
                   t.audited = true;
                   t.auditStatus = 'processing';
-
                   const manager = evidenceManagerRef.current;
                   manager?.captureRoiB(t, line, v);
-
-                  // Build sequence information
-                  const roiAId = t.roiAId || '';
-                  const roiALabel = geometry.find((g) => g.id === roiAId)?.label || 'ROI_A';
-                  const roiBLabel = line.label;
-                  const turnLabels = [roiALabel, roiBLabel];
-
+                  const turnLabels = uniqueTurnRois.map(
+                    (id) => geometry.find((g) => g.id === id)?.label || id
+                  );
                   const confirmedLine: GeometryLine = {
                     ...line,
-                    label: `GIRO_PROHIBIDO_${roiALabel}_A_${roiBLabel}`,
+                    label: `GIRO_PROHIBIDO_${turnLabels.join('_A_')}`,
                     violationKind: 'forbidden_turn_sequence',
-                    roiSequenceIds: [roiAId, line.id],
+                    roiSequenceIds: uniqueTurnRois,
                     roiSequenceLabels: turnLabels,
-                    analysisContext: `Secuencia verificada: ${roiALabel} → ${roiBLabel}`,
                   };
-
                   updateBufferStatus({
                     phase: 'confirmed',
                     roiBLabel: line.label,
                     capturedPhotos: manager?.getSnapshotCount(t.id) ?? 6,
                     activeTracks: manager?.getActiveCount() ?? 0,
                   });
-
                   scheduleFinalizeCapture(v, canvas, t, confirmedLine);
                 }
               }

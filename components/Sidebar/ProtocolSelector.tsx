@@ -111,14 +111,11 @@ export const ProtocolSelector = () => {
 
     if (combinedDirectivesList.length > 0) {
       setDirectives(`[PROTOCOLOS_ACTIVOS]:\n${combinedDirectivesList.join('\n\n')}`);
-      setGeometry((prev) => {
-        const customLines = prev.filter((l) => l.id.startsWith('geo_'));
-        return [...combinedLines, ...customLines];
-      });
+      setGeometry(combinedLines);
       addLog('AI', `Protocolos sincronizados: ${selectedIds.length} activos.`);
     } else {
       setDirectives('Monitorización estándar...');
-      setGeometry((prev) => prev.filter((l) => l.id.startsWith('geo_')));
+      setGeometry([]);
     }
   }, [selectedIds, setDirectives, setGeometry, addLog]);
 

@@ -8,7 +8,7 @@ import { SystemTerminal } from './RightSidebar/SystemTerminal';
  */
 export const RightSidebar = memo(() => {
   return (
-    <aside className="w-[280px] sm:w-80 border-l border-white/10 flex flex-col bg-[#020617]/95 z-50 h-screen shrink-0 overflow-hidden">
+    <aside className="w-80 border-l border-white/10 flex flex-col bg-[#020617]/95 z-50 h-screen shrink-0 overflow-hidden">
       <InfractionFeed />
       <SystemTerminal />
     </aside>
