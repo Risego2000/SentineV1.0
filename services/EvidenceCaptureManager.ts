@@ -349,8 +349,8 @@ export class EvidenceCaptureManager {
       const pad = 0.5;
       const vW = video.videoWidth;
       const vH = video.videoHeight;
-      const zX = Math.max(0, (track.bbox.x - (track.bbox.w * pad) / 2)) * vW;
-      const zY = Math.max(0, (track.bbox.y - (track.bbox.h * pad) / 2)) * vH;
+      const zX = Math.max(0, track.bbox.x - (track.bbox.w * pad) / 2) * vW;
+      const zY = Math.max(0, track.bbox.y - (track.bbox.h * pad) / 2) * vH;
       const zW = Math.min(1, track.bbox.w * (1 + pad)) * vW;
       const zH = Math.min(1, track.bbox.h * (1 + pad)) * vH;
 

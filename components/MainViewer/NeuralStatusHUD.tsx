@@ -1,5 +1,13 @@
 import React from 'react';
-import { ShieldCheck, Camera, Disc, AlertTriangle, CheckCircle2, RotateCcw, Save } from 'lucide-react';
+import {
+  ShieldCheck,
+  Camera,
+  Disc,
+  AlertTriangle,
+  CheckCircle2,
+  RotateCcw,
+  Save,
+} from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 
 /** Icon + color palette per phase */
@@ -78,7 +86,9 @@ export const NeuralStatusHUD = () => {
         {/* ── TOP BAR ─────────────────────────────────────── */}
         <div className="bg-white/5 px-2 py-1 md:px-3 md:py-1.5 border-b border-white/5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 md:gap-2">
-            <div className={`p-1 rounded-lg bg-black/40 ${cfg.color} transition-colors duration-500`}>
+            <div
+              className={`p-1 rounded-lg bg-black/40 ${cfg.color} transition-colors duration-500`}
+            >
               {cfg.icon}
             </div>
             <div className="flex flex-col leading-none">
@@ -92,23 +102,29 @@ export const NeuralStatusHUD = () => {
           </div>
           <div className="flex items-center gap-1 opacity-40">
             <ShieldCheck size={10} className="text-cyan-400" />
-            <span className="text-[7px] font-mono font-bold text-white hidden sm:inline">SEC_BOOT</span>
+            <span className="text-[7px] font-mono font-bold text-white hidden sm:inline">
+              SEC_BOOT
+            </span>
           </div>
         </div>
 
         {/* ── MAIN BODY ────────────────────────────────────── */}
         <div className="p-2 md:p-3 flex flex-col gap-2 md:gap-3">
-
           {/* Status label + percentage */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot} transition-all duration-500`} />
-              <span className={`text-[8px] md:text-[10px] font-black tracking-tight ${cfg.color} transition-colors duration-500`}>
+              <div
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot} transition-all duration-500`}
+              />
+              <span
+                className={`text-[8px] md:text-[10px] font-black tracking-tight ${cfg.color} transition-colors duration-500`}
+              >
                 {cfg.label}
               </span>
             </div>
             <span className="text-[11px] md:text-base font-black text-white font-mono leading-none">
-              {pct}<span className="text-[7px] text-slate-500 ml-0.5">%</span>
+              {pct}
+              <span className="text-[7px] text-slate-500 ml-0.5">%</span>
             </span>
           </div>
 
@@ -149,14 +165,20 @@ export const NeuralStatusHUD = () => {
                   key={i}
                   className={`flex-1 h-px transition-all duration-500 ${
                     roiAActive && !roiBActive
-                      ? i < 3 ? 'bg-amber-500/60' : 'bg-white/10'
+                      ? i < 3
+                        ? 'bg-amber-500/60'
+                        : 'bg-white/10'
                       : roiBActive
-                      ? 'bg-red-500/70'
-                      : 'bg-white/10'
+                        ? 'bg-red-500/70'
+                        : 'bg-white/10'
                   }`}
                 />
               ))}
-              <div className={`text-[8px] transition-colors duration-500 ${roiBActive ? 'text-red-400' : roiAActive ? 'text-amber-400/60' : 'text-white/20'}`}>▶</div>
+              <div
+                className={`text-[8px] transition-colors duration-500 ${roiBActive ? 'text-red-400' : roiAActive ? 'text-amber-400/60' : 'text-white/20'}`}
+              >
+                ▶
+              </div>
             </div>
 
             {/* ROI B bubble */}
@@ -175,27 +197,41 @@ export const NeuralStatusHUD = () => {
           <div className="grid grid-cols-3 gap-1 md:gap-2 pt-2 border-t border-white/5 mt-0.5">
             {/* Captured photos */}
             <div className="flex flex-col gap-0.5">
-              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">Fotos</span>
+              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">
+                Fotos
+              </span>
               <div className="flex items-center gap-1">
                 <Camera size={8} className="text-cyan-400 flex-shrink-0" />
-                <span className="text-[8px] md:text-[10px] font-black text-white font-mono">{photos}</span>
+                <span className="text-[8px] md:text-[10px] font-black text-white font-mono">
+                  {photos}
+                </span>
               </div>
             </div>
 
             {/* Plate OCR */}
             <div className="flex flex-col gap-0.5">
-              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">Matrícula</span>
-              <span className={`text-[7px] md:text-[9px] font-black font-mono truncate ${plate ? 'text-amber-400' : 'text-slate-700'}`}>
+              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">
+                Matrícula
+              </span>
+              <span
+                className={`text-[7px] md:text-[9px] font-black font-mono truncate ${plate ? 'text-amber-400' : 'text-slate-700'}`}
+              >
                 {plate ?? '---'}
               </span>
             </div>
 
             {/* FPS */}
             <div className="flex flex-col gap-0.5 items-end border-l border-white/5 pl-1">
-              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">FPS</span>
+              <span className="text-[5px] md:text-[6px] font-black text-slate-600 uppercase tracking-widest">
+                FPS
+              </span>
               <div className="flex items-center gap-1">
-                <span className="text-[8px] md:text-[10px] font-black text-purple-400 font-mono">{fps}</span>
-                {statusMsg && <div className="w-1 h-1 rounded-full bg-red-500 animate-ping flex-shrink-0" />}
+                <span className="text-[8px] md:text-[10px] font-black text-purple-400 font-mono">
+                  {fps}
+                </span>
+                {statusMsg && (
+                  <div className="w-1 h-1 rounded-full bg-red-500 animate-ping flex-shrink-0" />
+                )}
               </div>
             </div>
           </div>
@@ -216,7 +252,9 @@ export const NeuralStatusHUD = () => {
       {statusMsg && (
         <div className="bg-red-500/10 border border-red-500/30 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl backdrop-blur-md flex items-center gap-1.5 self-start animate-in slide-in-from-left-2">
           <AlertTriangle size={10} className="text-red-500 animate-bounce" />
-          <span className="text-[7px] md:text-[9px] font-black text-red-500 uppercase tracking-widest truncate max-w-[80px] md:max-w-none">{statusMsg}</span>
+          <span className="text-[7px] md:text-[9px] font-black text-red-500 uppercase tracking-widest truncate max-w-[80px] md:max-w-none">
+            {statusMsg}
+          </span>
         </div>
       )}
     </div>

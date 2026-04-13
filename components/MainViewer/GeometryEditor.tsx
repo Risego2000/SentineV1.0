@@ -231,8 +231,14 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
           className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[9999] max-h-[80vh] overflow-y-auto custom-scrollbar"
           style={{
             top: menuPos.sy > window.innerHeight * 0.6 ? 'auto' : `${menuPos.sy + 10}px`,
-            bottom: menuPos.sy > window.innerHeight * 0.6 ? `${window.innerHeight - menuPos.sy}px` : 'auto',
-            left: menuPos.sx > window.innerWidth * 0.7 ? `${menuPos.sx - 224 - 10}px` : `${menuPos.sx + 10}px`,
+            bottom:
+              menuPos.sy > window.innerHeight * 0.6
+                ? `${window.innerHeight - menuPos.sy}px`
+                : 'auto',
+            left:
+              menuPos.sx > window.innerWidth * 0.7
+                ? `${menuPos.sx - 224 - 10}px`
+                : `${menuPos.sx + 10}px`,
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >

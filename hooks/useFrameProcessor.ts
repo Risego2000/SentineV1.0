@@ -323,7 +323,10 @@ export const useFrameProcessor = () => {
               // GENERAL ROI: immediate audit (unchanged)
               if (line.type === 'roi_general' && isAuditEnabled) {
                 triggerCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
-                scheduleFinalizeCapture(v, canvas, t, { ...line, label: `ZONA_ANÁLISIS_${line.label}` });
+                scheduleFinalizeCapture(v, canvas, t, {
+                  ...line,
+                  label: `ZONA_ANÁLISIS_${line.label}`,
+                });
               }
 
               // FORBIDDEN TURN — two-phase

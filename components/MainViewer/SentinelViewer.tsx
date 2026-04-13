@@ -12,6 +12,7 @@ import { GeometryEditor } from './GeometryEditor';
 import { VideoTimeline } from './VideoTimeline';
 import { HelpCapsule } from './HelpCapsule';
 import { IpCameraModal } from '../IpCameraModal';
+import { useLayoutStore } from '../../stores/layoutStore';
 
 export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const {
@@ -32,6 +33,9 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   } = useSentinel();
 
   const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
+  const { gridSize } = useLayoutStore();
+  const compact = gridSize >= 2;
+  const mini = gridSize >= 3;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -174,7 +178,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
       <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
 
-      <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-4 lg:p-10">
+      <div className={mini ? "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-0" : compact ? "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-2" : "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-4 lg:p-8"}>
         <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none" />
         <div className="scanline" />
 
@@ -192,6 +196,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
             ref={canvasRef}
             className="w-full h-full object-contain pointer-events-none transition-transform duration-700 group-hover:scale-[1.01]"
           />
+          {/* VideoTimeline: z-30 keeps it below GeometryEditor (z-40) so edit mode always gets events */}
+          <VideoTimeline videoRef={videoRef} />
           <GeometryEditor canvasRef={canvasRef} />
 
           <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-cyan-500/50" />
@@ -223,9 +229,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         )}
       </div>
 
-      <div className="relative z-50">
+      <div className="relative z-50 shrink-0">
         <HelpCapsule />
-        <VideoTimeline videoRef={videoRef} />
         <ControlBar />
       </div>
     </main>
