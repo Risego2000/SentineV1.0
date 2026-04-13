@@ -62,11 +62,34 @@ export const useFrameProcessor = () => {
       updateBufferStatus({ seconds });
     });
 
+    evidenceManagerRef.current.setAutoFinalizeCallback((trackId) => {
+      const track = trackerRef.current.tracks.find((t) => t.id === trackId);
+      if (track) {
+        track.audited = true;
+        track.auditStatus = 'pending';
+        track.roiATurnCaptureKey = undefined;
+        track.firstHitFrame = undefined;
+        track.hasMidFrame = undefined;
+      }
+
+      updateBufferStatus({
+        state: 'idle',
+        phase: 'standby',
+        seconds: 0,
+        activeTracks: evidenceManagerRef.current?.getActiveCount() ?? 0,
+        capturedPhotos: 0,
+        roiALabel: undefined,
+        roiBLabel: undefined,
+        plateCandidate: undefined,
+      });
+    });
+
     return () => {
       timers.forEach((timerId) => window.clearTimeout(timerId));
       timers.clear();
       canvases.clear();
       evidenceManagerRef.current?.abortAll('Component unmount');
+      evidenceManagerRef.current = null;
     };
   }, [updateBufferStatus]);
 
