@@ -5,14 +5,11 @@ import { useFrameProcessor } from '../../hooks/useFrameProcessor';
 import { renderScene } from '../renderSystem';
 import { EmptyState } from './EmptyState';
 import { NeuralStatusHUD } from './NeuralStatusHUD';
-import { ControlBar } from './ControlBar';
-import { HeaderActions } from './HeaderActions';
 import { ForensicAnalysisOverlay } from './ForensicAnalysisOverlay';
 import { GeometryEditor } from './GeometryEditor';
-import { VideoTimeline } from './VideoTimeline';
-import { HelpCapsule } from './HelpCapsule';
 import { IpCameraModal } from '../IpCameraModal';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { useFocusedViewerStore } from '../../stores/focusedViewerStore';
 
 export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const {
@@ -30,12 +27,15 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     isBatchMode,
     loadNextInQueue,
     finalizeVideoReport,
+    logs,
   } = useSentinel();
 
   const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
-  const { gridSize } = useLayoutStore();
+  const { gridSize, focusedViewerId } = useLayoutStore();
+  const { update: updateFocusedViewer } = useFocusedViewerStore();
   const compact = gridSize >= 2;
   const mini = gridSize >= 3;
+  const isFocused = viewerId === focusedViewerId;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +85,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   }, [loop]);
 
   // --- EVENT HANDLERS ---
-  const handleFileSelect = () => fileInputRef.current?.click();
+  const handleFileSelect = React.useCallback(() => fileInputRef.current?.click(), []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -144,6 +144,26 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     finalizeVideoReport,
   ]);
 
+  // Sync this viewer state to the shared bar whenever it is the focused viewer
+  useEffect(() => {
+    if (!isFocused) return;
+    updateFocusedViewer({
+      viewerId,
+      isPlaying,
+      source,
+      videoRef,
+      logs,
+      setIsPlayingFn: setIsPlaying,
+      onScreenShareFn: () => { clearLogs(); contextStartScreenShare(videoRef); },
+      onIpCameraFn: () => setShowIpModal(true),
+      onUploadFn: handleFileSelect,
+    });
+  }, [
+    isFocused, isPlaying, source, logs, viewerId,
+    updateFocusedViewer, setIsPlaying, clearLogs, contextStartScreenShare,
+    videoRef, handleFileSelect,
+  ]);
+
   return (
     <main className="relative flex flex-col bg-black overflow-hidden h-full w-full">
       <input
@@ -166,15 +186,6 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       />
 
       <NeuralStatusHUD />
-      <HeaderActions
-        onScreenShare={() => {
-          clearLogs();
-          contextStartScreenShare(videoRef);
-        }}
-        onIpCamera={() => setShowIpModal(true)}
-        onUpload={handleFileSelect}
-        activeMode={source === 'upload' ? 'video' : source}
-      />
 
       <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
 
@@ -196,8 +207,6 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
             ref={canvasRef}
             className="w-full h-full object-contain pointer-events-none transition-transform duration-700 group-hover:scale-[1.01]"
           />
-          {/* VideoTimeline: z-30 keeps it below GeometryEditor (z-40) so edit mode always gets events */}
-          <VideoTimeline videoRef={videoRef} />
           <GeometryEditor canvasRef={canvasRef} />
 
           <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-cyan-500/50" />
@@ -229,10 +238,6 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         )}
       </div>
 
-      <div className="relative z-50 shrink-0">
-        <HelpCapsule />
-        <ControlBar />
-      </div>
     </main>
   );
 });

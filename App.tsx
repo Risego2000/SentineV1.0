@@ -1,29 +1,27 @@
 import React from 'react';
-
-// Components & Modules
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
+import { SharedHeaderActions } from './components/SharedBar/SharedHeaderActions';
+import { SharedBottomBar } from './components/SharedBar/SharedBottomBar';
 import './index.css';
 
-/**
- * Sentinel AI Supreme Command Unit (Main Application).
- * Orchestrates global visuals, tactical feedback loop, and system synchronization.
- */
-export const App = () => {
-  return (
-    <div className="h-screen w-screen bg-[#020617] text-slate-100 flex overflow-hidden font-sans select-none">
-      {/* Left Sidebar Portal Target */}
-      <div id="sidebar-root" className="h-full z-40 shrink-0" />
+export const App = () => (
+  <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col overflow-hidden font-sans select-none">
+    {/* Shared source buttons - one set for all viewers */}
+    <SharedHeaderActions />
 
-      {/* Central Grid Area */}
-      <div className="flex-1 relative z-10">
-        <ErrorBoundary onError={(err) => console.error(`UI crash: ${err.message}`)}>
+    {/* Middle: sidebars + viewer grid */}
+    <div className="flex-1 flex overflow-hidden min-h-0">
+      <div id="sidebar-root" className="h-full z-40 shrink-0" />
+      <div className="flex-1 relative z-10 min-w-0">
+        <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
           <MultiViewerGrid />
         </ErrorBoundary>
       </div>
-
-      {/* Right Sidebar Portal Target */}
       <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
     </div>
-  );
-};
+
+    {/* Shared timeline + playback controls - one for all viewers */}
+    <SharedBottomBar />
+  </div>
+);
