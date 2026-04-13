@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, FileText } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
 
@@ -36,24 +36,6 @@ export const InfractionFeed = () => {
           </div>
         </div>
       )}
-
-      <div
-        className="p-4 border-b border-white/10 flex items-center gap-2 bg-red-950/20 shrink-0"
-        {...helpProps('Flujo de infracciones confirmadas por la Unidad Forense Gemini IA.')}
-      >
-        <FileText className="text-red-400 shrink-0" size={18} aria-hidden="true" />
-        <span className="text-sm font-bold text-red-100 uppercase tracking-wider">
-          Infracciones Detectadas
-        </span>
-        {logs.length > 0 && (
-          <span
-            className="ml-auto text-xs font-mono bg-red-900/60 text-red-200 px-2 py-0.5 rounded-full"
-            aria-live="polite"
-          >
-            {logs.length}
-          </span>
-        )}
-      </div>
 
       <TacticalMetrics />
 
