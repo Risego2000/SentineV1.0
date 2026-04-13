@@ -306,7 +306,7 @@ export class ForensicQueueV3 {
         const compatibleGeometry: GeometryLine = {
           id: current.job.geometryState.lineId,
           label: current.job.geometryState.lineLabel,
-          type: current.job.geometryState.lineType as any,
+          type: current.job.geometryState.lineType as GeometryLine['type'],
           x1: current.job.geometryState.x1,
           y1: current.job.geometryState.y1,
           x2: current.job.geometryState.x2,
@@ -314,7 +314,7 @@ export class ForensicQueueV3 {
           points: current.job.geometryState.points
             ? [...current.job.geometryState.points]
             : undefined,
-          violationKind: current.job.geometryState.violationKind as any,
+          violationKind: current.job.geometryState.violationKind as GeometryLine['violationKind'],
           roiSequenceIds: current.job.geometryState.roiSequenceIds
             ? [...current.job.geometryState.roiSequenceIds]
             : undefined,

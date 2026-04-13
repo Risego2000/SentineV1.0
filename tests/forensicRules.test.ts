@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   matchesOrderedRoiSequence,
   buildForbiddenTurnAudit,
@@ -8,8 +8,55 @@ import {
   findForbiddenTurnRule,
   createForbiddenTurnRule,
 } from '../types/forensicRules';
-import { GeometryLine, Track } from '../types';
-import { AuditJob, createAuditJob } from '../types/auditJob';
+import { GeometryLine, Track, IKalman } from '../types';
+import { createAuditJob } from '../types/auditJob';
+import { OCRSynchronizer } from '../services/OCRSynchronizer';
+
+// Helper to create complete mock Track objects
+function createMockTrack(overrides?: Partial<Track>): Track {
+  const mockKalman: IKalman = {
+    x: 0.1,
+    y: 0.2,
+    vx: 1,
+    vy: 0.5,
+    update: () => {},
+    step: () => {},
+    getVelocity: () => 45,
+    getHeading: () => 1.5,
+  };
+
+  const track: Track = {
+    id: 1,
+    bbox: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
+    label: 'car',
+    conf: 0.95,
+    hits: 5,
+    age: 10,
+    tail: [{ x: 0.1, y: 0.2 }],
+    snapshots: [],
+    audited: false,
+    processedLines: [],
+    velocity: 45,
+    velocityHistory: [40, 45],
+    avgVelocity: 45,
+    acceleration: 0,
+    heading: 1.5,
+    isAnomalous: false,
+    dwellTime: 0,
+    kf: mockKalman,
+    missedFrames: 0,
+    isCoasting: false,
+    roiHistory: [],
+    ...overrides,
+  };
+
+  // Ensure velocityHistory is always an array, never undefined
+  if (track.velocityHistory === undefined) {
+    track.velocityHistory = [];
+  }
+
+  return track;
+}
 
 describe('forensicRules - Formal Rule System', () => {
   describe('matchesOrderedRoiSequence', () => {
@@ -227,18 +274,12 @@ describe('AuditJob - Immutable Snapshot', () => {
     });
 
     it('freezes immutable evidence parts', () => {
-      const track = {
+      const track = createMockTrack({
         id: 1,
-        label: 'car',
-        bbox: { x: 0, y: 0, w: 0.1, h: 0.1 },
         avgVelocity: 0,
         velocityHistory: [],
         heading: 0,
-        dwellTime: 0,
-        isAnomalous: false,
-        roiHistory: [],
-        tail: [],
-      } as any;
+      });
       const job = createAuditJob(
         track,
         { id: 'l', x1: 0, y1: 0, x2: 1, y2: 1, label: 'L', type: 'forbidden' },
@@ -256,11 +297,11 @@ describe('AuditJob - Immutable Snapshot', () => {
 
       // Evidence parts should be frozen
       expect(() => {
-        (job.trackState as any).velocityHistory = ['hacked'];
+        (job.trackState as unknown as { velocityHistory: string[] }).velocityHistory = ['hacked'];
       }).toThrow();
 
       expect(() => {
-        (job.geometryState as any).lineLabel = 'hacked';
+        (job.geometryState as unknown as { lineLabel: string }).lineLabel = 'hacked';
       }).toThrow();
 
       // Status should be mutable (for queue processing)
@@ -271,23 +312,15 @@ describe('AuditJob - Immutable Snapshot', () => {
 });
 
 describe('OCRSynchronizer - Timecode Integrity', () => {
-  // Mock for server-side testing
-  const mockVideo = {
-    videoWidth: 1920,
-    videoHeight: 1080,
-    currentTime: 0,
-  };
-
   it('does NOT fabricate date when OCR misses it', async () => {
     // This test verifies the logic without actual OCR
-    const timeMatch = '10:30:45';
-    const dateMatch = null; // OCR failed to detect date
+    const dateMatch: RegExpMatchArray | null = null; // OCR failed to detect date
 
     let dateStr: string;
     if (dateMatch) {
-      const d = dateMatch[1].padStart(2, '0');
-      const m = dateMatch[2].padStart(2, '0');
-      const y = dateMatch[3];
+      const d = (dateMatch[1] as string).padStart(2, '0');
+      const m = (dateMatch[2] as string).padStart(2, '0');
+      const y = dateMatch[3] as string;
       dateStr = `${d}/${m}/${y}`;
     } else {
       // Forense: NO fabricamos fecha - eso compromete la validez forense
@@ -296,5 +329,15 @@ describe('OCRSynchronizer - Timecode Integrity', () => {
 
     expect(dateStr).toBe('??/??/????');
     // The fabricated date approach would have given: actual current date
+  });
+
+  it('parses full OSD date and time correctly from OCR text', () => {
+    const sampleText = '23/04/2026, 12:48:19';
+    expect(OCRSynchronizer.parseTimecodeText(sampleText)).toBe('23/04/2026, 12:48:19');
+  });
+
+  it('parses ISO-like OSD date and time correctly from OCR text', () => {
+    const sampleText = '2026-04-23 12:48:19';
+    expect(OCRSynchronizer.parseTimecodeText(sampleText)).toBe('23/04/2026, 12:48:19');
   });
 });

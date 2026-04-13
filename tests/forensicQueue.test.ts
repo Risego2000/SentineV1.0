@@ -1,6 +1,53 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ForensicQueue, forensicQueue } from '../services/ForensicQueue';
+import { ForensicQueue } from '../services/ForensicQueue';
 import { matchesOrderedRoiSequence, buildForbiddenTurnAudit } from '../types/forensicRules';
+import type { Track, IKalman } from '../types';
+
+// Helper to create complete mock Track objects
+function createMockTrack(overrides?: Partial<Track>): Track {
+  const mockKalman: IKalman = {
+    x: 0.1,
+    y: 0.2,
+    vx: 1,
+    vy: 0.5,
+    update: vi.fn(),
+    step: vi.fn(),
+    getVelocity: vi.fn().mockReturnValue(45),
+    getHeading: vi.fn().mockReturnValue(1.5),
+  };
+
+  const track: Track = {
+    id: 1,
+    bbox: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
+    label: 'car',
+    conf: 0.95,
+    hits: 5,
+    age: 10,
+    tail: [{ x: 0.1, y: 0.2 }],
+    snapshots: [],
+    audited: false,
+    processedLines: [],
+    velocity: 45,
+    velocityHistory: [40, 45],
+    avgVelocity: 45,
+    acceleration: 0,
+    heading: 1.5,
+    isAnomalous: false,
+    dwellTime: 0,
+    kf: mockKalman,
+    missedFrames: 0,
+    isCoasting: false,
+    roiHistory: [],
+    ...overrides,
+  };
+
+  // Ensure velocityHistory is always an array, never undefined
+  if (track.velocityHistory === undefined) {
+    track.velocityHistory = [];
+  }
+
+  return track;
+}
 
 // Mock dependencies
 vi.mock('../services/EvidenceDB', () => ({
@@ -46,18 +93,11 @@ describe('ForensicQueueV3 - Immutable Audit Jobs', () => {
 
   describe('enqueue', () => {
     it('creates immutable job with frozen context', async () => {
-      const track = {
+      const track = createMockTrack({
         id: 1,
-        label: 'car',
-        bbox: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
         avgVelocity: 45,
         velocityHistory: [40, 45],
-        heading: 1.5,
-        dwellTime: 0,
-        isAnomalous: false,
-        roiHistory: [],
-        tail: [{ x: 0.1, y: 0.2 }],
-      };
+      });
 
       const geometry = {
         id: 'stop-line',
@@ -79,29 +119,6 @@ describe('ForensicQueueV3 - Immutable Audit Jobs', () => {
     });
 
     it('respects max queue size', async () => {
-      const track = {
-        id: 1,
-        label: 'car',
-        bbox: { x: 0, y: 0, w: 0.1, h: 0.1 },
-        avgVelocity: 0,
-        velocityHistory: [],
-        heading: 0,
-        dwellTime: 0,
-        isAnomalous: false,
-        roiHistory: [],
-        tail: [],
-      };
-
-      const geometry = {
-        id: 'line',
-        x1: 0,
-        y1: 0.5,
-        x2: 1,
-        y2: 0.5,
-        label: 'LINE',
-        type: 'forbidden' as const,
-      };
-
       // Queue should not exceed limit (tested internally by the queue)
       expect(queue.getPendingCount()).toBeLessThanOrEqual(50);
     });
@@ -127,18 +144,12 @@ describe('ForensicQueueV3 - Immutable Audit Jobs', () => {
     it('preserves directives at enqueue time', async () => {
       queue.updateContext('Original directives', 'standard');
 
-      const track = {
+      const track = createMockTrack({
         id: 5,
-        label: 'car',
-        bbox: { x: 0, y: 0, w: 0.1, h: 0.1 },
         avgVelocity: 0,
         velocityHistory: [],
         heading: 0,
-        dwellTime: 0,
-        isAnomalous: false,
-        roiHistory: [],
-        tail: [],
-      };
+      });
 
       const geometry = {
         id: 'g1',

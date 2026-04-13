@@ -9,7 +9,7 @@ import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
-import { ForensicRule, getRulesForGeometry } from '../types/forensicRules';
+import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
 
 const MAX_TAIL_POINTS = 50;
 const MIN_FINALIZE_DELAY_MS = 1200;
@@ -91,14 +91,9 @@ export const useFrameProcessor = () => {
       if (track.audited) return false;
       if (!evidenceManagerRef.current?.shouldCapture(track.id, line.id)) return false;
 
-      // Check for forbidden turn sequence
-      if (line.type === 'roi_turn') {
-        const turnRule = findForbiddenTurnRule(track.roiHistory);
-        if (turnRule) {
-          // Check if we have enough ROIs to trigger
-          const uniqueRois = [...new Set(track.roiHistory)];
-          return uniqueRois.length >= 2;
-        }
+      // ROI and polygon types are detected via polygon containment, never via line intersection
+      if (line.type === 'roi_turn' || line.type === 'roi_general' || line.type === 'box_junction') {
+        return false;
       }
 
       return true;
@@ -255,8 +250,9 @@ export const useFrameProcessor = () => {
           const lx2 = line.x2 * dW + oX;
           const ly2 = line.y2 * dH + oY;
 
-          // LINE INTERSECTION LOGIC
-          if (lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
+          // LINE INTERSECTION LOGIC â skip ROI and polygon-detected types
+          const isLineGeometry = !['roi_general', 'roi_turn', 'box_junction'].includes(line.type);
+          if (isLineGeometry && lineIntersect(p1x, p1y, cx, cy, lx1, ly1, lx2, ly2)) {
             let isInfraction = true;
             const infractionLabel = line.label;
 

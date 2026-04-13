@@ -344,19 +344,6 @@ export const SentinelProvider = ({
       }
     });
 
-    // Initial load of permanent infractions
-    (async () => {
-      const savedInfractions = await evidenceDB.getAllInfractions();
-      if (savedInfractions.length > 0) {
-        setLogs(savedInfractions.sort((a, b) => b.id - a.id));
-        setStats((prev) => ({ ...prev, inf: savedInfractions.length }));
-        addLog(
-          'INFO',
-          `Recuperadas ${savedInfractions.length} denuncias desde almacenamiento permanente.`
-        );
-      }
-    })();
-
     // Initial cleanup of old evidence
     evidenceDB.purgeOldEvidence();
 

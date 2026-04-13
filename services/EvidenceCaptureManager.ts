@@ -96,6 +96,7 @@ export class EvidenceCaptureManager {
 
     // Initialize recorder
     const recorder = new VideoBufferService(canvas);
+    recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
     recorder.start();
     this.recorders.set(key, recorder);
 
@@ -254,11 +255,14 @@ export class EvidenceCaptureManager {
     if (!ctx) return;
 
     try {
+      const snapshotWidth = 1920;
+      const snapshotHeight = 1080;
+
       // 1. FULL SCENE (Context)
-      canvas.width = 1280;
-      canvas.height = 720;
-      ctx.drawImage(video, 0, 0, 1280, 720);
-      const contextFrame = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+      canvas.width = snapshotWidth;
+      canvas.height = snapshotHeight;
+      ctx.drawImage(video, 0, 0, snapshotWidth, snapshotHeight);
+      const contextFrame = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
 
       // 2. ZOOM (Vehicle detail)
       const zoomPad = 0.5;
@@ -269,9 +273,9 @@ export class EvidenceCaptureManager {
       const zW = Math.min(1, track.bbox.w * (1 + zoomPad)) * vW;
       const zH = Math.min(1, track.bbox.h * (1 + zoomPad)) * vH;
 
-      ctx.clearRect(0, 0, 1280, 720);
-      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, 1280, 720);
-      const zoomFrame = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      ctx.clearRect(0, 0, snapshotWidth, snapshotHeight);
+      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, snapshotWidth, snapshotHeight);
+      const zoomFrame = ctx.canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
 
       // Store snapshots
       const storage = this.snapshotStorage.get(targetKey) || [];

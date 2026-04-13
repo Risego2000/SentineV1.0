@@ -12,6 +12,8 @@ import { GeometryEditor } from './GeometryEditor';
 import { VideoTimeline } from './VideoTimeline';
 import { HelpCapsule } from './HelpCapsule';
 import { IpCameraModal } from '../IpCameraModal';
+import { InfractionModal } from '../InfractionModal';
+import logoUrl from '../../LOGO.png';
 
 export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const {
@@ -29,6 +31,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     isBatchMode,
     loadNextInQueue,
     finalizeVideoReport,
+    selectedLog,
+    setSelectedLog,
   } = useSentinel();
 
   const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
@@ -141,92 +145,121 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   ]);
 
   return (
-    <main className="relative flex flex-col bg-black overflow-hidden h-full w-full">
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept="video/*"
-        multiple
-        onChange={onFileChange}
-      />
+    <main className="viewer-container relative flex flex-col bg-black overflow-hidden h-full w-full min-h-0">
+      <div className="viewer-inner relative flex flex-col w-full h-full overflow-hidden">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="video/*"
+          multiple
+          onChange={onFileChange}
+        />
 
-      {showIpModal && <IpCameraModal onClose={() => setShowIpModal(false)} />}
+        {showIpModal && <IpCameraModal onClose={() => setShowIpModal(false)} />}
 
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        style={{ opacity: 0 }}
-      />
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+          style={{ opacity: 0 }}
+        />
 
-      <NeuralStatusHUD />
-      <HeaderActions
-        onScreenShare={() => {
-          clearLogs();
-          contextStartScreenShare(videoRef);
-        }}
-        onIpCamera={() => setShowIpModal(true)}
-        onUpload={handleFileSelect}
-        activeMode={source === 'upload' ? 'video' : source}
-      />
+        <NeuralStatusHUD />
+        <HeaderActions
+          onScreenShare={() => {
+            clearLogs();
+            contextStartScreenShare(videoRef);
+          }}
+          onIpCamera={() => setShowIpModal(true)}
+          onUpload={handleFileSelect}
+          activeMode={source === 'upload' ? 'video' : source}
+        />
 
-      <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
-
-      <div className="flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-4 lg:p-10">
-        <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none" />
-        <div className="scanline" />
+        <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
 
         <div
-          className="relative z-20 flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 glass-card overflow-hidden group"
-          style={{
-            aspectRatio: `${aspectRatio}`,
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: 'auto',
-            height: 'auto',
-          }}
+          className={`flex-1 relative flex items-center justify-center overflow-hidden w-full h-full p-4 lg:p-10 ${
+            source === 'none' ? 'bg-transparent' : 'bg-[#01030d]'
+          }`}
         >
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full object-contain pointer-events-none transition-transform duration-700 group-hover:scale-[1.01]"
-          />
-          <GeometryEditor canvasRef={canvasRef} />
+          {source !== 'none' && (
+            <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none" />
+          )}
+          {source !== 'none' && <div className="scanline" />}
+          {source === 'none' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4 md:gap-6">
+              <img
+                src={logoUrl}
+                alt="Logo de visor"
+                className="max-w-[28%] sm:max-w-[24%] md:max-w-[18%] max-h-[30%] sm:max-h-[27%] object-contain"
+                style={{
+                  filter:
+                    'brightness(0) saturate(100%) invert(61%) sepia(85%) saturate(2521%) hue-rotate(167deg) brightness(96%) contrast(93%)',
+                }}
+              />
+              <div className="text-center space-y-2">
+                <span className="font-sans text-cyan-300/80 font-black uppercase tracking-[0.45em] text-[9px] sm:text-[10px] md:text-[11px] block">
+                  EXCMO. AYUNTAMIENTO DE DAGANZO DE ARRIBA
+                </span>
+                <span className="font-sans text-cyan-400/70 font-black uppercase tracking-[0.3em] text-[8px] sm:text-[9px] md:text-[10px] block">
+                  POLICIA LOCAL
+                </span>
+              </div>
+            </div>
+          )}
 
-          <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-cyan-500/50" />
-          <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-cyan-500/50" />
-          <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-cyan-500/50" />
-          <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-cyan-500/50" />
-        </div>
+          <div
+            className={`relative z-20 flex items-center justify-center overflow-hidden group ${
+              source === 'none'
+                ? ''
+                : 'shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 glass-card'
+            }`}
+            style={{
+              aspectRatio: `${aspectRatio}`,
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+            }}
+          >
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full object-contain pointer-events-none transition-transform duration-700 group-hover:scale-[1.01]"
+            />
+            <GeometryEditor canvasRef={canvasRef} />
+          </div>
 
-        {source === 'none' && <EmptyState />}
+          {source === 'none' && <EmptyState />}
 
-        {isAnalyzing && (
-          <div className="absolute inset-0 flex items-center justify-center z-[60] bg-[#020617]/60 backdrop-blur-md transition-all duration-500">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
-              <div className="relative bg-black/80 border border-cyan-500/40 px-12 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl overflow-hidden glass-card">
-                <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 animate-pulse" />
-                <Waves className="text-cyan-400 w-10 h-10 animate-bounce" />
-                <div className="flex flex-col items-center">
-                  <span className="text-sm font-black text-white uppercase tracking-[0.3em] italic text-glow-cyan">
-                    Analizando Vector
-                  </span>
-                  <span className="text-[10px] font-mono text-cyan-500/60 mt-1">
-                    PROCESANDO_CAPAS_NEURALES...
-                  </span>
+          {isAnalyzing && (
+            <div className="absolute inset-0 flex items-center justify-center z-[60] bg-[#020617]/60 backdrop-blur-md transition-all duration-500">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
+                <div className="relative bg-black/80 border border-cyan-500/40 px-12 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl overflow-hidden glass-card">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 animate-pulse" />
+                  <Waves className="text-cyan-400 w-10 h-10 animate-bounce" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-black text-white uppercase tracking-[0.3em] italic text-glow-cyan">
+                      Analizando Vector
+                    </span>
+                    <span className="text-[10px] font-mono text-cyan-500/60 mt-1">
+                      PROCESANDO_CAPAS_NEURALES...
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      <div className="relative z-50">
-        <HelpCapsule />
-        <VideoTimeline videoRef={videoRef} />
-        <ControlBar />
+        {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+        <div className="relative z-50">
+          <HelpCapsule />
+          <VideoTimeline videoRef={videoRef} />
+          <ControlBar />
+        </div>
       </div>
     </main>
   );

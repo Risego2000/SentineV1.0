@@ -103,6 +103,7 @@ export interface SentinelContextType {
   ) => Promise<void>;
   updateBufferStatus: (status: Partial<SentinelContextType['bufferStatus']>) => void;
   clearLogs: () => void;
+  viewerId?: string;
 }
 
 export const SentinelContext = createContext<SentinelContextType | undefined>(undefined);

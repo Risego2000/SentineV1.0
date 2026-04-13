@@ -87,29 +87,29 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
   };
 
   return (
-    <div className="absolute bottom-[112px] left-10 right-10 z-40 bg-gradient-to-t from-black/20 to-transparent pt-4 pb-2">
+    <div className="video-timeline absolute bottom-24 md:bottom-[112px] left-4 md:left-10 right-4 md:right-10 z-40 bg-gradient-to-t from-black/20 to-transparent pt-4 pb-2">
       {/* Header del Timeline: Código de Tiempo */}
-      <div className="flex justify-between items-end mb-3">
+      <div className="timeline-labels flex justify-between items-end mb-3 gap-4">
         <div className="flex flex-col">
-          <span className="text-xs font-black text-cyan-500/40 uppercase tracking-[0.3em]">
+          <span className="text-[10px] md:text-xs font-black text-cyan-500/40 uppercase tracking-[0.3em]">
             Live Vector Tracking
           </span>
           <div className="flex items-baseline gap-2">
-            <span className="text-xl font-black text-white font-mono tracking-tighter shadow-cyan-500/20 drop-shadow-lg">
+            <span className="text-lg md:text-xl font-black text-white font-mono tracking-tighter shadow-cyan-500/20 drop-shadow-lg">
               {formatTime((progress * duration) / 100)}
             </span>
-            <span className="text-xs font-bold text-slate-500 font-mono opacity-50">
+            <span className="text-[10px] md:text-xs font-bold text-slate-500 font-mono opacity-50">
               / {formatTime(duration)}
             </span>
           </div>
         </div>
 
         <div className="text-right">
-          <span className="text-xs font-black text-red-500/40 uppercase tracking-[0.3em]">
+          <span className="text-[10px] md:text-xs font-black text-red-500/40 uppercase tracking-[0.3em]">
             Incidents Detected
           </span>
           <div
-            className="text-xl font-black text-red-500 font-mono tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]"
+            className="text-lg md:text-xl font-black text-red-500 font-mono tracking-widest drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]"
             aria-live="polite"
           >
             {incidentLogs.length.toString().padStart(2, '0')}
@@ -131,7 +131,7 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
           tabIndex={0}
           onClick={handleTimelineClick}
           onKeyDown={handleTimelineKeyDown}
-          className="h-1.5 bg-slate-900/60 backdrop-blur-md rounded-full border border-white/5 cursor-pointer overflow-hidden relative transition-all duration-300 group-hover:h-3 group-hover:border-cyan-500/20 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black"
+          className="progress-track h-1.5 bg-slate-900/60 backdrop-blur-md rounded-full border border-white/5 cursor-pointer overflow-hidden relative transition-all duration-300 group-hover:h-3 group-hover:border-cyan-500/20 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black"
         >
           {/* Barra de Progreso */}
           <div
@@ -156,7 +156,7 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
               role="button"
               tabIndex={0}
               aria-label={`Ir a incidente: ${log.ruleCategory} a ${formatTime(log.playbackTime)}`}
-              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-red-600 rotate-45 border-2 border-black shadow-[0_0_10px_rgba(239,68,68,0.8)] cursor-pointer group/marker transition-transform hover:scale-125 z-20 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-black"
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 bg-red-600 rotate-45 border-2 border-black shadow-[0_0_10px_rgba(239,68,68,0.8)] cursor-pointer group/marker transition-transform hover:scale-125 z-20 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-black"
               style={{ left: `calc(${pos}% - 8px)` }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -177,13 +177,13 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
 
               {/* Tooltip Táctico */}
               <div
-                className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none"
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-opacity bg-black/90 border border-red-500/50 px-2 py-1 rounded-lg whitespace-nowrap pointer-events-none"
                 aria-hidden="true"
               >
-                <span className="text-xs font-black text-white uppercase block">
+                <span className="text-[10px] md:text-xs font-black text-white uppercase block">
                   {log.ruleCategory}
                 </span>
-                <span className="text-[10px] text-red-400 font-mono tracking-wider">
+                <span className="text-[9px] md:text-[10px] text-red-400 font-mono tracking-wider">
                   {log.plate} • {formatTime(log.playbackTime)}
                 </span>
               </div>

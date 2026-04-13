@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { useSentinel } from './useSentinel';
+import { useLayoutStore } from '../stores/layoutStore';
 
 export const useHelp = () => {
-  const { setHelpMsg } = useSentinel();
+  const { setHelpMsg } = useLayoutStore();
 
   const showHelp = useCallback(
     (msg: string) => {
