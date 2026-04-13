@@ -12,10 +12,10 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
   const [points, setPoints] = useState<Point[]>([]);
   const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState<Point>({ x: 0, y: 0 });
+  const [menuPos, setMenuPos] = useState<{ sx: number; sy: number }>({ sx: 0, sy: 0 });
 
-  const finishDrawing = useCallback((lastPoint: Point) => {
-    setMenuPos(lastPoint);
+  const finishDrawing = useCallback((sx: number, sy: number) => {
+    setMenuPos({ sx, sy });
     setShowMenu(true);
   }, []);
 
@@ -36,8 +36,12 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
       }
 
       if (e.key === 'Enter' && points.length > 1) {
-        // Finalize drawing and show menu at last point's screen position
-        finishDrawing(points[points.length - 1]);
+        // Compute screen position from last normalized point
+        if (canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          const last = points[points.length - 1];
+          finishDrawing(rect.left + last.x * rect.width, rect.top + last.y * rect.height);
+        }
       }
     };
 
@@ -102,7 +106,7 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
       setPoints([]);
       setCurrentPoint(null);
     } else if (points.length > 1) {
-      finishDrawing(getNormalizedPoint(e));
+      finishDrawing(e.clientX, e.clientY);
     }
   };
 
@@ -224,12 +228,11 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
 
       {showMenu && (
         <div
-          className="absolute bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[100] max-h-[80vh] overflow-y-auto custom-scrollbar"
+          className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[9999] max-h-[80vh] overflow-y-auto custom-scrollbar"
           style={{
-            top: menuPos.y > 0.6 ? 'auto' : `${menuPos.y * 100}%`,
-            bottom: menuPos.y > 0.6 ? `${(1 - menuPos.y) * 100}%` : 'auto',
-            left: `${menuPos.x * 100}%`,
-            transform: `translate(${menuPos.x > 0.7 ? '-100%' : '10px'}, ${menuPos.y > 0.6 ? '0' : '10px'})`,
+            top: menuPos.sy > window.innerHeight * 0.6 ? 'auto' : `${menuPos.sy + 10}px`,
+            bottom: menuPos.sy > window.innerHeight * 0.6 ? `${window.innerHeight - menuPos.sy}px` : 'auto',
+            left: menuPos.sx > window.innerWidth * 0.7 ? `${menuPos.sx - 224 - 10}px` : `${menuPos.sx + 10}px`,
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
