@@ -14,8 +14,10 @@ import { HelpCapsule } from './HelpCapsule';
 import { IpCameraModal } from '../IpCameraModal';
 import { InfractionModal } from '../InfractionModal';
 import logoUrl from '../../LOGO.png';
+import { useLayoutStore } from '../../stores/layoutStore';
 
 export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
+  const { gridSize } = useLayoutStore();
   const {
     source,
     isAnalyzing,
@@ -187,23 +189,23 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
           {source !== 'none' && (
             <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none" />
           )}
-          {source !== 'none' && <div className="scanline" />}
+          {source === 'none' && <div className="scanline" />}
           {source === 'none' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4 md:gap-6">
+            <div className="empty-state-overlay absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4">
               <img
                 src={logoUrl}
                 alt="Logo de visor"
-                className="max-w-[28%] sm:max-w-[24%] md:max-w-[18%] max-h-[30%] sm:max-h-[27%] object-contain"
+                className="viewer-logo object-contain"
                 style={{
                   filter:
                     'brightness(0) saturate(100%) invert(61%) sepia(85%) saturate(2521%) hue-rotate(167deg) brightness(96%) contrast(93%)',
                 }}
               />
-              <div className="text-center space-y-2">
-                <span className="font-sans text-cyan-300/80 font-black uppercase tracking-[0.45em] text-[9px] sm:text-[10px] md:text-[11px] block">
+              <div className="text-center space-y-1 md:space-y-2">
+                <span className="logo-text-primary font-sans text-cyan-300/80 font-black uppercase tracking-[0.45em] block">
                   EXCMO. AYUNTAMIENTO DE DAGANZO DE ARRIBA
                 </span>
-                <span className="font-sans text-cyan-400/70 font-black uppercase tracking-[0.3em] text-[8px] sm:text-[9px] md:text-[10px] block">
+                <span className="logo-text-secondary font-sans text-cyan-400/70 font-black uppercase tracking-[0.3em] block">
                   POLICIA LOCAL
                 </span>
               </div>
@@ -255,11 +257,15 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         </div>
 
         {selectedLog && <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+        
         <div className="relative z-50">
-          <HelpCapsule />
+          {gridSize > 1 && <HelpCapsule />}
+        </div>
+
+        <footer className="relative z-50 flex flex-col w-full shrink-0">
           <VideoTimeline videoRef={videoRef} />
           <ControlBar />
-        </div>
+        </footer>
       </div>
     </main>
   );

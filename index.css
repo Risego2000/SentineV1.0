@@ -120,6 +120,24 @@
     container-name: sentinel-viewer;
   }
 
+  .viewer-container .video-timeline {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+
+  .viewer-container .empty-state-overlay .viewer-logo {
+    max-width: 18%;
+    max-height: 27%;
+  }
+
+  .viewer-container .empty-state-overlay .logo-text-primary {
+    font-size: 11px;
+  }
+
+  .viewer-container .empty-state-overlay .logo-text-secondary {
+    font-size: 10px;
+  }
+
   @container sentinel-viewer (max-width: 960px) {
     .viewer-container .header-actions {
       top: 0.85rem;
@@ -136,10 +154,6 @@
       left: 0.85rem;
       right: 0.85rem;
     }
-    .viewer-container .neural-status-hud > div {
-      padding: 0.55rem 0.75rem;
-      gap: 0.75rem;
-    }
     .viewer-container .control-bar {
       height: 3.5rem;
       padding-left: 0.8rem;
@@ -152,9 +166,10 @@
       display: none;
     }
     .viewer-container .video-timeline {
-      bottom: 1.5rem;
-      left: 0.75rem;
-      right: 0.75rem;
+      padding-top: 0.5rem;
+      padding-bottom: 0.25rem;
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
     }
     .viewer-container .video-timeline .text-lg,
     .viewer-container .video-timeline .text-xl {
@@ -162,6 +177,15 @@
     }
     .viewer-container .video-timeline .progress-track {
       height: 0.75rem;
+    }
+    .viewer-container .empty-state-overlay .viewer-logo {
+      max-width: 22%;
+    }
+    .viewer-container .empty-state-overlay .logo-text-primary {
+      font-size: 9px;
+    }
+    .viewer-container .empty-state-overlay .logo-text-secondary {
+      font-size: 8px;
     }
     .viewer-container .help-capsule {
       bottom: 1rem;
@@ -175,14 +199,16 @@
       gap: 0.35rem;
     }
     .viewer-container .header-actions button {
-      min-width: 7rem;
-      font-size: 0.7rem;
+      min-width: 0;
+      width: auto;
+      padding: 0.5rem;
+      font-size: 0; /* Hide text, only show icons */
     }
-    .viewer-container .neural-status-hud {
-      flex-wrap: wrap;
+    .viewer-container .header-actions button span {
+      display: none;
     }
-    .viewer-container .neural-status-hud > div {
-      width: 100%;
+    .viewer-container .header-actions button svg {
+      margin: 0;
     }
     .viewer-container .control-bar {
       height: 3.25rem;
@@ -193,12 +219,22 @@
       font-size: 0.95rem;
     }
     .viewer-container .video-timeline {
-      bottom: 1rem;
-      left: 0.5rem;
-      right: 0.5rem;
+      padding-top: 0.25rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
     }
     .viewer-container .video-timeline .timeline-labels {
       gap: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    .viewer-container .empty-state-overlay .viewer-logo {
+      max-width: 26%;
+    }
+    .viewer-container .empty-state-overlay .logo-text-primary {
+      font-size: 8px;
+    }
+    .viewer-container .empty-state-overlay .logo-text-secondary {
+      font-size: 7px;
     }
     .viewer-container .help-capsule {
       bottom: 0.75rem;
@@ -208,25 +244,68 @@
   @container sentinel-viewer (max-width: 520px) {
     .viewer-container .header-actions {
       flex-wrap: wrap;
-      justify-content: center;
+      justify-content: flex-end;
       top: 0.5rem;
       right: 0.5rem;
     }
     .viewer-container .header-actions button {
-      min-width: calc(33% - 0.4rem);
+      min-width: 0;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .viewer-container .header-actions button span {
+      display: none;
+    }
+    .viewer-container .header-actions button svg {
+      margin: 0;
+      width: 14px;
+      height: 14px;
     }
     .viewer-container .control-bar {
-      height: 3rem;
+      height: 2.75rem;
       padding-left: 0.5rem;
       padding-right: 0.5rem;
     }
+    .viewer-container .control-bar button {
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 0.5rem;
+    }
+    .viewer-container .control-bar button svg {
+      width: 14px;
+      height: 14px;
+    }
     .viewer-container .control-bar .text-xl {
-      font-size: 0.85rem;
+      font-size: 0.75rem;
     }
     .viewer-container .video-timeline {
-      bottom: 0.75rem;
-      left: 0.5rem;
-      right: 0.5rem;
+      padding-top: 0.2rem;
+      padding-bottom: 0.1rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    .viewer-container .video-timeline .timeline-labels {
+      margin-bottom: 0.1rem;
+    }
+    .viewer-container .video-timeline .timeline-labels span {
+      font-size: 0.6rem;
+    }
+    .viewer-container .video-timeline .text-lg,
+    .viewer-container .video-timeline .text-xl {
+      font-size: 0.8rem;
+    }
+    .viewer-container .empty-state-overlay .viewer-logo {
+      max-width: 30%;
+    }
+    .viewer-container .empty-state-overlay .logo-text-primary {
+      font-size: 7px;
+    }
+    .viewer-container .empty-state-overlay .logo-text-secondary {
+      font-size: 6px;
     }
     .viewer-container .help-capsule {
       display: none;

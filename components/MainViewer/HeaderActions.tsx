@@ -30,7 +30,7 @@ export const HeaderActions = ({
         role="button"
         aria-pressed={isActive('live')}
         aria-label="Compartir ventana o aplicación en pantalla"
-        className={`h-10 md:h-12 px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-[10rem] md:min-w-[160px] group focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
+        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[8rem] md:min-w-[160px] group focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
           isActive('live')
             ? 'bg-cyan-500 text-black shadow-cyan-500/30'
             : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
@@ -40,7 +40,8 @@ export const HeaderActions = ({
         )}
       >
         <Monitor size={14} className={isActive('live') ? 'animate-pulse' : ''} />
-        Compartir Ventana
+        <span className="hidden sm:inline">Compartir Ventana</span>
+        <span className="inline sm:hidden">Pantalla</span>
       </button>
 
       <button
@@ -48,7 +49,7 @@ export const HeaderActions = ({
         role="button"
         aria-pressed={isActive('ip')}
         aria-label="Conectar cámara IP remota"
-        className={`h-10 md:h-12 px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-[9rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
+        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[7rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
           isActive('ip')
             ? 'bg-cyan-500 text-black shadow-cyan-500/30'
             : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-cyan-950/40 hover:text-cyan-300 hover:border-cyan-500/30'
@@ -58,7 +59,8 @@ export const HeaderActions = ({
         )}
       >
         <Globe size={14} className={isActive('ip') ? 'animate-pulse' : ''} />
-        Cámara IP
+        <span className="hidden sm:inline">Cámara IP</span>
+        <span className="inline sm:hidden">Cámara</span>
       </button>
 
       <button
@@ -66,7 +68,7 @@ export const HeaderActions = ({
         role="button"
         aria-pressed={isActive('video')}
         aria-label="Subir archivo de video local"
-        className={`h-10 md:h-12 px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-[9rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
+        className={`h-10 md:h-12 px-3 sm:px-4 md:px-5 rounded-full font-black text-[9px] md:text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 md:gap-2 min-w-0 sm:min-w-[7rem] md:min-w-[140px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-black ${
           isActive('video')
             ? 'bg-cyan-500 text-black shadow-cyan-500/30'
             : 'bg-black/50 border border-white/10 text-slate-400 hover:bg-slate-900/60 hover:text-slate-300 hover:border-white/20'
@@ -76,7 +78,8 @@ export const HeaderActions = ({
         )}
       >
         <Upload size={14} />
-        Subir Video
+        <span className="hidden sm:inline">Subir Video</span>
+        <span className="inline sm:hidden">Video</span>
       </button>
     </div>
   );

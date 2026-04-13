@@ -21,7 +21,9 @@ export const MultiViewerGrid = () => {
   };
 
   return (
-    <div className={`w-full h-full grid gap-1 p-1 bg-black/50 overflow-y-auto lg:overflow-hidden custom-scrollbar ${getGridClass()}`}>
+    <div
+      className={`w-full h-full grid gap-1 p-1 bg-black/50 overflow-y-auto lg:overflow-hidden custom-scrollbar ${getGridClass()}`}
+    >
       {activeViewers.map((viewerId) => (
         <SentinelProvider key={viewerId} viewerId={viewerId}>
           <div

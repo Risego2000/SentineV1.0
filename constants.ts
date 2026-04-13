@@ -240,6 +240,61 @@ export const ROAD_PRESETS: Record<string, RoadPreset> = {
     ],
     directivesTemplate: `PROTOCOL_T_JUNCTION:\n- Control de incorporación desde vía secundaria.`,
   },
+  'roi-general-demo': {
+    lines: [
+      {
+        id: 'roi_general_a',
+        x1: 0.3,
+        y1: 0.4,
+        x2: 0.7,
+        y2: 0.8,
+        points: [
+          { x: 0.3, y: 0.4 },
+          { x: 0.7, y: 0.4 },
+          { x: 0.7, y: 0.8 },
+          { x: 0.3, y: 0.8 },
+        ],
+        label: 'ROI A (GENERAL)',
+        type: 'roi_general',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_ROI_GENERAL:\n- Vigilar el ingreso y comportamiento dentro de la zona ROI A.`,
+  },
+  'roi-turn-demo': {
+    lines: [
+      {
+        id: 'roi_turn_a',
+        x1: 0.2,
+        y1: 0.4,
+        x2: 0.4,
+        y2: 0.6,
+        points: [
+          { x: 0.2, y: 0.4 },
+          { x: 0.4, y: 0.4 },
+          { x: 0.4, y: 0.6 },
+          { x: 0.2, y: 0.6 },
+        ],
+        label: 'ORIGEN (A)',
+        type: 'roi_turn',
+      },
+      {
+        id: 'roi_turn_b',
+        x1: 0.6,
+        y1: 0.4,
+        x2: 0.8,
+        y2: 0.6,
+        points: [
+          { x: 0.6, y: 0.4 },
+          { x: 0.8, y: 0.4 },
+          { x: 0.8, y: 0.6 },
+          { x: 0.6, y: 0.6 },
+        ],
+        label: 'DESTINO PROHIBIDO (B)',
+        type: 'roi_turn',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_FORBIDDEN_TURN:\n- Detectar vehículos que pasen de la zona de ORIGEN (A) hacia DESTINO PROHIBIDO (B).`,
+  },
 };
 
 export const ROAD_MENU_GROUPS = [

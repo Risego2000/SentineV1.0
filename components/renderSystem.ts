@@ -70,6 +70,20 @@ export const renderScene = (
         strokeColor = line.type === 'bus_lane' ? '#f97316' : '#06b6d4';
         lineWidth = 3;
         ctx.shadowColor = strokeColor;
+      } else if (line.type === 'roi_general') {
+        strokeColor = '#10b981';
+        lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.shadowColor = '#10b981';
+      } else if (line.type === 'roi_turn') {
+        strokeColor = '#a855f7';
+        lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.shadowColor = '#a855f7';
+      } else if (line.type === 'box_junction') {
+        strokeColor = '#fbbf24';
+        lineWidth = 3;
+        ctx.shadowColor = '#fbbf24';
       }
 
       if (isClosed) {
@@ -83,6 +97,7 @@ export const renderScene = (
       ctx.lineJoin = 'round';
       ctx.shadowBlur = 15;
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
 
@@ -232,18 +247,77 @@ export const renderScene = (
       ctx.font = 'bold 9px monospace';
       ctx.fillText(telemetryString, x + 5, y - 8);
 
-      // 3.5 ANOMALY ALERTS
+      // 3.5 ROI SEQUENCE TRACKING
+      if (track.roiHistory && track.roiHistory.length >= 2) {
+        const uniqueRois = [...new Set(track.roiHistory)];
+        if (uniqueRois.length >= 2) {
+          const roiAId = uniqueRois[0];
+          const roiBId = uniqueRois[uniqueRois.length - 1];
+          
+          const roiALabel = geometry.find(g => g.id === roiAId)?.label || 'ROI_A';
+          const roiBLabel = geometry.find(g => g.id === roiBId)?.label || 'ROI_B';
+          
+          const roiString = `VECTOR: ${roiALabel} ➔ ${roiBLabel}`;
+          
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.95)'; // Red background
+          ctx.font = 'black 9px monospace';
+          const roiWidth = ctx.measureText(roiString).width;
+          
+          // Badge background
+          ctx.fillRect(x, y - 32, roiWidth + 12, 14);
+          
+          // Gloss effect
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+          ctx.fillRect(x, y - 32, roiWidth + 12, 7);
+          
+          // Text
+          ctx.fillStyle = '#fff';
+          ctx.fillText(roiString, x + 6, y - 22);
+          
+          // 3.5.1 DRAW VISUAL VECTOR CONNECTION
+          const roiA = geometry.find(g => g.id === roiAId);
+          const roiB = geometry.find(g => g.id === roiBId);
+          
+          if (roiA && roiB) {
+            // Get centers of ROIs or midpoints of lines
+            const getPos = (g: GeometryLine) => {
+              if (g.points && g.points.length > 0) {
+                const sumX = g.points.reduce((acc, p) => acc + p.x, 0);
+                const sumY = g.points.reduce((acc, p) => acc + p.y, 0);
+                return { x: (sumX / g.points.length) * width, y: (sumY / g.points.length) * height };
+              }
+              return { x: ((g.x1 + g.x2) / 2) * width, y: ((g.y1 + g.y2) / 2) * height };
+            };
+            
+            const posA = getPos(roiA);
+            const posB = getPos(roiB);
+            
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.moveTo(posA.x, posA.y);
+            ctx.lineTo(posB.x, posB.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+      }
+
+      // 3.6 ANOMALY ALERTS
       if (track.isAnomalous && track.anomalyLabel) {
+        const hasSeq = track.roiHistory && [...new Set(track.roiHistory)].length >= 2;
+        const offset = hasSeq ? 46 : 28;
         ctx.fillStyle = '#facc15';
         ctx.font = 'bold 9px monospace';
-        ctx.fillText(`⚠ ${track.anomalyLabel.toUpperCase()}`, x, y - 28);
+        ctx.fillText(`⚠ ${track.anomalyLabel.toUpperCase()}`, x, y - offset);
         ctx.strokeStyle = '#facc15';
         ctx.setLineDash([2, 2]);
         ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
         ctx.setLineDash([]);
       }
 
-      // 3.6 COLLISION WARNING
+      // 3.7 COLLISION WARNING
       if (track.potentialCollision) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 3;

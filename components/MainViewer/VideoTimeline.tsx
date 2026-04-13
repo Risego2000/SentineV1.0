@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useLayoutStore } from '../../stores/layoutStore';
+import { HelpCapsule } from './HelpCapsule';
 
 interface VideoTimelineProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -7,6 +9,7 @@ interface VideoTimelineProps {
 
 export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
   const { logs, isPlaying } = useSentinel();
+  const { gridSize } = useLayoutStore();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -87,7 +90,7 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
   };
 
   return (
-    <div className="video-timeline absolute bottom-24 md:bottom-[112px] left-4 md:left-10 right-4 md:right-10 z-40 bg-gradient-to-t from-black/20 to-transparent pt-4 pb-2">
+    <div className="video-timeline w-full z-40 bg-gradient-to-t from-black/20 to-transparent pt-4 pb-2">
       {/* Header del Timeline: Código de Tiempo */}
       <div className="timeline-labels flex justify-between items-end mb-3 gap-4">
         <div className="flex flex-col">
@@ -103,6 +106,13 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef }) => {
             </span>
           </div>
         </div>
+
+        {/* Solo mostramos la ayuda inline si es una única ventana y cabe bien */}
+        {gridSize === 1 && (
+          <div className="hidden lg:flex flex-1 items-center justify-center">
+            <HelpCapsule variant="inline" />
+          </div>
+        )}
 
         <div className="text-right">
           <span className="text-[10px] md:text-xs font-black text-red-500/40 uppercase tracking-[0.3em]">

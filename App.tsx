@@ -57,8 +57,12 @@ export const App = () => {
           <div className="flex items-center gap-3">
             <Radar size={24} className="text-cyan-400 animate-pulse" />
             <div className="flex flex-col">
-              <span className="font-black italic text-xs tracking-tighter leading-none">SENTINEL</span>
-              <span className="text-[8px] font-bold text-cyan-500 tracking-widest uppercase opacity-80">BIO_AI_CORE</span>
+              <span className="font-black italic text-xs tracking-tighter leading-none">
+                SENTINEL
+              </span>
+              <span className="text-[8px] font-bold text-cyan-500 tracking-widest uppercase opacity-80">
+                BIO_AI_CORE
+              </span>
             </div>
           </div>
           <button

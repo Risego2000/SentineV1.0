@@ -118,6 +118,7 @@ export interface Track {
   hasMidFrame?: boolean;
   firstHitFrame?: number; // Frame count when ROI A was first hit
   roiAId?: string; // ID of the first ROI (ROI A)
+  roiATurnCaptureKey?: string; // Active pending capture key while waiting for ROI B
   color?: string; // Assigned color for visualization
   videoClip?: string; // Infraction clip (Base64)
 }

@@ -16,12 +16,12 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 backdrop-blur-2xl animate-in fade-in duration-300">
-      <div className="bg-[#050914] w-full max-w-6xl h-[90vh] rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-0 lg:p-6 backdrop-blur-2xl animate-in fade-in duration-300">
+      <div className="bg-[#050914] w-full lg:max-w-6xl h-full lg:h-[90vh] lg:rounded-[40px] border-y lg:border border-white/10 overflow-hidden flex flex-col shadow-2xl">
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          <div className="flex-[1.8] bg-[#02040a] flex flex-col p-4 gap-4 overflow-hidden min-h-0">
+          <div className="flex-[1.2] lg:flex-[1.8] bg-[#02040a] flex flex-col p-4 gap-4 overflow-y-auto lg:overflow-hidden min-h-0">
             {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
-              <div className="flex flex-col h-full gap-4 justify-center">
+              <div className="flex flex-col lg:h-full gap-4 justify-center">
                 {[
                   { img: log.extraSnapshots[0], label: '01 FOTOGRAMA INICIAL (ROI A)' },
                   { img: log.extraSnapshots[1], label: '02 FOTOGRAMA INTERMEDIO' },
@@ -29,7 +29,7 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                 ].map((frame, idx) => (
                   <div
                     key={idx}
-                    className="flex-1 relative group rounded-2xl overflow-hidden border border-white/10 shadow-inner bg-slate-900/40 min-h-0"
+                    className="h-48 lg:flex-1 relative group rounded-2xl overflow-hidden border border-white/10 shadow-inner bg-slate-900/40 shrink-0 lg:shrink"
                   >
                     <img
                       src={`data:image/jpeg;base64,${frame.img}`}
