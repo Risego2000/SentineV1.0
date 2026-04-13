@@ -36,9 +36,9 @@ export const Sidebar = memo(() => {
       </div>
 
       <div className="flex-1 p-5 space-y-8 overflow-y-auto custom-scrollbar">
-        <SystemStatus />
         <LayoutControls />
         <SidebarSourceActions />
+        <SystemStatus />
         <EngineSettings />
         <SecurityProtocol />
         <ProtocolSelector />
