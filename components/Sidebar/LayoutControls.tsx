@@ -3,6 +3,20 @@ import { LayoutGrid, Square, Grid2X2 } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useHelp } from '../../hooks/useHelp';
 
+// Two vertical panels side-by-side icon
+const TwoColumns = ({ className }: { className?: string }) => (
+  <svg
+    width="24" height="24" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="3" y="3" width="7" height="18" rx="1.5" />
+    <rect x="14" y="3" width="7" height="18" rx="1.5" />
+  </svg>
+);
+
 export const LayoutControls = () => {
   const { gridSize, setGridSize } = useLayoutStore();
   const { helpProps } = useHelp();
@@ -39,7 +53,7 @@ export const LayoutControls = () => {
           }`}
           title="2x1 (Dual Viewer)"
         >
-          <LayoutGrid className={`w-6 h-6 rotate-90 ${gridSize === 2 ? 'text-cyan-400' : ''}`} />
+          <TwoColumns className={`w-6 h-6 ${gridSize === 2 ? 'text-cyan-400' : ''}`} />
         </button>
 
         <button
