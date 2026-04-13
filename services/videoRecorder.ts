@@ -8,8 +8,8 @@ export class VideoBufferService {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private onBufferUpdate?: (seconds: number) => void;
-  private readonly maxSeconds = 20; // Buffer exactly 20 seconds
+  private readonly maxSeconds = 21; // 20 seg + 1 seg pre-roll
+  private bufferCallback?: (seconds: number) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     try {
@@ -22,11 +22,11 @@ export class VideoBufferService {
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           this.chunks.push(e.data);
-          // Mantener solo los últimos 20 segundos (trozos de 1s).
+          // Mantener solo los últimos 10 segundos (trozos de 1s).
           if (this.chunks.length > this.maxSeconds) {
             this.chunks.shift();
           }
-          this.onBufferUpdate?.(this.chunks.length);
+          this.bufferCallback?.(this.chunks.length);
         }
       };
     } catch (e) {
@@ -34,11 +34,14 @@ export class VideoBufferService {
     }
   }
 
+  setBufferCallback(callback: (seconds: number) => void) {
+    this.bufferCallback = callback;
+  }
+
   start() {
     if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
       this.mediaRecorder.start(1000); // Trazos de 1 segundo
-      logger.info('RECORDER', 'Buffer Circular de Video Iniciado (20s)');
-      this.onBufferUpdate?.(this.chunks.length);
+      logger.info('RECORDER', 'Buffer Circular de Video Iniciado (10s)');
     }
   }
 
@@ -48,16 +51,12 @@ export class VideoBufferService {
     }
   }
 
-  setBufferCallback(callback: (seconds: number) => void) {
-    this.onBufferUpdate = callback;
-  }
-
   getBufferSeconds(): number {
     return this.chunks.length;
   }
 
   /**
-   * Extrae los últimos 20 segundos del buffer.
+   * Extrae los últimos 21 segundos del buffer.
    */
   async getClip(): Promise<string> {
     return new Promise((resolve) => {
