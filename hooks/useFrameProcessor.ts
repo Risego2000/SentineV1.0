@@ -255,6 +255,7 @@ export const useFrameProcessor = () => {
         // Process geometry interactions
         geometry.forEach((line: GeometryLine) => {
           if (t.processedLines.includes(line.id)) return;
+          if (t.audited) return; // stop once Phase 2 or triggerCapture marks this track
           if (t.tail.length < 2) return;
 
           const p1 = t.tail[t.tail.length - 2];
@@ -334,12 +335,19 @@ export const useFrameProcessor = () => {
                 const uniqueTurnRois = [...new Set(t.roiHistory)].filter(
                   (id) => geometry.find((g) => g.id === id)?.type === 'roi_turn'
                 );
+                // Canonical ROI A = first roi_turn in the geometry list
+                const canonicalRoiA = geometry.find((g) => g.type === 'roi_turn');
 
-                // PHASE 1: ROI A — start 20s buffer, do NOT set t.audited (must reach ROI B)
-                if (uniqueTurnRois.length === 1 && !t.roiATurnCaptureKey) {
+                // PHASE 1: ROI A — start 20s buffer only when entering the designated ROI A
+                if (
+                  uniqueTurnRois.length === 1 &&
+                  !t.roiATurnCaptureKey &&
+                  line.id === canonicalRoiA?.id
+                ) {
                   const manager = evidenceManagerRef.current;
                   const key = manager?.startTurnCapture(t, line, v, canvas, frameCountRef.current);
                   if (key) {
+                    t.roiAId = line.id;
                     t.roiATurnCaptureKey = key;
                     t.firstHitFrame = frameCountRef.current;
                     updateBufferStatus({
