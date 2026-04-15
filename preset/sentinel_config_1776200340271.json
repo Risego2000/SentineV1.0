@@ -1,0 +1,91 @@
+{
+  "version": "1.6",
+  "timestamp": "2026-04-14T22:03:58.667Z",
+  "sentinel": {
+    "directives": "\n- [ROI A]: Análisis de Giro Prohibido (Secuencial).\n- [ROI B]: Análisis de Giro Prohibido (Secuencial).",
+    "geometry": [
+      {
+        "id": "geo_1776204216486",
+        "x1": 0.23757408337112787,
+        "y1": 0.48608929115135086,
+        "x2": 0.2723434477194327,
+        "y2": 0.9638391338150799,
+        "points": [
+          {
+            "x": 0.23757408337112787,
+            "y": 0.48608929115135086
+          },
+          {
+            "x": 0.34436570244092124,
+            "y": 0.4597104654828014
+          },
+          {
+            "x": 0.439567533394613,
+            "y": 0.45531399453804317
+          },
+          {
+            "x": 0.5339415223400118,
+            "y": 0.9653046241299993
+          },
+          {
+            "x": 0.2723434477194327,
+            "y": 0.9638391338150799
+          }
+        ],
+        "type": "roi_turn",
+        "label": "ROI A"
+      },
+      {
+        "id": "geo_1776204231983",
+        "x1": 0.7582867065874073,
+        "y1": 0.19152573785254864,
+        "x2": 0.7615980746205792,
+        "y2": 0.1988531894271457,
+        "points": [
+          {
+            "x": 0.7582867065874073,
+            "y": 0.19152573785254864
+          },
+          {
+            "x": 0.677158189774696,
+            "y": 0.21937005383601751
+          },
+          {
+            "x": 0.8178913311845012,
+            "y": 0.3761775175323948
+          },
+          {
+            "x": 0.8874300598811109,
+            "y": 0.3336782983997318
+          },
+          {
+            "x": 0.7615980746205792,
+            "y": 0.1988531894271457
+          },
+          {
+            "x": 0.7615980746205792,
+            "y": 0.1988531894271457
+          }
+        ],
+        "type": "roi_turn",
+        "label": "ROI B"
+      }
+    ],
+    "currentPreset": "sentinel",
+    "isPoseEnabled": false,
+    "isAuditEnabled": true,
+    "currentAuditPreset": "senior",
+    "currentKinematicPreset": "full",
+    "calibration": 0.05,
+    "analysisGridSize": 1,
+    "selectedProtocolIds": [
+      "roi-turn-demo"
+    ]
+  },
+  "layout": {
+    "gridSize": 1,
+    "showDetections": true,
+    "showROIs": true,
+    "isSidebarCollapsed": false
+  }
+}
