@@ -1,9 +1,25 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const getSupabaseUrl = () =>
-  import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || '';
-const getSupabaseAnonKey = () =>
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || '';
+const getSupabaseUrl = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || '';
+  }
+  return (
+    process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.SUPABASE_URL || ''
+  );
+};
+
+const getSupabaseAnonKey = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || '';
+  }
+  return (
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    ''
+  );
+};
 
 let _supabase: SupabaseClient | null = null;
 
