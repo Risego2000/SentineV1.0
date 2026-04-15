@@ -114,24 +114,24 @@ export const ConfigManager = () => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 mb-4">
       <h3
-        className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
+        className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
         {...helpProps(
           'GESTIÓN DE PERFILES: Permite exportar o importar la configuración completa del sistema, incluyendo directivas y zonas ROI.'
         )}
       >
-        <Save size={14} className="text-blue-500" /> Preset
+        <Save size={10} className="text-blue-500" /> Preset
       </h3>
       <div className="flex flex-col gap-2">
-        <div className="horizon-card rounded-[20px] p-1.5 flex items-center gap-2 relative overflow-hidden">
+        <div className="horizon-card rounded-[16px] p-1 flex items-center gap-2 relative overflow-hidden">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300 bg-white/[0.02] border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all duration-300 bg-white/[0.02] border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30"
             {...helpProps('Cargar archivo JSON desde su ordenador.')}
           >
-            <Upload size={18} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Cargar</span>
+            <Upload size={12} />
+            <span className="text-[8px] font-black uppercase tracking-wider">Cargar</span>
           </button>
 
           <button
@@ -139,8 +139,8 @@ export const ConfigManager = () => {
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300 bg-white/[0.02] border border-white/5 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 hover:border-blue-500"
             {...helpProps('Guardar la configuración actual en un archivo JSON.')}
           >
-            <Download size={18} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Guardar</span>
+            <Download size={12} />
+            <span className="text-[8px] font-black uppercase tracking-wider">Guardar</span>
           </button>
 
           <input

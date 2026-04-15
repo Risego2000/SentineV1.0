@@ -11,13 +11,22 @@ const escapeCsvCell = (value: unknown): string => {
 const formatTimestamp = (date = new Date()): string =>
   date.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
 
-const getExpedienteNumber = (): string => {
-  const now = new Date();
-  const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const key = `sentinel_exp_${today}`;
+const getExpedienteNumber = (infractionDate?: Date): string => {
+  const date = infractionDate || new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const key = `sentinel_exp_${year}_${month}_${day}`;
   const current = Number(localStorage.getItem(key) || '0') + 1;
   localStorage.setItem(key, String(current));
-  return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${String(current).padStart(4, '0')}`;
+  return `${year}/${month}/${day}/${String(current).padStart(3, '0')}`;
+};
+
+const getExpedienteFolder = (infractionDate: Date): string => {
+  const year = infractionDate.getFullYear();
+  const month = String(infractionDate.getMonth() + 1).padStart(2, '0');
+  const day = String(infractionDate.getDate()).padStart(2, '0');
+  return `${year}_${month}_${day}`;
 };
 
 const withImagePrefix = (frame?: string): string | null => {
@@ -147,7 +156,7 @@ const addAnverso = async (doc: InstanceType<JsPDFType>, log: InfractionLog, exp:
   doc.setFontSize(9);
   doc.text(time || '__:__', 115, y);
   y += 5;
-  addField('Lugar:', 'Casco Urbano / Vía Pública - Daganzo de Arriba');
+  addField('Lugar:', log.infractionLocation || 'Casco Urbano / Vía Pública - Daganzo de Arriba');
   y += 3;
   addField('Término Municipal:', 'Daganzo de Arriba (Madrid)');
   y += 10;
@@ -670,9 +679,18 @@ const buildInfractionPages = async (
   index: number,
   total: number
 ) => {
-  const exp = getExpedienteNumber();
+  const infractionDate = log.localTime ? parseInfractionDate(log.localTime) : new Date();
+  const exp = getExpedienteNumber(infractionDate);
   await addAnverso(doc, log, exp);
   addInformacionReverso(doc, exp);
+};
+
+const parseInfractionDate = (localTime: string): Date => {
+  const match = localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (match) {
+    return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+  }
+  return new Date();
 };
 
 const bufferToBlob = (buffer: ArrayBuffer): Blob => new Blob([buffer], { type: 'application/pdf' });
@@ -723,9 +741,10 @@ export const ReportService = {
   },
 
   async downloadInfractionPdf(log: InfractionLog, filename?: string): Promise<void> {
-    const buffer = await this.generateInfractionPdf(log);
-    const expNum = getExpedienteNumber().replace(/\//g, '_');
+    const infractionDate = log.localTime ? parseInfractionDate(log.localTime) : new Date();
+    const expNum = getExpedienteNumber(infractionDate).replace(/\//g, '_');
     const file = filename || `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
+    const buffer = await this.generateInfractionPdf(log);
     const url = URL.createObjectURL(bufferToBlob(buffer));
     const link = document.createElement('a');
     link.href = url;
@@ -737,19 +756,12 @@ export const ReportService = {
   async generateAndSaveInfractionPdf(
     log: InfractionLog
   ): Promise<{ filename: string; path: string }> {
-    const expNum = getExpedienteNumber().replace(/\//g, '_');
+    const infractionDate = log.localTime ? parseInfractionDate(log.localTime) : new Date();
+    const expNum = getExpedienteNumber(infractionDate).replace(/\//g, '_');
     const filename = `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
     const buffer = await this.generateInfractionPdf(log);
-
-    let dateStr;
-    if (log.localTime) {
-      const match = log.localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (match) {
-        dateStr = `${match[3]}_${match[2].padStart(2, '0')}_${match[1].padStart(2, '0')}`;
-      }
-    }
-
-    const path = await this.savePdfToDisk(buffer, filename, dateStr);
+    const folderDate = getExpedienteFolder(infractionDate);
+    const path = await this.savePdfToDisk(buffer, filename, folderDate);
     return { filename, path };
   },
 

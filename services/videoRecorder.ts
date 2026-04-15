@@ -12,9 +12,11 @@ export class VideoBufferService {
   private stream: MediaStream | null = null;
   private readonly maxSeconds = 30;
   private bufferCallback?: (seconds: number) => void;
+  private timeoutCallback?: () => void;
   private mode: 'circular' | 'roi_based' = 'circular';
   private recordingStartTime: number = 0;
   private isRecording = false;
+  private timeoutId?: NodeJS.Timeout;
 
   constructor(canvas: HTMLCanvasElement, mode: 'circular' | 'roi_based' = 'circular') {
     this.mode = mode;
@@ -87,6 +89,13 @@ export class VideoBufferService {
         this.recordingStartTime = Date.now();
         this.isRecording = true;
         logger.info('RECORDER', 'Grabación iniciada en ROI A');
+
+        this.timeoutId = setTimeout(() => {
+          if (this.isRecording) {
+            logger.info('RECORDER', 'Timeout de 30s alcanzado sin ROI B - forzando parada');
+            this.timeoutCallback?.();
+          }
+        }, 30000);
       } else {
         logger.info('RECORDER', 'Buffer Circular de Video Iniciado');
       }
@@ -95,9 +104,20 @@ export class VideoBufferService {
   }
 
   /**
+   * Callback para notificar timeout (cuando no se detecta ROI B en 30s).
+   */
+  onTimeout(callback: () => void) {
+    this.timeoutCallback = callback;
+  }
+
+  /**
    * Detiene grabación (modo circular) o marca fin en ROI B (modo roi_based).
    */
   stop() {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = undefined;
+    }
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       if (this.mode === 'roi_based') {
         this.isRecording = false;

@@ -109,6 +109,10 @@ export class EvidenceCaptureManager {
     // Iniciar buffer basado en ROI: inicia en ROI A
     const recorder = new VideoBufferService(canvas, 'roi_based');
     recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
+    recorder.onTimeout(async () => {
+      console.warn(`[CAPTURE] Timeout ROI B para Track #${track.id} - generando clip de 30s`);
+      await this.finalizeRoiATimeout(track, roiALine, video, key, recorder);
+    });
     recorder.start();
     this.recorders.set(key, recorder);
 
@@ -405,6 +409,58 @@ export class EvidenceCaptureManager {
 
   private hasMidCapture(key: string): boolean {
     return (this.snapshotStorage.get(key) || []).some((s) => s.label === 'mid');
+  }
+
+  /**
+   * Finaliza captura cuando se alcanza el timeout de 30s sin ROI B.
+   * Genera evidencia con video de 30s y sin fotos de ROI B.
+   */
+  private async finalizeRoiATimeout(
+    track: Track,
+    geometry: GeometryLine,
+    video: HTMLVideoElement,
+    key: string,
+    recorder: VideoBufferService
+  ): Promise<void> {
+    const clip = await recorder.getClip();
+
+    const snapshots = this.snapshotStorage.get(key) || [];
+
+    const detailFrames = snapshots
+      .filter((s) => s.kind === 'detail')
+      .map((s) => s.data)
+      .slice(0, 3);
+    let ocrResults: string[] = [];
+    if (detailFrames.length > 0) {
+      try {
+        const result = await OCRSynchronizer.extractLicensePlate(detailFrames);
+        if (result && result.plate) ocrResults = [result.plate];
+      } catch (err) {
+        console.warn('[CAPTURE] OCR error in timeout:', err);
+      }
+    }
+
+    const localTime = new Date().toLocaleString();
+    const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
+
+    await evidenceDB.saveEvidence(key, {
+      snapshots: snapshots.map((s) => s.data),
+      contextSnapshots: snapshots.filter((s) => s.kind === 'general').map((s) => s.data),
+      zoomSnapshots: snapshots.filter((s) => s.kind === 'detail').map((s) => s.data),
+      ocrResults,
+      clip,
+    });
+
+    forensicQueue.enqueueJob(
+      { ...track, isAnomalous: !!track.isAnomalous } as any,
+      geometry,
+      key,
+      localTime,
+      videoTimeCode,
+      video.currentTime
+    );
+
+    this.cleanup(key);
   }
 
   private cleanup(key: string): void {

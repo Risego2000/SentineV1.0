@@ -62,6 +62,12 @@ export interface SentinelContextType {
   helpMsg: string | null;
   selectedProtocolIds: string[];
   setSelectedProtocolIds: (ids: string[]) => void;
+  infractionLocation: string;
+  setInfractionLocation: (location: string) => void;
+  infractionLocations: string[];
+  setInfractionLocations: React.Dispatch<React.SetStateAction<string[]>>;
+  addInfractionLocation: (location: string) => void;
+  removeInfractionLocation: (index: number) => void;
 
   // Actions
   setSource: (s: 'none' | 'live' | 'upload' | 'ip') => void;

@@ -12,16 +12,16 @@ export const SidebarSourceActions = () => {
   const viewerNum = viewerId.replace('visor_', '');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mb-4">
       <div className="flex items-center justify-between px-1">
         <h3
-          className="text-[10px] font-bold uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2"
+          className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2"
           {...helpProps('Selecciona la fuente de video para el visor activo.')}
         >
-          <Video size={14} className="text-blue-500" /> Fuente de Entrada
+          <Video size={11} className="text-blue-500" /> Fuente de Entrada
         </h3>
         {gridSize > 1 && (
-          <span className="text-[9px] font-bold text-slate-600 tracking-tighter uppercase">
+          <span className="text-[8px] font-black text-slate-600 tracking-tighter uppercase">
             Visor_{viewerNum}
           </span>
         )}
@@ -31,8 +31,8 @@ export const SidebarSourceActions = () => {
         {/* NETWORK & IP SECTION */}
         <div className="horizon-card rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2 px-1 mb-2">
-            <Wifi size={12} className="text-blue-500" />
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+            <Wifi size={10} className="text-blue-500" />
+            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
               Red / Directo
             </span>
           </div>
@@ -46,8 +46,8 @@ export const SidebarSourceActions = () => {
             }`}
             {...helpProps('Conectar a una cámara IP de red para vigilancia en vivo.')}
           >
-            <Globe size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-wider flex-1">Cámara IP</span>
+            <Globe size={13} />
+            <span className="text-[9px] font-black uppercase tracking-wider flex-1">Cámara IP</span>
             {activeMode === 'ip' && (
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             )}
@@ -62,8 +62,8 @@ export const SidebarSourceActions = () => {
             }`}
             {...helpProps('Compartir pantalla o ventana de aplicación como fuente de video.')}
           >
-            <Monitor size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-wider flex-1">
+            <Monitor size={13} />
+            <span className="text-[9px] font-black uppercase tracking-wider flex-1">
               Compartir Ventana
             </span>
             {activeMode === 'live' && (
@@ -89,10 +89,10 @@ export const SidebarSourceActions = () => {
                 : 'bg-slate-900/50 border-white/5 group-hover:border-white/10'
             }`}
           >
-            <Upload size={18} />
+            <Upload size={14} />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-widest">Subir Archivo</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">Subir Archivo</span>
             <span className="text-[9px] font-medium text-slate-600 uppercase tracking-tighter mt-0.5">
               MP4 / MKV Local
             </span>

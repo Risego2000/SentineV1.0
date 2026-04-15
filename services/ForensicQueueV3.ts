@@ -413,6 +413,7 @@ export class ForensicQueueV3 {
           const infractionLog: InfractionLog = {
             ...auditResult,
             id: Date.now(),
+            expedienteNum: '',
             plate:
               auditResult.plate && auditResult.plate !== 'DESCONOCIDO'
                 ? auditResult.plate

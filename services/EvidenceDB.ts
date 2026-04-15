@@ -1,6 +1,16 @@
 import { InfractionLog } from '../types';
 import { isSupabaseConfigured, SUPABASE_TABLES } from './supabase';
 
+const getExpedienteNum = (infractionDate: Date): string => {
+  const year = infractionDate.getFullYear();
+  const month = String(infractionDate.getMonth() + 1).padStart(2, '0');
+  const day = String(infractionDate.getDate()).padStart(2, '0');
+  const key = `sentinel_exp_${year}_${month}_${day}`;
+  const current = Number(localStorage.getItem(key) || '0') + 1;
+  localStorage.setItem(key, String(current));
+  return `${year}/${month}/${day}/${String(current).padStart(3, '0')}`;
+};
+
 /**
  * EvidenceDB - Persistent Local Storage for Tactical Evidence
  * Uses IndexedDB to store snapshots and clips without affecting React state performance.
@@ -147,14 +157,30 @@ export class EvidenceDB {
     });
   }
 
+  private parseInfractionDate(localTime: string): Date {
+    const match = localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (match) {
+      return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+    }
+    return new Date();
+  }
+
   async saveInfraction(log: InfractionLog): Promise<void> {
     if (!this.db) await this.init();
+
+    const infractionDate = this.parseInfractionDate(log.localTime || log.time);
+    const expedienteNum = getExpedienteNum(infractionDate);
+
+    const logWithExpediente: InfractionLog = {
+      ...log,
+      expedienteNum,
+    };
 
     // Save locally first for offline support
     await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
       const store = transaction.objectStore(this.logStoreName);
-      const record = { ...log, synced: false };
+      const record = { ...logWithExpediente, synced: false };
       const request = store.put(record);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(new Error('FAILED_TO_SAVE_INFRACTION'));
@@ -162,7 +188,7 @@ export class EvidenceDB {
 
     // Sync immediately to Supabase (not just proactively)
     if (isSupabaseConfigured) {
-      await this.syncInfractionToSupabase(log);
+      await this.syncInfractionToSupabase(logWithExpediente);
     }
   }
 
@@ -188,6 +214,7 @@ export class EvidenceDB {
 
       const { error: errorInfractions } = await supabase.from(SUPABASE_TABLES.INFRACTIONS).insert({
         status: 'completed',
+        expediente_num: infraction.expedienteNum,
         plate: infraction.plate,
         make_model: infraction.makeModel,
         color: infraction.color,
@@ -213,12 +240,14 @@ export class EvidenceDB {
         roi_history: infraction.roiHistory,
         viewer_id: infraction.viewerId,
         validation_status: 'pending',
+        infraction_location: infraction.infractionLocation,
         extra_data: {},
       });
 
       // Also sync to incidents for backward compatibility
       const { error: errorIncidents } = await supabase.from(SUPABASE_TABLES.INCIDENTS).insert({
         status: 'completed',
+        expediente_num: infraction.expedienteNum,
         plate: infraction.plate,
         make_model: infraction.makeModel,
         color: infraction.color,
@@ -243,12 +272,18 @@ export class EvidenceDB {
         roi_history: infraction.roiHistory,
         viewer_id: infraction.viewerId,
         validation_status: 'pending',
+        infraction_location: infraction.infractionLocation,
         extra_data: {},
       });
 
       if (!errorInfractions && !errorIncidents) {
         await this.markInfractionSynced(infraction.id);
-        console.log('[EvidenceDB] Infraction synced to Supabase:', infraction.plate);
+        console.log(
+          '[EvidenceDB] Infraction synced to Supabase:',
+          infraction.plate,
+          'Expediente:',
+          infraction.expedienteNum
+        );
         return true;
       }
 
@@ -337,11 +372,11 @@ export class EvidenceDB {
             telemetry: infraction.telemetry,
           };
 
-          // Try to insert into both infractions and incidents for backward compatibility
           const { error: errorInfractions } = await supabase
             .from(SUPABASE_TABLES.INFRACTIONS)
             .insert({
               status: 'completed',
+              expediente_num: infraction.expedienteNum,
               plate: infraction.plate,
               make_model: infraction.makeModel,
               color: infraction.color,
@@ -366,13 +401,14 @@ export class EvidenceDB {
               telemetry: infraction.telemetry,
               roi_history: infraction.roiHistory,
               viewer_id: infraction.viewerId,
-              validation_status: 'pending',
+              infraction_location: infraction.infractionLocation,
+              validation_status: 'pendiente',
               extra_data: {},
             });
 
-          // Also keep syncing to incidents if it exists
           const { error: errorIncidents } = await supabase.from(SUPABASE_TABLES.INCIDENTS).insert({
             status: 'completed',
+            expediente_num: infraction.expedienteNum,
             plate: infraction.plate,
             make_model: infraction.makeModel,
             color: infraction.color,
@@ -397,6 +433,7 @@ export class EvidenceDB {
             telemetry: infraction.telemetry,
             roi_history: infraction.roiHistory,
             viewer_id: infraction.viewerId,
+            infraction_location: infraction.infractionLocation,
             validation_status: 'pending',
             extra_data: {},
           });
@@ -443,4 +480,142 @@ export class EvidenceDB {
   }
 }
 
+export interface LugarInfraccion {
+  id?: string;
+  nombre: string;
+  descripcion?: string;
+  direccion?: string;
+  municipio?: string;
+  provincia?: string;
+  tipo_via?: string;
+  coordenadas?: { lat: number; lng: number };
+  activo?: boolean;
+  orden?: number;
+  metadata?: Record<string, unknown>;
+  operator_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const evidenceDB = new EvidenceDB();
+
+export async function getLugaresFromSupabase(): Promise<LugarInfraccion[]> {
+  if (!isSupabaseConfigured) {
+    const saved = localStorage.getItem('sentinel_lugares_infraccion');
+    return saved ? JSON.parse(saved) : [];
+  }
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.LUGARES_INFRACCION)
+      .select('*')
+      .eq('activo', true)
+      .order('orden', { ascending: true });
+    if (error) {
+      console.error('[EvidenceDB] Error fetching lugares:', error);
+      return [];
+    }
+    if (data && data.length > 0) {
+      localStorage.setItem('sentinel_lugares_infraccion', JSON.stringify(data));
+    }
+    return data || [];
+  } catch (err) {
+    console.error('[EvidenceDB] Error getting lugares:', err);
+    return [];
+  }
+}
+
+export async function saveLugarToSupabase(lugar: LugarInfraccion): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const saved = localStorage.getItem('sentinel_lugares_infraccion');
+    const lugares: LugarInfraccion[] = saved ? JSON.parse(saved) : [];
+    lugares.push({ ...lugar, id: lugar.id || crypto.randomUUID() });
+    localStorage.setItem('sentinel_lugares_infraccion', JSON.stringify(lugares));
+    return true;
+  }
+  try {
+    const { supabase } = await import('./supabase');
+    const { error } = await supabase.from(SUPABASE_TABLES.LUGARES_INFRACCION).insert({
+      nombre: lugar.nombre,
+      descripcion: lugar.descripcion,
+      direccion: lugar.direccion,
+      municipio: lugar.municipio || 'Daganzo de Arriba',
+      provincia: lugar.provincia || 'Madrid',
+      tipo_via: lugar.tipo_via || 'urbana',
+      coordenadas: lugar.coordenadas ? JSON.stringify(lugar.coordenadas) : {},
+      activo: true,
+      orden: lugar.orden || 0,
+      metadata: lugar.metadata || {},
+      operator_id: lugar.operator_id,
+    });
+    if (error) {
+      console.error('[EvidenceDB] Error saving lugar:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[EvidenceDB] Error saving lugar:', err);
+    return false;
+  }
+}
+
+export async function deleteLugarFromSupabase(id: string): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const saved = localStorage.getItem('sentinel_lugares_infraccion');
+    const lugares: LugarInfraccion[] = saved ? JSON.parse(saved) : [];
+    const filtered = lugares.filter((l) => l.id !== id);
+    localStorage.setItem('sentinel_lugares_infraccion', JSON.stringify(filtered));
+    return true;
+  }
+  try {
+    const { supabase } = await import('./supabase');
+    const { error } = await supabase.from(SUPABASE_TABLES.LUGARES_INFRACCION).delete().eq('id', id);
+    if (error) {
+      console.error('[EvidenceDB] Error deleting lugar:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[EvidenceDB] Error deleting lugar:', err);
+    return false;
+  }
+}
+
+export async function updateLugarToSupabase(lugar: LugarInfraccion): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const saved = localStorage.getItem('sentinel_lugares_infraccion');
+    const lugares: LugarInfraccion[] = saved ? JSON.parse(saved) : [];
+    const index = lugares.findIndex((l) => l.id === lugar.id);
+    if (index !== -1) {
+      lugares[index] = lugar;
+      localStorage.setItem('sentinel_lugares_infraccion', JSON.stringify(lugares));
+      return true;
+    }
+    return false;
+  }
+  try {
+    const { supabase } = await import('./supabase');
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.LUGARES_INFRACCION)
+      .update({
+        nombre: lugar.nombre,
+        descripcion: lugar.descripcion,
+        direccion: lugar.direccion,
+        municipio: lugar.municipio,
+        provincia: lugar.provincia,
+        tipo_via: lugar.tipo_via,
+        coordenadas: lugar.coordenadas ? JSON.stringify(lugar.coordenadas) : {},
+        orden: lugar.orden,
+        metadata: lugar.metadata,
+      })
+      .eq('id', lugar.id);
+    if (error) {
+      console.error('[EvidenceDB] Error updating lugar:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[EvidenceDB] Error updating lugar:', err);
+    return false;
+  }
+}

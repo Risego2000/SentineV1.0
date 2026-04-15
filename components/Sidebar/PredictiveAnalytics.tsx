@@ -29,7 +29,7 @@ export const PredictiveAnalytics = () => {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mb-4">
       <div
         className="flex items-center justify-between px-1"
         {...helpProps(

@@ -156,6 +156,7 @@ export interface AuditResponse {
   visualTimestamp: string;
   videoTimeCode: string; // The time printed on the video (e.g., "12:02:48")
   localTime: string; // The local wall-clock time (e.g., "2026-03-08 05:32:00")
+  infractionLocation?: string; // Lugar de la infracción
   telemetry: {
     speedEstimated: string;
     behaviorAnomalies?: string;
@@ -167,6 +168,7 @@ export interface AuditResponse {
  */
 export interface InfractionLog extends AuditResponse {
   id: number;
+  expedienteNum: string; // Format: YYYY/MM/DD/NNNN (e.g., 2026/04/15/001)
   image: string;
   extraSnapshots?: string[]; // [Initial, Mid, Final] context frames
   zoomSnapshots?: string[]; // [Initial, Mid, Final] zoomed vehicle evidence
@@ -182,6 +184,7 @@ export interface InfractionLog extends AuditResponse {
   validatedAt?: number;
   operatorId?: string;
   roiHistory?: string[]; // ROI sequence [ROI A, ROI B] for forbidden turns
+  infractionLocation?: string; // Lugar de la infracción (seleccionado de preset o manual)
 }
 
 /**

@@ -1,12 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const getSupabaseUrl = () =>
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.SUPABASE_URL || '';
+  import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || '';
 const getSupabaseAnonKey = () =>
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  '';
+  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || '';
 
 let _supabase: SupabaseClient | null = null;
 
@@ -40,6 +37,7 @@ export const SUPABASE_TABLES = {
   REPORTS: 'reports',
   SYSTEM_LOGS: 'system_logs',
   USERS: 'users',
+  LUGARES_INFRACCION: 'lugares_infraccion',
 } as const;
 
 export const isSupabaseConfigured = Boolean(getSupabaseUrl() && getSupabaseAnonKey());
