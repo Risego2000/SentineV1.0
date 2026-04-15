@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrainCircuit } from 'lucide-react';
+
+const escudo = '/ESCUDO.png?v=11';
 
 interface ForensicAnalysisOverlayProps {
   isAnalyzing: boolean;
@@ -21,8 +22,12 @@ export const ForensicAnalysisOverlay = ({ isAnalyzing }: ForensicAnalysisOverlay
           <div className="absolute inset-4 border-2 border-transparent border-b-cyan-400 rounded-full animate-spin-reverse" />
 
           {/* Central Icon */}
-          <div className="relative z-10 p-4 bg-black/50 rounded-full border border-cyan-500/30 backdrop-blur-md shadow-[0_0_30px_rgba(6,182,212,0.3)]">
-            <BrainCircuit size={40} className="text-cyan-400 animate-pulse" />
+          <div className="relative z-10 p-4 bg-black/50 rounded-full border border-cyan-500/30 backdrop-blur-md shadow-[0_0_30px_rgba(6,182,212,0.3)] flex items-center justify-center">
+            <img
+              src={escudo}
+              alt="Sentinel Shield"
+              className="w-10 h-10 object-contain animate-pulse"
+            />
           </div>
         </div>
 

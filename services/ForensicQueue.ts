@@ -86,7 +86,7 @@ export class ForensicQueue {
       label: string;
       bbox: { x: number; y: number; w: number; h: number };
       avgVelocity: number;
-      velocityHistory: number[];
+      velocityHistory?: number[];
       heading: number;
       dwellTime: number;
       isAnomalous: boolean;

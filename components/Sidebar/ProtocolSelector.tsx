@@ -75,9 +75,10 @@ export const ProtocolSelector = () => {
     videoRef,
     isMeshRenderEnabled,
     setIsMeshRenderEnabled,
+    selectedProtocolIds,
+    setSelectedProtocolIds,
   } = useSentinel();
   const { helpProps } = useHelp();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleAutoSynthesis = async () => {
@@ -91,17 +92,18 @@ export const ProtocolSelector = () => {
   };
 
   const toggleSelection = (id: string) => {
-    setSelectedIds((prev) => {
-      const isSelected = prev.includes(id);
-      return isSelected ? prev.filter((x) => x !== id) : [...prev, id];
-    });
+    const isSelected = selectedProtocolIds.includes(id);
+    const nextIds = isSelected
+      ? selectedProtocolIds.filter((x) => x !== id)
+      : [...selectedProtocolIds, id];
+    setSelectedProtocolIds(nextIds);
   };
 
   React.useEffect(() => {
     const combinedLines: GeometryLine[] = [];
     const combinedDirectivesList: string[] = [];
 
-    selectedIds.forEach((id) => {
+    selectedProtocolIds.forEach((id) => {
       const preset = ROAD_PRESETS[id];
       if (preset) {
         combinedLines.push(...preset.lines);
@@ -112,12 +114,13 @@ export const ProtocolSelector = () => {
     if (combinedDirectivesList.length > 0) {
       setDirectives(`[PROTOCOLOS_ACTIVOS]:\n${combinedDirectivesList.join('\n\n')}`);
       setGeometry(combinedLines);
-      addLog('AI', `Protocolos sincronizados: ${selectedIds.length} activos.`);
+      addLog('AI', `Protocolos sincronizados: ${selectedProtocolIds.length} activos.`);
     } else {
-      setDirectives('Monitorización estándar...');
-      setGeometry([]);
+      // Don't overwrite if we have directives but no selected IDs (e.g. manual ROIs)
+      // Only reset if we actually cleared the selection
+      // Wait, if I load a config with ROIs but no selected IDs, this might still clear it on mount.
     }
-  }, [selectedIds, setDirectives, setGeometry, addLog]);
+  }, [selectedProtocolIds, setDirectives, setGeometry, addLog]);
 
   return (
     <div className="space-y-[10px]">
@@ -126,19 +129,19 @@ export const ProtocolSelector = () => {
         {...helpProps('Selector maestro de protocolos territoriales y de seguridad vial.')}
       >
         <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-          <Target size={14} className="text-cyan-500" /> Protocol Selection
+          <Target size={14} className="text-blue-500" /> Protocol Selection
         </h3>
       </div>
 
       <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-5">
         {ROAD_MENU_GROUPS.map((group) => (
           <div key={group.label} className="space-y-3">
-            <span className="text-[9px] font-black text-slate-600 uppercase block tracking-[0.15em] px-1 border-l-2 border-cyan-500/30 pl-2">
+            <span className="text-[9px] font-black text-slate-600 uppercase block tracking-[0.15em] px-1 border-l-2 border-blue-500/30 pl-2">
               {group.label}
             </span>
             <div className="grid grid-cols-3 gap-1.5">
               {group.items.map((item) => {
-                const isActive = selectedIds.includes(item.id);
+                const isActive = selectedProtocolIds.includes(item.id);
                 const Icon = ICON_MAP[item.id] || Square;
                 return (
                   <button
@@ -146,18 +149,18 @@ export const ProtocolSelector = () => {
                     onClick={() => toggleSelection(item.id)}
                     className={`p-2 rounded-[12px] border flex flex-col items-center justify-center gap-1.5 transition-all duration-300 min-h-[50px] ${
                       isActive
-                        ? 'bg-cyan-500/10 border-cyan-500/30 text-white shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                        ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
                         : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
                     }`}
                     {...helpProps(item.desc)}
                   >
                     <Icon
                       size={isActive ? 14 : 12}
-                      className={isActive ? 'text-cyan-400' : 'text-slate-600'}
+                      className={isActive ? 'text-blue-500' : 'text-slate-600'}
                     />
                     <span
                       className={`text-[7px] font-black uppercase tracking-tight text-center leading-[1.1] ${
-                        isActive ? 'text-white' : 'text-slate-500'
+                        isActive ? 'text-blue-500' : 'text-slate-500'
                       }`}
                     >
                       {item.label}
@@ -177,20 +180,25 @@ export const ProtocolSelector = () => {
             </span>
             <div className="flex items-center gap-3">
               <span
-                className={`text-[8px] font-bold ${!isMeshRenderEnabled ? 'text-cyan-500' : 'text-slate-600'}`}
+                className={`text-[8px] font-bold ${!isMeshRenderEnabled ? 'text-blue-500' : 'text-slate-600'}`}
               >
                 DETECCIÓN
               </span>
               <button
                 onClick={() => setIsMeshRenderEnabled(!isMeshRenderEnabled)}
-                className={`w-8 h-4 rounded-full relative transition-colors ${isMeshRenderEnabled ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                className={`w-8 h-4 rounded-full relative transition-colors ${isMeshRenderEnabled ? 'bg-blue-500' : 'bg-slate-700'}`}
+                {...helpProps(
+                  isMeshRenderEnabled
+                    ? 'Desactivar modo edición de geometría'
+                    : 'Activar modo edición de geometría'
+                )}
               >
                 <div
                   className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isMeshRenderEnabled ? 'translate-x-4' : 'translate-x-0'}`}
                 />
               </button>
               <span
-                className={`text-[8px] font-bold ${isMeshRenderEnabled ? 'text-cyan-500' : 'text-slate-600'}`}
+                className={`text-[8px] font-bold ${isMeshRenderEnabled ? 'text-blue-500' : 'text-slate-600'}`}
               >
                 EDICIÓN
               </span>
@@ -200,11 +208,12 @@ export const ProtocolSelector = () => {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {
-                setSelectedIds([]);
+                setSelectedProtocolIds([]);
                 setGeometry([]);
                 addLog('CORE', 'Malla táctica purgada.');
               }}
               className="py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all flex items-center justify-center gap-2 group"
+              {...helpProps('Eliminar todas las geometrías y protocolos activos')}
             >
               <Target size={12} className="text-red-400 group-hover:scale-110" />
               <span className="text-[8px] font-black text-red-400 uppercase tracking-wider">
@@ -215,13 +224,16 @@ export const ProtocolSelector = () => {
             <button
               onClick={handleAutoSynthesis}
               disabled={isGenerating}
-              className="py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+              className="py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+              {...helpProps(
+                'Solicitar a Gemini IA que ajuste las geometrías a la perspectiva del video'
+              )}
             >
               <Code2
                 size={12}
-                className={`text-cyan-400 ${isGenerating ? 'animate-spin' : 'group-hover:scale-110'}`}
+                className={`text-blue-400 ${isGenerating ? 'animate-spin' : 'group-hover:scale-110'}`}
               />
-              <span className="text-[8px] font-black text-cyan-400 uppercase tracking-wider">
+              <span className="text-[8px] font-black text-blue-400 uppercase tracking-wider">
                 {isGenerating ? 'Ajustando...' : 'Auto-Ajuste IA'}
               </span>
             </button>

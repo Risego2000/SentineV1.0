@@ -32,49 +32,45 @@ export const EngineSettings = () => {
   const { helpProps } = useHelp();
 
   return (
-    <div className="space-y-[10px]">
+    <div className="space-y-[10px]" id="section-engine">
       <h3
-        className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
+        className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
         {...helpProps(
           'Configura los 3 núcleos principales de Sentinel AI para optimizar la detección y el peritaje.'
         )}
       >
-        <Zap size={14} className="text-amber-500" /> Configuración del Motor
+        <Zap size={14} className="text-blue-500" /> Configuración del Motor
       </h3>
 
-      <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-6">
+      <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-8">
         {/* 1. SISTEMA BIÓNICO (DETECTION) */}
         <div
-          className="space-y-3"
+          className="space-y-4"
           {...helpProps(
             'MOTOR BIÓNICO: Controla el rendimiento y la sensibilidad del detector MediaPipe.'
           )}
         >
-          <div className="flex items-center gap-2 px-1 border-l-2 border-cyan-500/30 pl-2">
-            <Cpu size={12} className="text-cyan-500/60" />
-            <span className="text-xs font-black text-slate-500 uppercase tracking-[0.15em]">
-              Sistema Biónico (MediaPipe)
+          <div className="flex items-center gap-2 px-1">
+            <Cpu size={12} className="text-blue-500" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Sistema Biónico
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {(Object.entries(DETECTION_PRESETS) as [PresetType, DetectionPresetData][]).map(
               ([key, data]) => (
                 <button
                   key={key}
                   onClick={() => setPreset(key)}
-                  aria-pressed={currentPreset === key}
-                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                  className={`p-2 rounded-[12px] border transition-all text-center flex flex-col items-center justify-center gap-1 min-h-[44px] ${
                     currentPreset === key
-                      ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
-                      : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                      ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                      : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
                   }`}
                   {...helpProps(`Activa preset ${data.label}: ${data.description}`)}
                 >
-                  <span className="text-[10px] font-black uppercase text-center w-full leading-tight">
+                  <span className="text-[9px] font-black uppercase tracking-tight">
                     {data.label}
-                  </span>
-                  <span className="text-[9px] leading-tight opacity-40 font-bold uppercase text-center w-full tracking-tighter">
-                    {data.description}
                   </span>
                 </button>
               )
@@ -84,63 +80,51 @@ export const EngineSettings = () => {
 
         {/* 2. UNIDAD FORENSE (GEMINI) */}
         <div
-          className="space-y-3 pt-1"
+          className="space-y-4 pt-6 border-t border-white/5"
           {...helpProps(
             'UNIDAD FORENSE: Activa la auditoría de Gemini IA para generar expedientes legales.'
           )}
         >
-          <div className="flex items-center justify-between px-1 border-l-2 border-amber-500/30 pl-2">
+          <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <ShieldCheck size={12} className="text-amber-500/60" aria-hidden="true" />
-              <span className="text-xs font-black text-slate-500 uppercase tracking-[0.15em]">
-                Unidad Forense (Gemini IA)
+              <ShieldCheck size={12} className="text-blue-500" aria-hidden="true" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Unidad Forense
               </span>
             </div>
             <button
               onClick={() => setIsAuditEnabled(!isAuditEnabled)}
-              role="switch"
-              aria-checked={isAuditEnabled}
-              aria-label={
-                isAuditEnabled
-                  ? 'Desactivar auditoría forense Gemini'
-                  : 'Activar auditoría forense Gemini'
-              }
-              className={`w-9 h-[18px] rounded-full relative transition-all duration-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isAuditEnabled ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]' : 'bg-slate-800 border border-white/10'}`}
+              className={`w-8 h-4 rounded-full relative transition-all duration-300 ${isAuditEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
               {...helpProps(
                 isAuditEnabled
-                  ? 'Desactiva el peritaje IA para ahorrar recursos API.'
-                  : 'Activa la auditoría neural de Gemini.'
+                  ? 'Desactivar unidad forense de Gemini'
+                  : 'Activar unidad forense de Gemini'
               )}
             >
               <div
-                className={`absolute top-0.5 left-0.5 w-[14px] h-[14px] bg-white rounded-full transition-transform duration-300 shadow-md ${isAuditEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`}
-                aria-hidden="true"
+                className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${isAuditEnabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </div>
 
           <div
-            className={`grid grid-cols-2 sm:grid-cols-3 gap-1.5 transition-all duration-500 ${isAuditEnabled ? 'opacity-100 scale-100' : 'opacity-20 grayscale pointer-events-none scale-[0.98]'}`}
+            className={`grid grid-cols-2 gap-2 transition-all duration-300 ${isAuditEnabled ? 'opacity-100' : 'opacity-20 grayscale pointer-events-none'}`}
           >
             {(Object.entries(AUDIT_PRESETS) as [AuditPresetType, AuditPresetData][]).map(
               ([key, data]) => (
                 <button
                   key={key}
                   onClick={() => setAuditPreset(key)}
-                  aria-pressed={currentAuditPreset === key}
                   disabled={!isAuditEnabled}
-                  className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                  className={`p-2 rounded-[12px] border transition-all text-center flex flex-col items-center justify-center gap-1 min-h-[44px] ${
                     currentAuditPreset === key
-                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                      ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                      : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04]'
                   }`}
-                  {...helpProps(`Auditoría nivel ${data.label}: ${data.description}`)}
+                  {...helpProps(`Activa auditoría ${data.label}: ${data.description}`)}
                 >
-                  <span className="text-[10px] font-black uppercase text-center w-full leading-tight">
+                  <span className="text-[9px] font-black uppercase tracking-tight">
                     {data.label}
-                  </span>
-                  <span className="text-[8px] leading-tight opacity-40 font-bold uppercase text-center w-full tracking-tighter">
-                    {data.description}
                   </span>
                 </button>
               )
@@ -150,41 +134,35 @@ export const EngineSettings = () => {
 
         {/* 3. MOTOR CINEMÁTICO (POSE) */}
         <div
-          className="space-y-3 pt-1"
+          className="space-y-4 pt-6 border-t border-white/5"
           {...helpProps(
             'MOTOR CINEMÁTICO: Analiza la estructura y conducta mediante Pose Landmarker.'
           )}
         >
-          <div className="flex items-center justify-between px-1 border-l-2 border-indigo-500/30 pl-2">
+          <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <Activity size={12} className="text-indigo-500/60" aria-hidden="true" />
-              <span className="text-xs font-black text-slate-500 uppercase tracking-[0.15em]">
-                Motor Cinemático (Pose)
+              <Activity size={12} className="text-blue-500" aria-hidden="true" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Motor Cinemático
               </span>
             </div>
             <button
               onClick={() => setIsPoseEnabled(!isPoseEnabled)}
-              role="switch"
-              aria-checked={isPoseEnabled}
-              aria-label={
-                isPoseEnabled ? 'Desactivar análisis de pose' : 'Activar análisis de pose'
-              }
-              className={`w-9 h-[18px] rounded-full relative transition-all duration-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isPoseEnabled ? 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-slate-800 border border-white/10'}`}
+              className={`w-8 h-4 rounded-full relative transition-all duration-300 ${isPoseEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
               {...helpProps(
                 isPoseEnabled
-                  ? 'Desactiva análisis de pose (CPU/GPU ahorro).'
-                  : 'Activa el reconocimiento estructural de pose.'
+                  ? 'Desactivar motor cinemático de Pose'
+                  : 'Activar motor cinemático de Pose'
               )}
             >
               <div
-                className={`absolute top-0.5 left-0.5 w-[14px] h-[14px] bg-white rounded-full transition-transform duration-300 shadow-md ${isPoseEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`}
-                aria-hidden="true"
+                className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${isPoseEnabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </div>
 
           <div
-            className={`grid grid-cols-3 gap-1.5 transition-all duration-500 ${isPoseEnabled ? 'opacity-100 scale-100' : 'opacity-20 grayscale pointer-events-none scale-[0.98]'}`}
+            className={`grid grid-cols-2 gap-2 transition-all duration-300 ${isPoseEnabled ? 'opacity-100' : 'opacity-20 grayscale pointer-events-none'}`}
           >
             {(
               Object.entries(KINEMATIC_PRESETS) as [KinematicPresetType, KinematicPresetData][]
@@ -192,21 +170,15 @@ export const EngineSettings = () => {
               <button
                 key={key}
                 onClick={() => setKinematicPreset(key)}
-                aria-pressed={currentKinematicPreset === key}
                 disabled={!isPoseEnabled}
-                className={`p-2 rounded-[12px] border transition-all text-left flex flex-col items-center justify-center gap-1 min-h-[50px] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                className={`p-2 rounded-[12px] border transition-all text-center flex flex-col items-center justify-center gap-1 min-h-[44px] ${
                   currentKinematicPreset === key
-                    ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
-                    : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/10 hover:bg-black/40'
+                    ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                    : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04]'
                 }`}
-                {...helpProps(`Modo cinemático ${data.label}: ${data.description}`)}
+                {...helpProps(`Activa motor cinemático ${data.label}: ${data.description}`)}
               >
-                <span className="text-[10px] font-black uppercase text-center w-full leading-tight">
-                  {data.label}
-                </span>
-                <span className="text-[8px] leading-tight opacity-40 font-bold uppercase text-center w-full tracking-tighter">
-                  {data.description}
-                </span>
+                <span className="text-[9px] font-black uppercase tracking-tight">{data.label}</span>
               </button>
             ))}
           </div>

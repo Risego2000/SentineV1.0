@@ -130,9 +130,9 @@ export const createReportsDomain = () => {
       }
     },
 
-    saveVideoEvidence: async (videoBuffer, filename) => {
+    saveVideoEvidence: async (videoBuffer, filename, dateStr?: string) => {
       try {
-        await ReportService.saveVideoToDisk(videoBuffer, filename);
+        await ReportService.saveVideoToDisk(videoBuffer, filename, dateStr);
         logger.success('REPORTS', `Video evidence saved: ${filename}`);
         return filename;
       } catch (error) {

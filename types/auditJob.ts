@@ -28,7 +28,7 @@ export interface AuditJobTrackState {
   bboxH: number;
   /** Velocity telemetry snapshot */
   avgVelocity: number; // km/h
-  velocityHistory: readonly number[];
+  velocityHistory?: readonly number[];
   /** Heading in radians */
   heading: number;
   /** Residence time in zone (ms) */
@@ -125,7 +125,7 @@ export function createAuditJob(
     label: string;
     bbox: { x: number; y: number; w: number; h: number };
     avgVelocity: number;
-    velocityHistory: number[] | readonly number[];
+    velocityHistory?: number[] | readonly number[];
     heading: number;
     dwellTime: number;
     isAnomalous: boolean;
@@ -154,7 +154,7 @@ export function createAuditJob(
       bboxW: track.bbox.w,
       bboxH: track.bbox.h,
       avgVelocity: track.avgVelocity,
-      velocityHistory: Object.freeze([...track.velocityHistory]),
+      velocityHistory: Object.freeze([...(track.velocityHistory || [])]),
       heading: track.heading,
       dwellTime: track.dwellTime,
       isAnomalous: track.isAnomalous,

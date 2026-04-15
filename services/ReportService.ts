@@ -8,13 +8,17 @@ const escapeCsvCell = (value: unknown): string => {
   return `"${formulaSafe.replace(/"/g, '""')}"`;
 };
 
-// REPORTS_DIR is intentionally NOT defined on the client — report saving goes
-// through the backend API (/api/reports/save), which reads REPORTS_DIR from
-// its own environment variable.  This constant was removed to avoid leaking
-// the server-side path into the frontend bundle.
-
 const formatTimestamp = (date = new Date()): string =>
   date.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+
+const getExpedienteNumber = (): string => {
+  const now = new Date();
+  const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const key = `sentinel_exp_${today}`;
+  const current = Number(localStorage.getItem(key) || '0') + 1;
+  localStorage.setItem(key, String(current));
+  return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${String(current).padStart(4, '0')}`;
+};
 
 const withImagePrefix = (frame?: string): string | null => {
   if (!frame) return null;
@@ -26,144 +30,313 @@ const createDoc = async (): Promise<InstanceType<JsPDFType>> => {
   return new jsPDF('p', 'mm', 'a4');
 };
 
-const addHeader = (
-  doc: InstanceType<JsPDFType>,
-  title: string,
-  subtitle: string,
-  pageLabel?: string
-) => {
-  doc.setFillColor(5, 9, 20);
-  doc.rect(0, 0, 210, 34, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.text(title, 14, 16);
-  doc.setFontSize(9);
-  doc.setTextColor(180, 185, 195);
-  doc.text(subtitle, 14, 24);
-  if (pageLabel) {
-    doc.text(pageLabel, 170, 24);
+let cachedLogo: string | null = null;
+let cachedEscudo: string | null = null;
+
+const loadImage = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
   }
 };
 
-const addImageStrip = (
-  doc: InstanceType<JsPDFType>,
-  title: string,
-  frames: string[],
-  startY: number
-): number => {
-  if (!frames.length) return startY;
+const getLogo = async (): Promise<string | null> => {
+  if (!cachedLogo) cachedLogo = await loadImage('/LOGO PDF.png');
+  return cachedLogo;
+};
+
+const getEscudo = async (): Promise<string | null> => {
+  if (!cachedEscudo) cachedEscudo = await loadImage('/ESCUDO PDF.png');
+  return cachedEscudo;
+};
+
+const addAnverso = async (doc: InstanceType<JsPDFType>, log: InfractionLog, exp: string) => {
+  const logo = await getLogo();
+  const escudo = await getEscudo();
+
+  // Header Box
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(10, 10, 190, 30);
+
+  if (escudo) doc.addImage(escudo, 'PNG', 12, 12, 25, 25);
+  if (logo) doc.addImage(logo, 'PNG', 160, 12, 35, 25);
 
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(11);
-  doc.text(title, 14, startY);
+  doc.setFontSize(14);
+  doc.text('POLICÍA LOCAL', 105, 20, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text('DAGANZO DE ARRIBA', 105, 28, { align: 'center' });
 
-  const boxW = 58;
-  const boxH = 34;
-  const x = 14;
-  const y = startY + 4;
-
-  frames.slice(0, 3).forEach((frame, index) => {
-    const image = withImagePrefix(frame);
-    if (!image) return;
-
-    doc.setDrawColor(200, 205, 214);
-    doc.roundedRect(x + index * (boxW + 6), y, boxW, boxH, 2, 2);
-    doc.addImage(image, 'JPEG', x + index * (boxW + 6) + 1, y + 1, boxW - 2, boxH - 2);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`${index + 1}`, x + index * (boxW + 6), y - 1);
-  });
-
-  return y + boxH + 8;
-};
-
-const addKeyValues = (
-  doc: InstanceType<JsPDFType>,
-  entries: Array<[string, string]>,
-  startY: number
-): number => {
-  let y = startY;
+  // 1. DATOS DE LA DENUNCIA
+  let y = 45;
   doc.setFontSize(10);
-  entries.forEach(([label, value], index) => {
-    const x = index % 2 === 0 ? 14 : 108;
-    if (index % 2 === 0 && index > 0) y += 8;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text(`${label}:`, x, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(30, 41, 59);
-    doc.text(doc.splitTextToSize(value || 'N/D', 78), x + 22, y);
-  });
+  doc.setFont('helvetica', 'bold');
+  doc.text('--- DATOS DE LA DENUNCIA ---', 10, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Número de Expediente: ${exp}`, 10, y);
+  y += 6;
 
-  return y + 10;
+  const [date, time] = (log.localTime || log.time).split(' ');
+  doc.text(`Fecha: ${date || '  /  /    '}          Hora: ${time || '  :  :  '}`, 10, y);
+  y += 6;
+  doc.text(`Lugar de la Infracción: Casco Urbano / Vía Pública - Daganzo de Arriba`, 10, y);
+  y += 10;
+
+  // 2. DATOS DEL VEHÍCULO
+  doc.setFont('helvetica', 'bold');
+  doc.text('--- DATOS DEL VEHÍCULO ---', 10, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Matrícula: ${log.plate || 'N/D'}`, 10, y);
+  doc.text(`Marca/Modelo: ${log.makeModel || 'N/D'}`, 100, y);
+  y += 6;
+  doc.text(`Color: ${log.color || 'N/D'}`, 10, y);
+  doc.text(`Tipo de Vehículo: Turismo / Motocicleta`, 100, y);
+  y += 10;
+
+  // 3. HECHO QUE SE DENUNCIA
+  doc.setFont('helvetica', 'bold');
+  doc.text('--- HECHO QUE SE DENUNCIA Y PRECEPTO VULNERADO ---', 10, y);
+  y += 6;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('HECHO DENUNCIADO: ', 10, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const legalText = `El vehículo arriba identificado fue sorprendido realizando ${log.ruleCategory.toLowerCase()} en el lugar y hora indicados. Los hechos han sido captados y acreditados mediante el sistema de videocámaras de vigilancia de tráfico, debidamente autorizado conforme a lo establecido en el Art. 23 del Real Decreto Legislativo 6/2015, de 30 de octubre, por el que se aprueba el Texto Refundido de la Ley sobre Tráfico, Circulación de Vehículos a Motor y Seguridad Vial (TRLTSV), y en la Instrucción 08/V-74 de la DGT. Las imágenes correspondientes obran en el expediente y están a disposición del interesado.`;
+  const legalLines = doc.splitTextToSize(legalText, 190);
+  doc.text(legalLines, 10, y + 4);
+  y += legalLines.length * 4 + 6;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(
+    `PRECEPTO INFRINGIDO: ${log.legalBase || 'Art. de la Ordenanza Municipal / TRLTSV'}`,
+    10,
+    y
+  );
+  y += 8;
+
+  // Estimates for fine
+  let amount = 200;
+  let points = 0;
+  const sev = log.severity as string; // Cast to string for safety if it's coming from AI
+
+  if (sev === 'LOW') {
+    amount = 100;
+    points = 0;
+  } else if (sev === 'MEDIUM' || sev === 'HIGH') {
+    amount = 200;
+    points = 4;
+  } else if (sev === 'CRITICAL') {
+    amount = 500;
+    points = 6;
+  }
+
+  doc.text(`GRAVEDAD: ${sev}`, 10, y);
+  doc.text(`CUANTÍA DE LA SANCIÓN: ${amount} €`, 100, y);
+  y += 6;
+  doc.text(`REDUCCIÓN 50% (pago voluntario en 20 días naturales): ${amount / 2} €`, 10, y);
+  y += 6;
+  doc.text(`PUNTOS A DETRAER: ${points}`, 10, y);
+  y += 12;
+
+  // Images Section - 6 images in 2 rows (3 general + 3 detail)
+  const contextImages = (log.extraSnapshots || [])
+    .slice(0, 3)
+    .map(withImagePrefix)
+    .filter(Boolean) as string[];
+  const zoomImages = (log.zoomSnapshots || [])
+    .slice(0, 3)
+    .map(withImagePrefix)
+    .filter(Boolean) as string[];
+
+  const imgW = 60;
+  const imgH = 35;
+  const gap = 5;
+  const startX = 10;
+
+  if (contextImages.length > 0 || zoomImages.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('--- PRUEBAS GRÁFICAS ---', 10, y);
+    y += 5;
+
+    // Row 1: Context/General images (3 images)
+    if (contextImages.length > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Imágenes Generales', 10, y);
+      y += 2;
+
+      contextImages.forEach((img, idx) => {
+        doc.addImage(img, 'JPEG', startX + idx * (imgW + gap), y, imgW, imgH);
+        doc.rect(startX + idx * (imgW + gap), y, imgW, imgH);
+      });
+      y += imgH + 5;
+    }
+
+    // Row 2: Zoom/Detail images (3 images)
+    if (zoomImages.length > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Imágenes de Detalle (Matrícula/Vehículo)', 10, y);
+      y += 2;
+
+      zoomImages.forEach((img, idx) => {
+        doc.addImage(img, 'JPEG', startX + idx * (imgW + gap), y, imgW, imgH);
+        doc.rect(startX + idx * (imgW + gap), y, imgW, imgH);
+      });
+      y += imgH + 5;
+    }
+  }
+
+  // 4. FIRMAS
+  doc.setFont('helvetica', 'bold');
+  doc.text('--- FIRMAS ---', 10, y);
+  y += 6;
+  doc.setFontSize(9);
+  doc.text('Firma del Agente Denunciante', 10, y);
+  doc.text('Firma del Infractor', 110, y); // Though the note says not needed
+  y += 20;
+
+  doc.text(`Agente TIP: SENT-AI-01 (Validación Automática)`, 10, y);
+  doc.text(`Policía Local de Daganzo de Arriba`, 10, y + 4);
+
+  y += 12;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  const noteText = `Nota: En denuncias por videocámara en las que el denunciado no está presente en el momento de la captación de imágenes, no procede la firma del infractor, ya que la notificación se realiza posteriormente por vía administrativa. Esto es conforme al Art. 90 del TRLTSV y al Art. 43 de la Ley 39/2015 del Procedimiento Administrativo Común.`;
+  const noteLines = doc.splitTextToSize(noteText, 190);
+  doc.text(noteLines, 10, y);
 };
 
-const buildInfractionPages = (
+const addInformacionReverso = (doc: InstanceType<JsPDFType>, exp: string) => {
+  doc.addPage();
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(10, 10, 190, 277);
+
+  let y = 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  const introText = `Usted dispone de un plazo de 20 días naturales, contados desde el día siguiente a la notificación de esta denuncia, para:`;
+  doc.text(introText, 15, y);
+  y += 6;
+  doc.text('1. EFECTUAR EL PAGO VOLUNTARIO CON REDUCCIÓN DEL 50%.', 20, y);
+  y += 5;
+  doc.text('2. FORMULAR ALEGACIONES O SOLICITAR PRUEBAS.', 20, y);
+  y += 10;
+
+  // Section: TRÁMITE PARA EL PAGO
+  doc.setFontSize(11);
+  doc.text('TRÁMITE PARA EL PAGO (Art. 21 y 94 TGSV)', 15, y);
+  doc.line(15, y + 1, 100, y + 1);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  const payText = `Si opta por el pago voluntario dentro del plazo, se beneficiará de una reducción del 50% sobre la cuantía de la sanción. El pago implica la renuncia a formular alegaciones y la firmeza de la sanción en vía administrativa.`;
+  const payLines = doc.splitTextToSize(payText, 180);
+  doc.text(payLines, 15, y);
+  y += payLines.length * 4 + 4;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`CUENTA BANCARIA PARA EL PAGO: ES12 3456 7890 1234 5678 9012`, 15, y);
+  y += 5;
+  doc.text(`CONCEPTO DE LA TRANSFERENCIA: EXPEDIENTE ${exp}`, 15, y);
+  y += 6;
+
+  doc.text('FORMAS DE PAGO:', 15, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text('• ONLINE (Portal Ciudadano): www.ayto-daganzo.org', 20, y);
+  y += 4;
+  doc.text(
+    '• PRESENCIAL (Caja Municipal): Plaza de la Villa, 1 - 28814 Daganzo de Arriba (Horario: L-V 9:00 a 14:00 horas)',
+    20,
+    y
+  );
+  y += 4;
+  doc.text('• TRANSFERENCIA BANCARIA: A la cuenta arriba indicada.', 20, y);
+  y += 10;
+
+  // Section: PLAZOS Y RECURSOS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('PLAZOS Y RECURSOS (Art. 17 RD 320/1994)', 15, y);
+  doc.line(15, y + 1, 100, y + 1);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  const recurText = `Si no está de acuerdo con la denuncia y no desea acogerse a la reducción por pago voluntario, dispone de un plazo de 20 días naturales para presentar alegaciones o solicitar pruebas ante la autoridad instructora.`;
+  const recurLines = doc.splitTextToSize(recurText, 180);
+  doc.text(recurLines, 15, y);
+  y += recurLines.length * 4 + 4;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('ANTE QUIÉN RECURRIR:', 15, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    '• Alegaciones/Recurso de Alzada: 1 mes ante el Ilmo. Sr. Concejal Delegado del Ayuntamiento de Daganzo de Arriba.',
+    20,
+    y
+  );
+  y += 4;
+  doc.text(
+    '• Vía Contencioso-Administrativa: Recurrible ante el Juzgado de lo Contencioso-Administrativo de Madrid.',
+    20,
+    y
+  );
+  y += 10;
+
+  // Section: PRESCRIPCIÓN Y EJECUCIÓN
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('PRESCRIPCIÓN Y EJECUCIÓN', 15, y);
+  doc.line(15, y + 1, 70, y + 1);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    '• Prescripción de Infracciones: Leves 3 meses, Graves 6 meses, Muy Graves 1 año.',
+    15,
+    y
+  );
+  y += 5;
+  doc.text('• Prescripción de Sanciones: 1 año (Art. 18 RD 320/1994).', 15, y);
+  y += 7;
+  doc.setFont('helvetica', 'bold');
+  doc.text('RECLAMACIÓN EJECUTIVA:', 15, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  const execText = `En caso de impago de la sanción una vez firme, se procederá a la reclamación de la cantidad por vía ejecutiva, con los recargos legales correspondientes y el embargo de bienes (Art. 21 RD 320/1994).`;
+  const execLines = doc.splitTextToSize(execText, 180);
+  doc.text(execLines, 15, y);
+
+  doc.setFontSize(8);
+  doc.text('AYUNTAMIENTO DE DAGANZO DE ARRIBA - POLICÍA LOCAL', 105, 280, { align: 'center' });
+};
+
+const buildInfractionPages = async (
   doc: InstanceType<JsPDFType>,
   log: InfractionLog,
   index: number,
   total: number
 ) => {
-  addHeader(
-    doc,
-    'SENTINEL AI - EXPEDIENTE DE INFRACCION',
-    `Vehiculo ${log.plate || 'DESCONOCIDO'} | ${log.ruleCategory}`,
-    `${index}/${total}`
-  );
-
-  let y = 44;
-
-  y = addKeyValues(
-    doc,
-    [
-      ['Matricula IA', log.plate || 'DESCONOCIDO'],
-      ['OCR matricula', log.plateOcr || 'SIN LECTURA'],
-      ['Marca/modelo', log.makeModel || 'DESCONOCIDO'],
-      ['Color', log.color || 'DESCONOCIDO'],
-      ['Gravedad', log.severity],
-      ['Base legal', log.legalBase || 'Revision manual'],
-      ['Tiempo video', log.videoTimeCode || log.time],
-      ['Tiempo local', log.localTime || log.time],
-    ],
-    y
-  );
-
-  if (log.plateOcrCandidates?.length) {
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text('Candidatos OCR:', 14, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(log.plateOcrCandidates.join(' | '), 42, y);
-    y += 8;
-  }
-
-  y = addImageStrip(doc, 'Escena contextual', log.extraSnapshots || [], y);
-  y = addImageStrip(doc, 'Zoom del vehiculo infractor', log.zoomSnapshots || [], y);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.text('Descripcion tecnica', 14, y);
-  y += 6;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(30, 41, 59);
-  const description = doc.splitTextToSize(log.description || 'Sin descripcion', 182);
-  doc.text(description, 14, y);
-  y += description.length * 5 + 6;
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('Razonamiento pericial', 14, y);
-  y += 6;
-  doc.setFont('helvetica', 'normal');
-
-  (log.reasoning || []).forEach((reason, idx) => {
-    const lines = doc.splitTextToSize(`${idx + 1}. ${reason}`, 182);
-    doc.text(lines, 14, y);
-    y += lines.length * 5 + 1;
-  });
+  const exp = getExpedienteNumber();
+  await addAnverso(doc, log, exp);
+  addInformacionReverso(doc, exp);
 };
 
 const bufferToBlob = (buffer: ArrayBuffer): Blob => new Blob([buffer], { type: 'application/pdf' });
@@ -209,13 +382,14 @@ export const ReportService = {
 
   async generateInfractionPdf(log: InfractionLog): Promise<ArrayBuffer> {
     const doc = await createDoc();
-    buildInfractionPages(doc, log, 1, 1);
+    await buildInfractionPages(doc, log, 1, 1);
     return doc.output('arraybuffer');
   },
 
   async downloadInfractionPdf(log: InfractionLog, filename?: string): Promise<void> {
     const buffer = await this.generateInfractionPdf(log);
-    const file = filename || `Expediente_Digital_${log.plate || 'SENT'}_${log.id}.pdf`;
+    const expNum = getExpedienteNumber().replace(/\//g, '_');
+    const file = filename || `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
     const url = URL.createObjectURL(bufferToBlob(buffer));
     const link = document.createElement('a');
     link.href = url;
@@ -227,50 +401,40 @@ export const ReportService = {
   async generateAndSaveInfractionPdf(
     log: InfractionLog
   ): Promise<{ filename: string; path: string }> {
-    const filename = `Expediente_Digital_${log.plate || 'SENT'}_${log.id}.pdf`;
+    const expNum = getExpedienteNumber().replace(/\//g, '_');
+    const filename = `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
     const buffer = await this.generateInfractionPdf(log);
-    const path = await this.savePdfToDisk(buffer, filename);
+
+    let dateStr;
+    if (log.localTime) {
+      const match = log.localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (match) {
+        dateStr = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+      }
+    }
+
+    const path = await this.savePdfToDisk(buffer, filename, dateStr);
     return { filename, path };
   },
 
   async generateBatchPdf(
-    infractions: InfractionLog[],
-    title = 'SENTINEL AI - INFORME CONSOLIDADO DE DENUNCIAS'
+    infractions: InfractionLog[]
   ): Promise<{ buffer: ArrayBuffer; filename: string }> {
     const doc = await createDoc();
-    const generatedAt = new Date().toLocaleString('es-ES');
     const filename = `Sentinel_Denuncias_${formatTimestamp()}.pdf`;
 
-    addHeader(doc, title, `Generado ${generatedAt}`);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.text(`Total de infracciones: ${infractions.length}`, 14, 48);
-
-    let y = 58;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    infractions.forEach((inf, index) => {
-      const line = `${index + 1}. ${inf.ruleCategory} | ${inf.plate || 'DESCONOCIDO'} | ${inf.localTime || inf.time}`;
-      doc.text(doc.splitTextToSize(line, 180), 14, y);
-      y += 8;
-      if (y > 270 && index < infractions.length - 1) {
-        doc.addPage();
-        addHeader(doc, title, `Resumen continuacion ${generatedAt}`);
-        y = 44;
-      }
-    });
-
-    infractions.forEach((inf, index) => {
-      doc.addPage();
-      buildInfractionPages(doc, inf, index + 1, infractions.length);
-    });
+    for (let i = 0; i < infractions.length; i++) {
+      if (i > 0) doc.addPage();
+      await buildInfractionPages(doc, infractions[i], i + 1, infractions.length);
+    }
 
     return { buffer: doc.output('arraybuffer'), filename };
   },
 
-  async savePdfToDisk(buffer: ArrayBuffer, filename: string): Promise<string> {
-    const response = await fetch(`/api/reports/save?filename=${encodeURIComponent(filename)}`, {
+  async savePdfToDisk(buffer: ArrayBuffer, filename: string, dateStr?: string): Promise<string> {
+    const query = new URLSearchParams({ filename });
+    if (dateStr) query.append('date', dateStr);
+    const response = await fetch(`/api/reports/save?${query.toString()}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/pdf',
@@ -279,24 +443,26 @@ export const ReportService = {
     });
 
     if (!response.ok) {
-      throw new Error(`No se pudo guardar el PDF en ${REPORTS_DIR}`);
+      throw new Error(`No se pudo guardar el PDF en el servidor`);
     }
 
     const data = await response.json();
     return data.path as string;
   },
 
-  async saveVideoToDisk(buffer: ArrayBuffer, filename: string): Promise<string> {
-    const response = await fetch(`/api/reports/video?filename=${encodeURIComponent(filename)}`, {
+  async saveVideoToDisk(buffer: ArrayBuffer, filename: string, dateStr?: string): Promise<string> {
+    const query = new URLSearchParams({ filename });
+    if (dateStr) query.append('date', dateStr);
+    const response = await fetch(`/api/reports/video?${query.toString()}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'video/webm',
+        'Content-Type': 'application/octet-stream',
       },
       body: buffer,
     });
 
     if (!response.ok) {
-      throw new Error(`No se pudo guardar el Video en ${REPORTS_DIR}`);
+      throw new Error(`No se pudo guardar el Video en el servidor`);
     }
 
     const data = await response.json();
@@ -307,7 +473,16 @@ export const ReportService = {
     infractions: InfractionLog[]
   ): Promise<{ filename: string; path: string }> {
     const { buffer, filename } = await this.generateBatchPdf(infractions);
-    const path = await this.savePdfToDisk(buffer, filename);
+
+    let dateStr;
+    if (infractions.length > 0 && infractions[0].localTime) {
+      const match = infractions[0].localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (match) {
+        dateStr = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+      }
+    }
+
+    const path = await this.savePdfToDisk(buffer, filename, dateStr);
     return { filename, path };
   },
 };

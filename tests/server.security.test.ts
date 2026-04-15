@@ -73,8 +73,7 @@ describe('sanitizeFilename — extension handling', () => {
   it('keeps existing .pdf extension', () =>
     expect(sanitizeFilename('report.pdf', '.pdf')).toMatch(/\.pdf$/));
 
-  it('adds .webm extension', () =>
-    expect(sanitizeFilename('evidence', '.webm')).toMatch(/\.webm$/));
+  it('adds .mp4 extension', () => expect(sanitizeFilename('evidence', '.mp4')).toMatch(/\.mp4$/));
 });
 
 describe('sanitizeFilename — valid filenames', () => {

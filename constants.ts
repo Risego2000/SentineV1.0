@@ -356,7 +356,7 @@ export const ROAD_MENU_GROUPS = [
 export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   scout: {
     label: 'Scout',
-    description: 'Optimizado para alta velocidad (60fps) y baja latencia.',
+    description: 'Alta velocidad (60fps), baja latencia.',
     config: {
       confidenceThreshold: 0.3,
       nmsThreshold: 0.3,
@@ -367,7 +367,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   sentinel: {
     label: 'Sentinel',
-    description: 'Balance ideal biónico: seguimiento y peritaje estándar.',
+    description: 'Balance ideal: seguimiento estándar.',
     config: {
       confidenceThreshold: 0.35,
       nmsThreshold: 0.4,
@@ -378,7 +378,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   warden: {
     label: 'Warden',
-    description: 'Máxima precisión para tráfico denso y entornos urbanos.',
+    description: 'Máxima precisión para tráfico denso.',
     config: {
       confidenceThreshold: 0.45,
       nmsThreshold: 0.5,
@@ -389,7 +389,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   shadow: {
     label: 'Shadow',
-    description: 'Filtro especializado para baja visibilidad y modo nocturno.',
+    description: 'Filtro para baja visibilidad/nocturno.',
     config: {
       confidenceThreshold: 0.25,
       nmsThreshold: 0.3,
@@ -403,33 +403,33 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
 export const AUDIT_PRESETS: Record<AuditPresetType, AuditPresetData> = {
   standard: {
     label: 'Estándar',
-    description: 'Auditoría equilibrada de infracciones comunes.',
+    description: 'Auditoría equilibrada.',
     instructions: 'Analyze common traffic violations with standard rigor.',
   },
   flash: {
     label: 'Flash 2.0',
-    description: 'OCR ultrarrápido y validación de matrícula.',
+    description: 'OCR y placa ultrarrápido.',
     instructions: 'Detect and identify license plates rapidly with high-speed neural processing.',
   },
   tactical: {
     label: 'Táctico Pro',
-    description: 'Análisis de maniobra y comportamiento dinámico.',
+    description: 'Análisis de maniobra dinámica.',
     instructions: 'Detailed behavioral and kinetic analysis of the vehicle maneuvers.',
   },
   full: {
     label: 'Jurídico Premium',
-    description: 'Expediente RGC completo con base legal detallada.',
+    description: 'Expediente RGC completo.',
     instructions: 'Full legal audit according to RGC standards with detailed article citations.',
   },
   neural: {
     label: 'Motor Neural',
-    description: 'Detección profunda basada en patrones de riesgo.',
+    description: 'Patrones de riesgo profundo.',
     instructions:
       'Deep neural analysis focusing on high-risk traffic patterns and cognitive anomalies.',
   },
   senior: {
     label: 'Ingeniero Senior',
-    description: 'Peritaje biónico de alta fidelidad con EvidenceDB.',
+    description: 'Peritaje biónico EvidenceDB.',
     instructions:
       'Supreme architectural audit leveraging asynchronous EvidenceDB and ForensicQueue for maximum reliability.',
   },
@@ -438,19 +438,19 @@ export const AUDIT_PRESETS: Record<AuditPresetType, AuditPresetData> = {
 export const KINEMATIC_PRESETS: Record<KinematicPresetType, KinematicPresetData> = {
   lite: {
     label: 'Modelo Lite',
-    description: 'Procesado ultrarrápido para análisis de flujo.',
+    description: 'Análisis de flujo rápido.',
     model: 'lite',
     pose: false,
   },
   full: {
     label: 'Modelo Full',
-    description: 'Balance ideal: detección estándar biónica.',
+    description: 'Detección estándar biónica.',
     model: 'full',
     pose: true,
   },
   heavy: {
     label: 'Modelo Heavy',
-    description: 'Máxima precisión: peritaje estructural profundo.',
+    description: 'Peritaje estructural profundo.',
     model: 'heavy',
     pose: true,
   },

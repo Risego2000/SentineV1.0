@@ -1,14 +1,18 @@
 import React from 'react';
-import { LayoutGrid, Square, Grid2X2 } from 'lucide-react';
+import { LayoutGrid, Square, Grid2X2, Eye, EyeOff, ScanLine, Map } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useHelp } from '../../hooks/useHelp';
 
-// Two vertical panels side-by-side icon
 const TwoColumns = ({ className }: { className?: string }) => (
   <svg
-    width="24" height="24" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2"
-    strokeLinecap="round" strokeLinejoin="round"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     className={className}
     aria-hidden="true"
   >
@@ -18,55 +22,89 @@ const TwoColumns = ({ className }: { className?: string }) => (
 );
 
 export const LayoutControls = () => {
-  const { gridSize, setGridSize } = useLayoutStore();
+  const { gridSize, setGridSize, showDetections, toggleDetections, showROIs, toggleROIs } =
+    useLayoutStore();
   const { helpProps } = useHelp();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-[10px]">
       <h3
-        className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
+        className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"
         {...helpProps('Controla la disposición y el número de visores simultáneos.')}
       >
-        <LayoutGrid size={14} className="text-cyan-500" /> Disposición Visual
+        <LayoutGrid size={14} className="text-blue-500" /> VISUALIZACIÓN
       </h3>
-      <div className="glass-card rounded-[20px] p-1.5 flex items-center gap-1 shadow-2xl relative overflow-hidden bg-slate-950/60 border border-white/5">
-        <div className="absolute inset-0 hud-grid opacity-10 pointer-events-none" />
 
-        <button
-          onClick={() => setGridSize(1)}
-          className={`relative z-10 flex-1 flex items-center justify-center py-3 rounded-2xl transition-all duration-300 ${
-            gridSize === 1
-              ? 'bg-cyan-950/80 shadow-[0_0_15px_rgba(6,182,212,0.2)] border border-cyan-500/30'
-              : 'text-slate-500 hover:text-cyan-400 hover:bg-slate-900/50 border border-transparent'
-          }`}
-          title="1x1 (Single Viewer)"
-        >
-          <Square className={`w-6 h-6 ${gridSize === 1 ? 'text-cyan-400' : ''}`} />
-        </button>
+      <div className="bg-slate-900/40 border border-white/10 rounded-[20px] p-4 space-y-4">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setGridSize(1)}
+            className={`flex-1 flex items-center justify-center py-3 rounded-[12px] border transition-all duration-300 ${
+              gridSize === 1
+                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+            }`}
+            {...helpProps('Vista de visor único 1x1')}
+          >
+            <Square className="w-5 h-5" />
+          </button>
 
-        <button
-          onClick={() => setGridSize(2)}
-          className={`relative z-10 flex-1 flex items-center justify-center py-3 rounded-2xl transition-all duration-300 ${
-            gridSize === 2
-              ? 'bg-cyan-950/80 shadow-[0_0_15px_rgba(6,182,212,0.2)] border border-cyan-500/30'
-              : 'text-slate-500 hover:text-cyan-400 hover:bg-slate-900/50 border border-transparent'
-          }`}
-          title="2x1 (Dual Viewer)"
-        >
-          <TwoColumns className={`w-6 h-6 ${gridSize === 2 ? 'text-cyan-400' : ''}`} />
-        </button>
+          <button
+            onClick={() => setGridSize(2)}
+            className={`flex-1 flex items-center justify-center py-3 rounded-[12px] border transition-all duration-300 ${
+              gridSize === 2
+                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+            }`}
+            {...helpProps('Vista de doble visor 2x1')}
+          >
+            <TwoColumns className="w-5 h-5" />
+          </button>
 
-        <button
-          onClick={() => setGridSize(4)}
-          className={`relative z-10 flex-1 flex items-center justify-center py-3 rounded-2xl transition-all duration-300 ${
-            gridSize === 4
-              ? 'bg-cyan-950/80 shadow-[0_0_15px_rgba(6,182,212,0.2)] border border-cyan-500/30'
-              : 'text-slate-500 hover:text-cyan-400 hover:bg-slate-900/50 border border-transparent'
-          }`}
-          title="2x2 (Quad Viewer)"
-        >
-          <Grid2X2 className={`w-6 h-6 ${gridSize === 4 ? 'text-cyan-400' : ''}`} />
-        </button>
+          <button
+            onClick={() => setGridSize(4)}
+            className={`flex-1 flex items-center justify-center py-3 rounded-[12px] border transition-all duration-300 ${
+              gridSize === 4
+                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+            }`}
+            {...helpProps('Vista cuádruple de visores 2x2')}
+          >
+            <Grid2X2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={toggleDetections}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-[12px] border transition-all duration-300 ${
+              showDetections
+                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+            }`}
+            {...helpProps('Muestra u oculta los cuadros de detección de vehículos y telemetría.')}
+          >
+            {showDetections ? <ScanLine size={14} /> : <EyeOff size={14} />}
+            <span className="text-[9px] font-bold uppercase tracking-wider">
+              {showDetections ? 'Detecciones ON' : 'Detecciones OFF'}
+            </span>
+          </button>
+
+          <button
+            onClick={toggleROIs}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-[12px] border transition-all duration-300 ${
+              showROIs
+                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                : 'bg-black/20 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+            }`}
+            {...helpProps('Muestra u oculta las zonas de análisis ROI y líneas configuradas.')}
+          >
+            {showROIs ? <Map size={14} /> : <EyeOff size={14} />}
+            <span className="text-[9px] font-bold uppercase tracking-wider">
+              {showROIs ? 'Zonas ROI ON' : 'Zonas ROI OFF'}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

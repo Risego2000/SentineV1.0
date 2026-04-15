@@ -72,6 +72,7 @@ export const SentinelProvider = ({
     const saved = Number(localStorage.getItem('sentinel_analysis_grid') || '1');
     return saved === 2 || saved === 3 ? saved : 1;
   });
+  const [selectedProtocolIds, setSelectedProtocolIds] = useState<string[]>([]);
 
   const [bufferStatus, setBufferStatus] = useState<SentinelContextType['bufferStatus']>({
     state: 'idle',
@@ -93,6 +94,7 @@ export const SentinelProvider = ({
   const [videoQueue, setVideoQueue] = useState<File[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [helpMsg, setHelpMsg] = useState<string | null>(null);
 
   const hasApiKey = !!import.meta.env.VITE_GOOGLE_GENAI_KEY;
 
@@ -256,7 +258,10 @@ export const SentinelProvider = ({
     (preset: PresetType) => {
       setPreset(preset);
       setEngineConfig(DETECTION_PRESETS[preset].config);
-      addLog('CORE', `Modo de operación cambiado a: ${DETECTION_PRESETS[preset].label} `);
+      addLog(
+        'CORE',
+        `Modo de operación cambiado a: ${DETECTION_PRESETS[preset].label.toUpperCase()}`
+      );
     },
     [addLog]
   );
@@ -292,10 +297,19 @@ export const SentinelProvider = ({
           // Permanently save Video Evidence to disk
           if (log.videoClip) {
             try {
-              const videoFilename = filename.replace('.pdf', '.webm');
+              const videoFilename = filename.replace('.pdf', '.mp4');
               const videoBase64 = log.videoClip.split(',')[1];
               const videoBuffer = Uint8Array.from(atob(videoBase64), (c) => c.charCodeAt(0)).buffer;
-              await ReportService.saveVideoToDisk(videoBuffer, videoFilename);
+
+              let dateStr;
+              if (log.localTime) {
+                const match = log.localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                if (match) {
+                  dateStr = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+                }
+              }
+
+              await ReportService.saveVideoToDisk(videoBuffer, videoFilename, dateStr);
               addLog('SUCCESS', `Evidencia de video guardada: ${videoFilename}`);
             } catch (vErr) {
               console.error('Error saving video evidence:', vErr);
@@ -487,7 +501,12 @@ export const SentinelProvider = ({
   );
 
   const loadVideo = useCallback(
-    async (file: File, videoRef: React.RefObject<HTMLVideoElement | null>, keepConfig = false) => {
+    async (
+      file: File,
+      videoRef: React.RefObject<HTMLVideoElement | null>,
+      keepConfig = false,
+      autoPlay = true
+    ) => {
       if (!file || !videoRef.current) return;
 
       const video = videoRef.current;
@@ -542,7 +561,7 @@ export const SentinelProvider = ({
           video.onloadeddata = () => {
             addLog('SUCCESS', `Video transcodificado listo.`);
             setStatusMsg('CARGA_COMPLETA');
-            if (keepConfig) setIsPlaying(true);
+            if (autoPlay) setIsPlaying(true);
           };
         } catch (error) {
           clearInterval(pollInterval);
@@ -556,7 +575,7 @@ export const SentinelProvider = ({
         video.removeEventListener('error', handleError);
         addLog('INFO', `Video "${file.name}" sincronizado.`);
         setStatusMsg('SISTEMA_LISTO');
-        if (keepConfig) setIsPlaying(true);
+        if (autoPlay) setIsPlaying(true);
       };
 
       setSource('upload');
@@ -623,6 +642,11 @@ export const SentinelProvider = ({
   }, [addLog]);
 
   const loadNextInQueue = useCallback(async () => {
+    // Wait for current forensic audits to finish before moving to next video
+    // This ensures we don't overlap heavy AI analysis between videos
+    addLog('INFO', 'Finalizando peritajes del video actual antes de proceder...');
+    await forensicQueue.waitForIdle();
+
     if (currentQueueIndex < videoQueue.length - 1) {
       const nextIndex = currentQueueIndex + 1;
       setCurrentQueueIndex(nextIndex);
@@ -763,6 +787,29 @@ export const SentinelProvider = ({
     }
   }, [geometry, directives]);
 
+  const validateInfraction = useCallback(
+    (id: number, status: 'validated' | 'rejected') => {
+      setLogs((prev) => {
+        const next = prev.map((log) => {
+          if (log.id === id) {
+            const updated = { ...log, validationStatus: status, validatedAt: Date.now() };
+            // Persist change to DB
+            evidenceDB.saveInfraction(updated);
+            return updated;
+          }
+          return log;
+        });
+        return status === 'rejected' ? next.filter((l) => l.id !== id) : next;
+      });
+      addLog(
+        status === 'validated' ? 'SUCCESS' : 'WARN',
+        `Infracción #${id} marcada como ${status.toUpperCase()} por el operador.`
+      );
+    },
+
+    [setLogs, addLog]
+  );
+
   // Memoize the context value so consumers only re-render when relevant slices change
   const value: SentinelContextType = useMemo(
     () => ({
@@ -798,6 +845,8 @@ export const SentinelProvider = ({
       systemStatus,
       statusLabel,
       hasApiKey,
+      helpMsg,
+      setHelpMsg,
       addLog,
       generateGeometry,
       runAudit,
@@ -821,6 +870,7 @@ export const SentinelProvider = ({
       setPerformanceMetrics,
       updateBufferStatus,
       clearLogs,
+      validateInfraction,
       tracks,
       setTracks,
       isAuditEnabled,
@@ -834,6 +884,8 @@ export const SentinelProvider = ({
       analysisGridSize,
       setAnalysisGridSize,
       viewerId,
+      selectedProtocolIds,
+      setSelectedProtocolIds,
     }),
     [
       source,
@@ -859,6 +911,8 @@ export const SentinelProvider = ({
       systemLogs,
       statusMsg,
       setStatusMsg,
+      helpMsg,
+      setHelpMsg,
       isAnalyzing,
       systemStatus,
       statusLabel,
@@ -886,7 +940,9 @@ export const SentinelProvider = ({
       setPerformanceMetrics,
       updateBufferStatus,
       clearLogs,
+      validateInfraction,
       tracks,
+      setTracks,
       isAuditEnabled,
       setIsAuditEnabled,
       currentAuditPreset,
@@ -898,6 +954,8 @@ export const SentinelProvider = ({
       analysisGridSize,
       setAnalysisGridSize,
       viewerId,
+      selectedProtocolIds,
+      setSelectedProtocolIds,
     ]
   );
 

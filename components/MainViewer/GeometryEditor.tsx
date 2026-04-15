@@ -3,12 +3,20 @@ import ReactDOM from 'react-dom';
 import { GeometryLine, EntityType, Point } from '../../types';
 import { Ban, ShieldAlert, GitCommitVertical, Box, Scale } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
+import { useLayoutStore } from '../../stores/layoutStore';
 
 export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasElement | null> }> = ({
   canvasRef,
 }) => {
-  const { geometry, setGeometry, isMeshRenderEnabled, setIsMeshRenderEnabled, setCalibration } =
-    useSentinel();
+  const {
+    geometry,
+    setGeometry,
+    isMeshRenderEnabled,
+    setIsMeshRenderEnabled,
+    setCalibration,
+    viewerId,
+  } = useSentinel();
+  const { gridSize, focusedViewerId, showROIs } = useLayoutStore();
 
   const [points, setPoints] = useState<Point[]>([]);
   const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
@@ -21,9 +29,12 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
   }, []);
 
   // Handles line completion logic via keyboard and mouse
+  // Only the focused viewer's GeometryEditor should respond to global keyboard events
+  const isActiveEditor = isMeshRenderEnabled && (!viewerId || viewerId === focusedViewerId);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isMeshRenderEnabled) return;
+      if (!isActiveEditor) return;
 
       if (e.key === 'Escape') {
         if (showMenu) {
@@ -48,7 +59,7 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [finishDrawing, points, isMeshRenderEnabled, setIsMeshRenderEnabled, showMenu]);
+  }, [finishDrawing, points, isActiveEditor, setIsMeshRenderEnabled, showMenu]);
 
   const getNormalizedPoint = (e: React.MouseEvent | MouseEvent): Point => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -188,9 +199,10 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
                   strokeWidth={line.type === 'lane_divider' ? '2' : '5'}
                   strokeDasharray={line.type === 'lane_divider' ? '10, 5' : '0'}
                   fill={isClosed ? `${strokeColor}26` : 'none'}
-                  opacity={isMeshRenderEnabled ? '0.9' : '0.5'} // Allow seeing them even when not editing but dimmer
+                  opacity={isMeshRenderEnabled ? '0.9' : showROIs ? '0.5' : '0'}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  className="transition-opacity duration-300"
                 />
                 {isMeshRenderEnabled &&
                   polyPoints.map((p, idx) => (
@@ -227,166 +239,169 @@ export const GeometryEditor: React.FC<{ canvasRef: React.RefObject<HTMLCanvasEle
         )}
       </svg>
 
-      {showMenu && ReactDOM.createPortal(
-        <div
-          className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[9999] max-h-[80vh] overflow-y-auto custom-scrollbar"
-          style={{
-            top: menuPos.sy > window.innerHeight * 0.6 ? 'auto' : `${menuPos.sy + 10}px`,
-            bottom:
-              menuPos.sy > window.innerHeight * 0.6
-                ? `${window.innerHeight - menuPos.sy}px`
-                : 'auto',
-            left:
-              menuPos.sx > window.innerWidth * 0.7
-                ? `${menuPos.sx - 224 - 10}px`
-                : `${menuPos.sx + 10}px`,
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="text-[10px] text-slate-500 font-bold uppercase px-2 py-1 flex justify-between items-center border-b border-white/5 mb-1 pb-2">
-            <span>Configurar Elemento</span>
-          </div>
-
-          <button
-            onClick={() => confirmLine('forbidden', 'PROHIBIDO')}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-red-500/20 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors">
-              <Ban size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
-              Línea Continua / Prohibido
-            </span>
-          </button>
-
-          <button
-            onClick={() => confirmLine('stop_line', 'STOP')}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-amber-500/20 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-              <ShieldAlert size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-              Línea de STOP
-            </span>
-          </button>
-
-          <button
-            onClick={() => confirmLine('lane_divider', 'CARRIL')}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-cyan-500/20 text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
-              <GitCommitVertical size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
-              División de Carril
-            </span>
-          </button>
-
-          <button
-            onClick={() => confirmLine('pedestrian', 'PEATONES')}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-blue-500/20 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-              <ShieldAlert size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
-              Paso de Peatones
-            </span>
-          </button>
-
-          <button
-            onClick={() => confirmLine('bus_lane', 'CARRIL BUS')}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
-              <Box size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-              Carril BUS / TAXI
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              const roiCount = geometry.filter((l) => l.type.startsWith('roi_')).length;
-              const label = `ROI ${String.fromCharCode(65 + (roiCount % 26))}`;
-              confirmLine('roi_general', label);
+      {showMenu &&
+        ReactDOM.createPortal(
+          <div
+            className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 p-2 rounded-xl shadow-2xl flex flex-col gap-1 w-56 z-[9999] max-h-[80vh] overflow-y-auto custom-scrollbar"
+            style={{
+              top: menuPos.sy > window.innerHeight * 0.6 ? 'auto' : `${menuPos.sy + 10}px`,
+              bottom:
+                menuPos.sy > window.innerHeight * 0.6
+                  ? `${window.innerHeight - menuPos.sy}px`
+                  : 'auto',
+              left:
+                menuPos.sx > window.innerWidth * 0.7
+                  ? `${menuPos.sx - 224 - 10}px`
+                  : `${menuPos.sx + 10}px`,
             }}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-              <Box size={14} />
+            <div className="text-[10px] text-slate-500 font-bold uppercase px-2 py-1 flex justify-between items-center border-b border-white/5 mb-1 pb-2">
+              <span>Configurar Elemento</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                ROI: ANÁLISIS GENERAL
-              </span>
-            </div>
-          </button>
 
-          <button
-            onClick={() => {
-              const roiCount = geometry.filter((l) => l.type.startsWith('roi_')).length;
-              const label = `ROI ${String.fromCharCode(65 + (roiCount % 26))}`;
-              confirmLine('roi_turn', label);
-            }}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
-          >
-            <div className="p-1.5 rounded bg-purple-500/20 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
-              <Box size={14} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
-                ROI: GIRO PROHIBIDO
+            <button
+              onClick={() => confirmLine('forbidden', 'PROHIBIDO')}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-red-500/20 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors">
+                <Ban size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                Línea Continua / Prohibido
               </span>
-            </div>
-          </button>
+            </button>
 
-          <button
-            onClick={() => {
-              if (points.length < 2 || !canvasRef.current) return;
-              const distMeters = prompt('Distancia REAL en METROS entre el PRIMER y ÚLTIMO punto:');
-              if (distMeters && !isNaN(parseFloat(distMeters))) {
-                const rect = canvasRef.current.getBoundingClientRect();
-                const p1 = points[0];
-                const p2 = points[points.length - 1];
-                const dx = (p2.x - p1.x) * rect.width;
-                const dy = (p2.y - p1.y) * rect.height;
-                const pixelDist = Math.sqrt(dx * dx + dy * dy);
-                if (pixelDist > 0) {
-                  const newCalib = parseFloat(distMeters) / pixelDist;
-                  setCalibration(newCalib);
-                  alert(`Calibración establecida: ${newCalib.toFixed(6)} m/px`);
+            <button
+              onClick={() => confirmLine('stop_line', 'STOP')}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-amber-500/20 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                <ShieldAlert size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                Línea de STOP
+              </span>
+            </button>
+
+            <button
+              onClick={() => confirmLine('lane_divider', 'CARRIL')}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-cyan-500/20 text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                <GitCommitVertical size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                División de Carril
+              </span>
+            </button>
+
+            <button
+              onClick={() => confirmLine('pedestrian', 'PEATONES')}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-blue-500/20 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <ShieldAlert size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                Paso de Peatones
+              </span>
+            </button>
+
+            <button
+              onClick={() => confirmLine('bus_lane', 'CARRIL BUS')}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                <Box size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                Carril BUS / TAXI
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                const roiCount = geometry.filter((l) => l.type.startsWith('roi_')).length;
+                const label = `ROI ${String.fromCharCode(65 + (roiCount % 26))}`;
+                confirmLine('roi_general', label);
+              }}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <Box size={14} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                  ROI: ANÁLISIS GENERAL
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                const roiCount = geometry.filter((l) => l.type.startsWith('roi_')).length;
+                const label = `ROI ${String.fromCharCode(65 + (roiCount % 26))}`;
+                confirmLine('roi_turn', label);
+              }}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group"
+            >
+              <div className="p-1.5 rounded bg-purple-500/20 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                <Box size={14} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                  ROI: GIRO PROHIBIDO
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                if (points.length < 2 || !canvasRef.current) return;
+                const distMeters = prompt(
+                  'Distancia REAL en METROS entre el PRIMER y ÚLTIMO punto:'
+                );
+                if (distMeters && !isNaN(parseFloat(distMeters))) {
+                  const rect = canvasRef.current.getBoundingClientRect();
+                  const p1 = points[0];
+                  const p2 = points[points.length - 1];
+                  const dx = (p2.x - p1.x) * rect.width;
+                  const dy = (p2.y - p1.y) * rect.height;
+                  const pixelDist = Math.sqrt(dx * dx + dy * dy);
+                  if (pixelDist > 0) {
+                    const newCalib = parseFloat(distMeters) / pixelDist;
+                    setCalibration(newCalib);
+                    alert(`Calibración establecida: ${newCalib.toFixed(6)} m/px`);
+                  }
                 }
-              }
-              setPoints([]);
-              setCurrentPoint(null);
-              setShowMenu(false);
-            }}
-            className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group border-t border-white/10 mt-1 pt-2"
-          >
-            <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-              <Scale size={14} />
-            </div>
-            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-              Calibrar Distancia
-            </span>
-          </button>
+                setPoints([]);
+                setCurrentPoint(null);
+                setShowMenu(false);
+              }}
+              className="flex items-center gap-3 p-2 hover:bg-white/10 rounded-lg text-left group border-t border-white/10 mt-1 pt-2"
+            >
+              <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <Scale size={14} />
+              </div>
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                Calibrar Distancia
+              </span>
+            </button>
 
-          <button
-            onClick={() => {
-              setPoints([]);
-              setCurrentPoint(null);
-              setShowMenu(false);
-            }}
-            className="p-1 text-[9px] text-slate-600 hover:text-white uppercase font-black transition-colors"
-          >
-            Cancelar
-          </button>
-        </div>,
-        document.body
-      )}
+            <button
+              onClick={() => {
+                setPoints([]);
+                setCurrentPoint(null);
+                setShowMenu(false);
+              }}
+              className="p-1 text-[9px] text-slate-600 hover:text-white uppercase font-black transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

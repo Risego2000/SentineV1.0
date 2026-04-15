@@ -1,6 +1,8 @@
-import { X, Scale, FileDown } from 'lucide-react';
+import { X, Scale, FileDown, CheckCircle, Ban } from 'lucide-react';
 import { InfractionLog } from '../types';
 import { ReportService } from '../services/ReportService';
+import { useSentinel } from '../hooks/useSentinel';
+import { useHelp } from '../hooks/useHelp';
 
 interface InfractionModalProps {
   log: InfractionLog;
@@ -8,136 +10,185 @@ interface InfractionModalProps {
 }
 
 export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
+  const { validateInfraction } = useSentinel();
+  const { helpProps } = useHelp();
+
   const generatePDF = async () => {
     await ReportService.downloadInfractionPdf(
       log,
-      `Expediente_Digital_${log.plate || 'SENT'}_${log.id.toString().slice(0, 8)}.pdf`
+      `ACTA_PERICIAL_${log.plate || 'SENT'}_${log.id.toString().slice(0, 8)}.pdf`
     );
   };
 
+  const handleValidate = () => {
+    validateInfraction(log.id, 'validated');
+    onClose();
+  };
+
+  const handleReject = () => {
+    validateInfraction(log.id, 'rejected');
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 backdrop-blur-2xl animate-in fade-in duration-300">
-      <div className="bg-[#050914] w-full max-w-6xl h-[90vh] rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          <div className="flex-[1.8] bg-[#02040a] flex flex-col p-4 gap-4 overflow-hidden min-h-0">
-            {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
-              <div className="flex flex-col h-full gap-4 justify-center">
-                {[
-                  { img: log.extraSnapshots[0], label: '01 FOTOGRAMA INICIAL (ROI A)' },
-                  { img: log.extraSnapshots[1], label: '02 FOTOGRAMA INTERMEDIO' },
-                  { img: log.extraSnapshots[2], label: '03 FOTOGRAMA FINAL (ROI B)' },
-                ].map((frame, idx) => (
-                  <div
-                    key={idx}
-                    className="flex-1 relative group rounded-2xl overflow-hidden border border-white/10 shadow-inner bg-slate-900/40 min-h-0"
-                  >
-                    <img
-                      src={`data:image/jpeg;base64,${frame.img}`}
-                      className="w-full h-full object-contain brightness-[0.95] group-hover:brightness-110 transition-all duration-700"
-                      alt={frame.label}
-                    />
-                    <div className="absolute top-4 left-4">
-                      <span className="text-[10px] font-black text-white px-3 py-1.5 rounded-lg bg-red-600/90 backdrop-blur-md uppercase tracking-widest shadow-lg border border-white/20">
-                        {frame.label}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="relative w-full h-full flex items-center justify-center bg-black">
-                {log.videoClip ? (
-                  <video
-                    src={log.videoClip}
-                    controls
-                    autoPlay
-                    loop
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <img src={log.image} className="w-full h-full object-contain bg-black/40" />
-                )}
-              </div>
-            )}
+    <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#121216] w-full max-w-5xl h-[90vh] rounded-lg border border-white/10 overflow-hidden flex flex-col shadow-2xl">
+        {/* Header - Formal look */}
+        <div className="px-8 py-6 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-bold text-white tracking-tight uppercase">
+              Acta de Peritaje Judicial IA
+            </h2>
+            <p className="text-[10px] text-slate-500 font-medium tracking-[0.2em] uppercase mt-1">
+              Sentinel Horizon Protocol • Forensic Unit
+            </p>
           </div>
-          <div className="w-full lg:w-[420px] p-6 flex flex-col bg-slate-950/20 border-l border-white/5 overflow-y-auto custom-scrollbar">
-            <button onClick={onClose} className="self-end p-2 text-slate-500 hover:text-white mb-2">
-              <X size={20} />
-            </button>
-            <div className="space-y-6">
-              <div>
-                <span className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1 block">
-                  Captura Forense
-                </span>
-                <h2 className="text-3xl font-black text-white italic tracking-tighter truncate">
-                  {log.ruleCategory}
-                </h2>
-              </div>
-              <div className="bg-black/40 p-5 rounded-3xl border border-white/5 space-y-3">
-                <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">Vehículo</span>
-                  <span className="text-xl font-mono font-black text-cyan-400">
-                    {log.plate || 'SENT-IA'}
-                  </span>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Column - Evidence Viewer */}
+          <div className="flex-1 bg-black/40 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Evidencia Fotográfica Certificada
+              </h3>
+              {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {[
+                    { img: log.extraSnapshots[0], label: 'FOTOGRAMA 01 - ENTRADA EN ROI' },
+                    { img: log.extraSnapshots[1], label: 'FOTOGRAMA 02 - POSICIÓN CRÍTICA' },
+                    { img: log.extraSnapshots[2], label: 'FOTOGRAMA 03 - SALIDA / CONFIRMACIÓN' },
+                  ].map((frame, idx) => (
+                    <div
+                      key={idx}
+                      className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-slate-900/40"
+                    >
+                      <img
+                        src={`data:image/jpeg;base64,${frame.img}`}
+                        className="w-full h-full object-contain"
+                        alt={frame.label}
+                      />
+                      <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2 py-1 border border-white/10 rounded">
+                        <span className="text-[8px] font-bold text-white uppercase tracking-wider">
+                          {frame.label}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">
-                    Tiempo Video (OSD)
-                  </span>
-                  <span className="text-base font-mono font-bold text-amber-500">
-                    {log.videoTimeCode || log.time}
-                  </span>
+              ) : (
+                <div className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-black">
+                  {log.videoClip ? (
+                    <video
+                      src={log.videoClip}
+                      controls
+                      autoPlay
+                      loop
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <img src={log.image} className="w-full h-full object-contain" />
+                  )}
                 </div>
-                <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">
-                    Tiempo Local
+              )}
+            </div>
+          </div>
+
+          {/* Right Column - Data & Actions */}
+          <div className="w-[380px] border-l border-white/5 flex flex-col bg-[#0d0d0f]">
+            <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+              {/* Status Section */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Estado
                   </span>
-                  <span className="text-base font-mono font-bold text-slate-300">
-                    {log.localTime || new Date().toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">Gravedad</span>
-                  <span className="text-lg font-black text-red-600 uppercase italic">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${log.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}
+                  >
                     {log.severity}
                   </span>
                 </div>
+                <h4 className="text-lg font-bold text-white tracking-tight leading-snug uppercase">
+                  {log.ruleCategory}
+                </h4>
               </div>
+
+              {/* Data Table */}
+              <div className="space-y-4 border-t border-b border-white/5 py-6">
+                <div className="grid grid-cols-2 gap-y-4 text-[11px]">
+                  <span className="text-slate-500 font-medium">Placa / ID</span>
+                  <span className="text-blue-500 font-bold text-right font-mono">
+                    {log.plate || 'DESCONOCIDO'}
+                  </span>
+
+                  <span className="text-slate-500 font-medium">Marca/Modelo</span>
+                  <span className="text-slate-300 font-bold text-right uppercase">
+                    {log.makeModel || 'N/A'}
+                  </span>
+
+                  <span className="text-slate-500 font-medium">Timestamp Video</span>
+                  <span className="text-slate-300 font-bold text-right font-mono">
+                    {log.videoTimeCode || log.time}
+                  </span>
+
+                  <span className="text-slate-500 font-medium">Timestamp Local</span>
+                  <span className="text-slate-300 font-bold text-right font-mono">
+                    {log.localTime || 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Legal Base */}
               <div className="space-y-3">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Scale size={14} className="text-cyan-500" /> Fundamento Legal
-                </h3>
-                <p className="text-[12px] text-slate-300 leading-relaxed italic uppercase border-l-2 border-cyan-500/30 pl-3 py-1">
+                <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Scale size={14} className="text-blue-500" /> Dictamen Forense
+                </h5>
+                <p className="text-xs text-slate-300 leading-relaxed italic bg-white/[0.02] p-4 rounded border border-white/5">
                   "{log.description}"
                 </p>
-                <div className="p-3 bg-cyan-900/5 border border-cyan-500/10 rounded-2xl space-y-2">
+                <div className="space-y-2 pt-2">
                   {log.reasoning?.map((r, i) => (
-                    <div
-                      key={i}
-                      className="flex gap-3 text-[10px] font-mono text-cyan-200 uppercase"
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
-                        {i + 1}
-                      </div>
-                      <span className="leading-tight">{r}</span>
+                    <div key={i} className="flex gap-3 text-[10px] text-slate-400">
+                      <span className="text-blue-500 font-bold shrink-0">{i + 1}.</span>
+                      <span className="leading-tight uppercase tracking-tight">{r}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-8 border-t border-white/5 bg-white/[0.01] space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={generatePDF}
-                  className="w-full py-5 bg-slate-800 text-white rounded-[25px] font-black uppercase tracking-widest shadow-xl hover:bg-slate-700 active:scale-95 text-xs flex items-center justify-center gap-2"
+                  onClick={handleReject}
+                  className="py-3 px-4 border border-white/10 rounded hover:bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                  {...helpProps('Rechazar esta infracción y eliminar del registro.')}
                 >
-                  <FileDown size={16} /> Expt. Digital
+                  <Ban size={14} /> Descartar
                 </button>
                 <button
-                  onClick={onClose}
-                  className="w-full py-5 bg-red-600 text-white rounded-[25px] font-black uppercase tracking-widest shadow-2xl hover:bg-red-500 active:scale-95 text-xs"
+                  onClick={handleValidate}
+                  className="py-3 px-4 bg-blue-600 rounded hover:bg-blue-500 text-white text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg"
+                  {...helpProps('Validar infracción para procesamiento legal.')}
                 >
-                  Confirmar Sanción
+                  <CheckCircle size={14} /> Validar
                 </button>
               </div>
+              <button
+                onClick={generatePDF}
+                className="w-full py-3 text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all"
+                {...helpProps('Descargar informe PDF certificado con evidencia fotográfica.')}
+              >
+                <FileDown size={14} /> Generar Expediente PDF Certificado
+              </button>
             </div>
           </div>
         </div>

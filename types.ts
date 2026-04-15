@@ -178,6 +178,9 @@ export interface InfractionLog extends AuditResponse {
   playbackTime?: number; // Time in seconds from the start of the video
   reportPath?: string;
   viewerId?: string; // Multi-viewer support
+  validationStatus?: 'pending' | 'validated' | 'rejected';
+  validatedAt?: number;
+  operatorId?: string;
 }
 
 /**

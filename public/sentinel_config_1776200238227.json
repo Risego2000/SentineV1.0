@@ -1,0 +1,82 @@
+{
+  "version": "1.6",
+  "timestamp": "2026-04-14T20:57:18.224Z",
+  "sentinel": {
+    "directives": "\n- [ROI A]: Análisis de Giro Prohibido (Secuencial).\n- [ROI B]: Análisis de Giro Prohibido (Secuencial).",
+    "geometry": [
+      {
+        "id": "geo_1776200221740",
+        "x1": 0.29386733993505,
+        "y1": 0.4846238008364315,
+        "x2": 0.3104241801009094,
+        "y2": 0.960908153185241,
+        "points": [
+          {
+            "x": 0.29386733993505,
+            "y": 0.4846238008364315
+          },
+          {
+            "x": 0.39569190695508555,
+            "y": 0.47583085894691496
+          },
+          {
+            "x": 0.5140733141409806,
+            "y": 0.4670379170573985
+          },
+          {
+            "x": 0.6150700391527231,
+            "y": 0.9638391338150799
+          },
+          {
+            "x": 0.3104241801009094,
+            "y": 0.960908153185241
+          }
+        ],
+        "type": "roi_turn",
+        "label": "ROI A"
+      },
+      {
+        "id": "geo_1776200230504",
+        "x1": 0.7880890188859543,
+        "y1": 0.21204260226142044,
+        "x2": 0.8783237977898882,
+        "y2": 0.33074731776989297,
+        "points": [
+          {
+            "x": 0.7880890188859543,
+            "y": 0.21204260226142044
+          },
+          {
+            "x": 0.6937150299405554,
+            "y": 0.23549044730013105
+          },
+          {
+            "x": 0.8145799631513294,
+            "y": 0.37910849816223363
+          },
+          {
+            "x": 0.8783237977898882,
+            "y": 0.33074731776989297
+          }
+        ],
+        "type": "roi_turn",
+        "label": "ROI B"
+      }
+    ],
+    "currentPreset": "sentinel",
+    "isPoseEnabled": false,
+    "isAuditEnabled": true,
+    "currentAuditPreset": "senior",
+    "currentKinematicPreset": "full",
+    "calibration": 0.05,
+    "analysisGridSize": 1,
+    "selectedProtocolIds": [
+      "roi-turn-demo"
+    ]
+  },
+  "layout": {
+    "gridSize": 1,
+    "showDetections": true,
+    "showROIs": true
+  }
+}

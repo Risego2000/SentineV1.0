@@ -1,5 +1,4 @@
 import React, { memo, useRef, useEffect, useCallback } from 'react';
-import { Waves } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useFrameProcessor } from '../../hooks/useFrameProcessor';
 import { renderScene } from '../renderSystem';
@@ -7,9 +6,12 @@ import { EmptyState } from './EmptyState';
 import { NeuralStatusHUD } from './NeuralStatusHUD';
 import { ForensicAnalysisOverlay } from './ForensicAnalysisOverlay';
 import { GeometryEditor } from './GeometryEditor';
+import { SystemAlertHUD } from './SystemAlertHUD';
 import { IpCameraModal } from '../IpCameraModal';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useFocusedViewerStore } from '../../stores/focusedViewerStore';
+
+const escudo = '/ESCUDO.png?v=11';
 
 export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const {
@@ -31,7 +33,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   } = useSentinel();
 
   const { processFrame, trackerRef, resetTracker } = useFrameProcessor();
-  const { gridSize, focusedViewerId } = useLayoutStore();
+  const { gridSize, focusedViewerId, showDetections, showROIs } = useLayoutStore();
   const { update: updateFocusedViewer } = useFocusedViewerStore();
   const compact = gridSize >= 2;
   const mini = gridSize >= 3;
@@ -55,7 +57,15 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       if (isPlaying) {
         await processFrame(v, canvas);
       }
-      renderScene(ctx, v, trackerRef.current.tracks, geometry, isMeshRenderEnabled);
+      renderScene(
+        ctx,
+        v,
+        trackerRef.current.tracks,
+        geometry,
+        isMeshRenderEnabled,
+        showDetections,
+        showROIs
+      );
     } catch (err) {
       addLog(
         'ERROR',
@@ -68,6 +78,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     geometry,
     processFrame,
     isMeshRenderEnabled,
+    showDetections,
+    showROIs,
     videoRef,
     trackerRef,
     addLog,
@@ -154,14 +166,25 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       videoRef,
       logs,
       setIsPlayingFn: setIsPlaying,
-      onScreenShareFn: () => { clearLogs(); contextStartScreenShare(videoRef); },
+      onScreenShareFn: () => {
+        clearLogs();
+        contextStartScreenShare(videoRef);
+      },
       onIpCameraFn: () => setShowIpModal(true),
       onUploadFn: handleFileSelect,
     });
   }, [
-    isFocused, isPlaying, source, logs, viewerId,
-    updateFocusedViewer, setIsPlaying, clearLogs, contextStartScreenShare,
-    videoRef, handleFileSelect,
+    isFocused,
+    isPlaying,
+    source,
+    logs,
+    viewerId,
+    updateFocusedViewer,
+    setIsPlaying,
+    clearLogs,
+    contextStartScreenShare,
+    videoRef,
+    handleFileSelect,
   ]);
 
   return (
@@ -189,7 +212,17 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
       <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
 
-      <div className={mini ? "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-0" : compact ? "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-2" : "flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-4 lg:p-8"}>
+      <SystemAlertHUD />
+
+      <div
+        className={
+          mini
+            ? 'flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-0'
+            : compact
+              ? 'flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-2'
+              : 'flex-1 relative flex items-center justify-center bg-[#01030d] overflow-hidden w-full h-full p-4 lg:p-8'
+        }
+      >
         <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none" />
         <div className="scanline" />
 
@@ -209,10 +242,10 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
           />
           <GeometryEditor canvasRef={canvasRef} />
 
-          <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-cyan-500/50" />
-          <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-cyan-500/50" />
-          <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-cyan-500/50" />
-          <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-cyan-500/50" />
+          <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-blue-500/50" />
+          <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-blue-500/50" />
+          <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-blue-500/50" />
+          <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-blue-500/50" />
         </div>
 
         {source === 'none' && <EmptyState />}
@@ -220,15 +253,19 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         {isAnalyzing && (
           <div className="absolute inset-0 flex items-center justify-center z-[60] bg-[#020617]/60 backdrop-blur-md transition-all duration-500">
             <div className="relative group">
-              <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
-              <div className="relative bg-black/80 border border-cyan-500/40 px-12 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl overflow-hidden glass-card">
-                <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 animate-pulse" />
-                <Waves className="text-cyan-400 w-10 h-10 animate-bounce" />
+              <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
+              <div className="relative bg-black/80 border border-blue-500/40 px-12 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl overflow-hidden glass-card">
+                <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
+                <img
+                  src={escudo}
+                  alt="Sentinel Logo"
+                  className="w-12 h-12 object-contain animate-bounce"
+                />
                 <div className="flex flex-col items-center">
-                  <span className="text-sm font-black text-white uppercase tracking-[0.3em] italic text-glow-cyan">
+                  <span className="text-sm font-black text-white uppercase tracking-[0.3em] italic text-glow-blue">
                     Analizando Vector
                   </span>
-                  <span className="text-[10px] font-mono text-cyan-500/60 mt-1">
+                  <span className="text-[10px] font-mono text-blue-500/60 mt-1">
                     PROCESANDO_CAPAS_NEURALES...
                   </span>
                 </div>
@@ -237,7 +274,6 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
           </div>
         )}
       </div>
-
     </main>
   );
 });

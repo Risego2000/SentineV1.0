@@ -5,19 +5,21 @@ import { InfractionLog } from '../types';
  * Uses IndexedDB to store snapshots and clips without affecting React state performance.
  */
 export class EvidenceDB {
-  private dbName = 'sentinel_evidence_v1';
+  private dbName = 'sentinel_evidence_v2';
   private storeName = 'evidences';
   private logStoreName = 'infractions';
   private db: IDBDatabase | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
     this.init();
   }
 
   private init(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Version 3: adds 'timestamp' index on evidences store for fast purge queries
-      const request = indexedDB.open(this.dbName, 3);
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, 4);
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
@@ -26,7 +28,6 @@ export class EvidenceDB {
           const evidenceStore = db.createObjectStore(this.storeName, { keyPath: 'id' });
           evidenceStore.createIndex('timestamp', 'timestamp', { unique: false });
         } else {
-          // Migration: add index to existing store if missing
           const tx = (event.target as IDBOpenDBRequest).transaction!;
           const evidenceStore = tx.objectStore(this.storeName);
           if (!evidenceStore.indexNames.contains('timestamp')) {
@@ -35,7 +36,14 @@ export class EvidenceDB {
         }
 
         if (!db.objectStoreNames.contains(this.logStoreName)) {
-          db.createObjectStore(this.logStoreName, { keyPath: 'id' });
+          const logStore = db.createObjectStore(this.logStoreName, { keyPath: 'id' });
+          logStore.createIndex('synced', 'synced', { unique: false });
+        } else {
+          const tx = (event.target as IDBOpenDBRequest).transaction!;
+          const logStore = tx.objectStore(this.logStoreName);
+          if (!logStore.indexNames.contains('synced')) {
+            logStore.createIndex('synced', 'synced', { unique: false });
+          }
         }
       };
 
@@ -44,8 +52,13 @@ export class EvidenceDB {
         resolve();
       };
 
-      request.onerror = () => reject(new Error('FAILED_TO_OPEN_INDEXED_DB'));
+      request.onerror = () => {
+        this.initPromise = null;
+        reject(new Error('FAILED_TO_OPEN_INDEXED_DB'));
+      };
     });
+
+    return this.initPromise;
   }
 
   async saveEvidence(
@@ -138,10 +151,113 @@ export class EvidenceDB {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
       const store = transaction.objectStore(this.logStoreName);
-      const request = store.put(log);
+      const record = { ...log, synced: false };
+      const request = store.put(record);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(new Error('FAILED_TO_SAVE_INFRACTION'));
     });
+  }
+
+  async syncUnsyncedInfractions(): Promise<InfractionLog[]> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.logStoreName], 'readonly');
+      const store = transaction.objectStore(this.logStoreName);
+
+      let index: IDBIndex | null = null;
+      try {
+        index = store.index('synced');
+      } catch {
+        // Index not available, fallback to full scan
+      }
+
+      if (!index) {
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const results = request.result as (InfractionLog & { synced?: boolean })[];
+          resolve(results.filter((i) => !i.synced));
+        };
+        request.onerror = () => reject(new Error('FAILED_TO_GET_UNSYNCED_INFRACTIONS'));
+        return;
+      }
+
+      const range = IDBKeyRange.only(false);
+      const request = index.getAll(range);
+      request.onsuccess = () => resolve((request.result as InfractionLog[]) || []);
+      request.onerror = () => reject(new Error('FAILED_TO_GET_UNSYNCED_INFRACTIONS'));
+    });
+  }
+
+  async markInfractionSynced(id: number): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
+      const store = transaction.objectStore(this.logStoreName);
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result;
+        if (record) {
+          record.synced = true;
+          const putRequest = store.put(record);
+          putRequest.onsuccess = () => resolve();
+          putRequest.onerror = () => reject(new Error('FAILED_TO_MARK_SYNCED'));
+        } else {
+          resolve();
+        }
+      };
+      getRequest.onerror = () => reject(new Error('FAILED_TO_MARK_SYNCED'));
+    });
+  }
+
+  async syncToSupabase(): Promise<{ synced: number; failed: number }> {
+    try {
+      const unsynced = await this.syncUnsyncedInfractions();
+      let synced = 0;
+      let failed = 0;
+
+      for (const infraction of unsynced) {
+        try {
+          const { supabase } = await import('./supabase');
+          const { error } = await supabase.from('incidents').insert({
+            plate: infraction.plate,
+            make_model: infraction.makeModel,
+            color: infraction.color,
+            severity: infraction.severity,
+            description: infraction.description,
+            rule_category: infraction.ruleCategory,
+            legal_base: infraction.legalBase,
+            reasoning: infraction.reasoning,
+            visual_timestamp: infraction.visualTimestamp,
+            video_time_code: infraction.videoTimeCode,
+            local_time: infraction.localTime,
+            image: infraction.image,
+            extra_snapshots: infraction.extraSnapshots,
+            zoom_snapshots: infraction.zoomSnapshots,
+            ocr_results: infraction.ocrResults,
+            plate_ocr: infraction.plateOcr,
+            video_clip: infraction.videoClip,
+            time: infraction.time,
+            validation_status: 'pending',
+          });
+
+          if (!error) {
+            await this.markInfractionSynced(infraction.id);
+            synced++;
+          } else {
+            console.error('[Supabase Sync] Insert failed:', error);
+            failed++;
+          }
+        } catch (err) {
+          console.error('[Supabase Sync] Error syncing infraction:', err);
+          failed++;
+        }
+      }
+
+      return { synced, failed };
+    } catch {
+      return { synced: 0, failed: 0 };
+    }
   }
 
   async getAllInfractions(): Promise<InfractionLog[]> {

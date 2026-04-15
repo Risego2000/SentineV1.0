@@ -5,6 +5,9 @@ import { SentinelViewer } from './SentinelViewer';
 import { createPortal } from 'react-dom';
 import { Sidebar } from '../Sidebar';
 import { RightSidebar } from '../RightSidebar';
+import { HelpCapsule } from './HelpCapsule';
+import { useSentinel } from '../../hooks/useSentinel';
+import { InfractionModal } from '../InfractionModal';
 
 export const MultiViewerGrid = () => {
   const { gridSize, activeViewers, focusedViewerId, setFocusedViewer } = useLayoutStore();
@@ -24,14 +27,14 @@ export const MultiViewerGrid = () => {
   };
 
   return (
-    <div className={`w-full h-full grid gap-1 p-1 bg-black/50 ${getGridClass()}`}>
+    <div className={`w-full h-full grid gap-2 ${getGridClass()}`}>
       {activeViewers.map((viewerId) => (
         <SentinelProvider key={viewerId} viewerId={viewerId}>
           <div
-            className={`relative flex-1 overflow-hidden rounded-xl border-2 transition-colors ${
+            className={`relative flex-1 overflow-hidden rounded-lg border transition-all duration-300 ${
               focusedViewerId === viewerId
-                ? 'border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                : 'border-white/5 opacity-80 hover:opacity-100'
+                ? 'border-blue-500/50 bg-[#121216]'
+                : 'border-white/5 bg-[#0d0d0f] opacity-60 hover:opacity-100'
             }`}
             onClick={() => setFocusedViewer(viewerId)}
           >
@@ -48,9 +51,21 @@ export const MultiViewerGrid = () => {
               <RightSidebar />
             </Portal>
           )}
+          {focusedViewerId === viewerId && <HelpCapsule />}
+          <SentinelModalPortal />
         </SentinelProvider>
       ))}
     </div>
+  );
+};
+
+const SentinelModalPortal = () => {
+  const { selectedLog, setSelectedLog } = useSentinel();
+  if (!selectedLog) return null;
+  return (
+    <Portal targetId="modal-root">
+      <InfractionModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+    </Portal>
   );
 };
 

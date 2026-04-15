@@ -299,7 +299,7 @@ export function createEvidenceStoreRouter() {
             if (h === 'createdAt') return new Date(i.createdAt).toISOString();
             if (h === 'auditResult') return JSON.stringify(i.auditResult);
             const auditValue = (i.auditResult as Record<string, unknown>)[h];
-            const recordValue = (i as Record<string, unknown>)[h];
+            const recordValue = (i as unknown as Record<string, unknown>)[h];
             return String(auditValue ?? recordValue ?? '');
           })
           .join(',')

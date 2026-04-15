@@ -94,7 +94,7 @@ export class ForensicQueueV3 {
       label: string;
       bbox: { x: number; y: number; w: number; h: number };
       avgVelocity: number;
-      velocityHistory: number[];
+      velocityHistory?: number[];
       heading: number;
       dwellTime: number;
       isAnomalous: boolean;
@@ -289,7 +289,7 @@ export class ForensicQueueV3 {
             h: current.job.trackState.bboxH,
           },
           avgVelocity: current.job.trackState.avgVelocity,
-          velocityHistory: [...current.job.trackState.velocityHistory],
+          velocityHistory: [...(current.job.trackState.velocityHistory || [])],
           heading: current.job.trackState.heading,
           dwellTime: current.job.trackState.dwellTime,
           isAnomalous: current.job.trackState.isAnomalous,
@@ -340,8 +340,17 @@ export class ForensicQueueV3 {
             [...current.job.geometryState.roiSequenceIds]
           );
 
+        logger.info(
+          'FORENSIC_QUEUE',
+          `Validation check para job ${current.job.id}: violationKind=${current.job.geometryState.violationKind}, isForbiddenTurnSequence=${isForbiddenTurnSequence}`
+        );
+
         // Apply forbidden turn override if needed
         if (isForbiddenTurnSequence) {
+          logger.info(
+            'FORENSIC_QUEUE',
+            `Aplicando override de giro prohibido estricto para job ${current.job.id}`
+          );
           const sequenceLabels = current.job.geometryState.roiSequenceLabels || ['ROI A', 'ROI B'];
           auditResult.infraction = true;
           auditResult.ruleCategory = 'GIRO_PROHIBIDO';
@@ -380,8 +389,12 @@ export class ForensicQueueV3 {
             videoClip: evidence.clip,
             time: new Date().toLocaleTimeString(),
             localTime: current.job.snapshot.localTime,
-            videoTimeCode: current.job.snapshot.videoTimeCode,
+            videoTimeCode:
+              auditResult.videoTimeCode && !auditResult.videoTimeCode.includes('??')
+                ? auditResult.videoTimeCode
+                : current.job.snapshot.videoTimeCode,
             playbackTime: current.job.snapshot.playbackTime,
+            viewerId: current.job.viewerId,
           };
 
           if (this.listeners.size > 0) {
@@ -397,25 +410,51 @@ export class ForensicQueueV3 {
         await evidenceDB.deleteEvidence(current.job.id);
       }
     } catch (error) {
-      current.currentStatus = 'failed';
-      this.onEvent?.({
-        type: 'job_failed',
-        message: `Fallo en auditoría forense para ${current.job.id}: ${error instanceof Error ? error.message : String(error)}`,
-        jobId: current.job.id,
-      });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isRecoverableAIError =
+        errorMessage.includes('503') ||
+        errorMessage.includes('high demand') ||
+        errorMessage.includes('UNAVAILABLE') ||
+        errorMessage.includes('fetch failed') ||
+        errorMessage.includes('timeout');
 
-      logger.error(
-        'FORENSIC_QUEUE',
-        `Job ${current.job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
+      if (isRecoverableAIError) {
+        const requeued = this.requeueWithRetry(
+          current,
+          `Error temporal de IA (Sobrecarga) para ${current.job.id}. Reintentando (${current.retries + 1}/${this.maxRetries})... Detalle: ${errorMessage}`
+        );
+
+        if (!requeued) {
+          current.currentStatus = 'failed';
+          this.onEvent?.({
+            type: 'job_failed',
+            message: `Fallo definitivo en auditoría forense para ${current.job.id} tras máximos reintentos por sobrecarga de IA.`,
+            jobId: current.job.id,
+          });
+
+          logger.error(
+            'FORENSIC_QUEUE',
+            `Job ${current.job.id} failed definitively after max retries: ${errorMessage}`,
+            error
+          );
+        }
+      } else {
+        current.currentStatus = 'failed';
+        this.onEvent?.({
+          type: 'job_failed',
+          message: `Fallo en auditoría forense para ${current.job.id}: ${errorMessage}`,
+          jobId: current.job.id,
+        });
+
+        logger.error('FORENSIC_QUEUE', `Job ${current.job.id} failed: ${errorMessage}`, error);
+      }
     }
 
     this.isProcessing = false;
     this.resolveIdleIfNeeded();
 
     // Small cooldown between AI calls and retry reschedules
-    const nextDelay = current.currentStatus === 'pending' ? this.retryDelayMs : 1000;
+    const nextDelay = current.currentStatus === 'pending' ? this.retryDelayMs : 0;
     setTimeout(() => this.processNext(), nextDelay);
   }
 

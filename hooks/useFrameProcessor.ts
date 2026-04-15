@@ -12,13 +12,11 @@ import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
 import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
 
 const MAX_TAIL_POINTS = 50;
-const MIN_FINALIZE_DELAY_MS = 1200;
-const MAX_FINALIZE_DELAY_MS = 3600;
+const MIN_FINALIZE_DELAY_MS = 0;
+const MAX_FINALIZE_DELAY_MS = 0;
 
 const getFinalizeDelayMs = (track: Track) => {
-  const velocityFactor = Math.max(0, Math.min(60, track.avgVelocity || 0));
-  const dynamicDelay = MIN_FINALIZE_DELAY_MS + velocityFactor * 20;
-  return Math.max(MIN_FINALIZE_DELAY_MS, Math.min(MAX_FINALIZE_DELAY_MS, dynamicDelay));
+  return 0;
 };
 
 /**
@@ -238,6 +236,9 @@ export const useFrameProcessor = () => {
           t.tail = [...t.tail, { x: normX, y: normY }].slice(-MAX_TAIL_POINTS);
         }
 
+        // Only process evidence/geometry interactions for established tracks
+        if (t.hits < minHits) return;
+
         // Mid-path turn capture — ~30 frames after ROI A, before ROI B
         if (t.roiATurnCaptureKey && !t.forbiddenTurnCaptured && !t.hasMidFrame) {
           const framesSinceA = frameCountRef.current - (t.firstHitFrame || 0);
@@ -255,6 +256,7 @@ export const useFrameProcessor = () => {
         // Process geometry interactions
         geometry.forEach((line: GeometryLine) => {
           if (t.processedLines.includes(line.id)) return;
+          if (t.audited) return; // stop once Phase 2 or triggerCapture marks this track
           if (t.tail.length < 2) return;
 
           const p1 = t.tail[t.tail.length - 2];
@@ -334,12 +336,22 @@ export const useFrameProcessor = () => {
                 const uniqueTurnRois = [...new Set(t.roiHistory)].filter(
                   (id) => geometry.find((g) => g.id === id)?.type === 'roi_turn'
                 );
+                // Canonical ROI A = first roi_turn in the geometry list, or specifically labeled 'ROI A'
+                const canonicalRoiA =
+                  geometry.find(
+                    (g) => g.type === 'roi_turn' && g.label.toUpperCase().includes('ROI A')
+                  ) || geometry.find((g) => g.type === 'roi_turn');
 
-                // PHASE 1: ROI A — start 20s buffer, do NOT set t.audited (must reach ROI B)
-                if (uniqueTurnRois.length === 1 && !t.roiATurnCaptureKey) {
+                // PHASE 1: ROI A — start 20s buffer only when entering the designated ROI A
+                if (
+                  uniqueTurnRois.length === 1 &&
+                  !t.roiATurnCaptureKey &&
+                  line.id === canonicalRoiA?.id
+                ) {
                   const manager = evidenceManagerRef.current;
                   const key = manager?.startTurnCapture(t, line, v, canvas, frameCountRef.current);
                   if (key) {
+                    t.roiAId = line.id;
                     t.roiATurnCaptureKey = key;
                     t.firstHitFrame = frameCountRef.current;
                     updateBufferStatus({
@@ -353,7 +365,12 @@ export const useFrameProcessor = () => {
                 }
 
                 // PHASE 2: ROI B — confirm infraction, finalize evidence
-                if (uniqueTurnRois.length >= 2 && !t.forbiddenTurnCaptured) {
+                // ONLY trigger if Phase 1 (ROI A) was previously captured for this track
+                if (
+                  uniqueTurnRois.length >= 2 &&
+                  t.roiATurnCaptureKey &&
+                  !t.forbiddenTurnCaptured
+                ) {
                   t.forbiddenTurnCaptured = true;
                   t.audited = true;
                   t.auditStatus = 'processing';
@@ -432,6 +449,19 @@ export const useFrameProcessor = () => {
 
         if (isPoseEnabled) {
           await detectPose(v);
+        }
+
+        // Cleanup any captures for tracks that have been dropped
+        const activeTrackIds = new Set(trackerRef.current.tracks.map((t) => t.id));
+        const manager = evidenceManagerRef.current;
+        if (manager) {
+          const oldCount = manager.getActiveCount();
+          manager.syncActiveTracks(activeTrackIds);
+          if (manager.getActiveCount() < oldCount && manager.getActiveCount() === 0) {
+            updateBufferStatus({ state: 'idle', activeTracks: 0 });
+          } else if (manager.getActiveCount() < oldCount) {
+            updateBufferStatus({ activeTracks: manager.getActiveCount() });
+          }
         }
 
         // Sync with Global Context (throttled)

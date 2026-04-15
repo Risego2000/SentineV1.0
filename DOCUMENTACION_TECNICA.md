@@ -118,6 +118,7 @@ geometry.forEach((line) => {
 2.  Envío a Gemini para análisis técnico-legal.
 3.  Generación de informe forense (Marca, Modelo, Placa, RGC).
 4.  Almacenamiento de infracción en el Log interactivo.
+5.  **Validación Humana:** El operador revisa la evidencia y confirma o descarta la sanción.
 
 #### 5.3.2 Implementación
 

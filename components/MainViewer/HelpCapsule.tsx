@@ -8,10 +8,10 @@ export const HelpCapsule = () => {
   if (!helpMsg) return null;
 
   return (
-    <div className="absolute left-1/2 -translate-x-1/2 bottom-[140px] z-[60] flex items-center justify-center w-full px-10 pointer-events-none">
-      <div className="bg-black/60 backdrop-blur-md border border-cyan-500/20 px-6 py-2 rounded-full shadow-[0_0_30px_rgba(6,182,212,0.1)] flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <Info size={14} className="text-cyan-400 shrink-0" />
-        <span className="text-[10px] font-medium text-cyan-50/80 uppercase tracking-wide leading-none py-0.5">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] flex justify-center pointer-events-none min-w-[300px]">
+      <div className="bg-blue-600 border-2 border-white/20 px-8 py-3 rounded-2xl shadow-[0_0_50px_rgba(59,130,246,0.5)] flex items-center gap-4 transition-all duration-300 scale-100 opacity-100 whitespace-nowrap">
+        <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse shadow-[0_0_10px_white]" />
+        <span className="text-[12px] font-black text-white uppercase tracking-[0.15em] leading-none drop-shadow-lg">
           {helpMsg}
         </span>
       </div>

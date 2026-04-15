@@ -19,13 +19,13 @@ export default defineConfig(() => {
   return {
     envDir: findEnvDir(__dirname),
     server: {
-      port: 3001,
-      strictPort: true,
+      port: parseInt(process.env.PORT || '3001'),
+      strictPort: false,
       host: 'localhost',
       hmr: {
         protocol: 'ws',
         host: 'localhost',
-        port: 3001,
+        port: parseInt(process.env.PORT || '3001'),
       },
       headers: {
         'Cross-Origin-Embedder-Policy': 'require-corp',

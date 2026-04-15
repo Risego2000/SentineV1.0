@@ -114,8 +114,8 @@ export const OCRSynchronizer = {
     if (!ctx) return '';
 
     // Define OSD Region (Top-Left Focus)
-    const scanW = video.videoWidth * 0.35; // Slightly wider to catch full date-time string
-    const scanH = video.videoHeight * 0.08; // Slightly shorter to focus on the top line
+    const scanW = video.videoWidth * 0.7; // Increased to 70% to catch full date-time string even if it's long
+    const scanH = video.videoHeight * 0.15; // Slightly taller to account for different font sizes and positions
 
     canvas.width = scanW;
     canvas.height = scanH;
@@ -135,12 +135,46 @@ export const OCRSynchronizer = {
       } = await worker.recognize(canvas);
       let cleanedText = text.trim();
 
+      // OCR sometimes misinterprets numbers. Fix common issues for dates/times:
+      cleanedText = cleanedText
+        .replace(/Z/gi, '2')
+        .replace(/O/gi, '0')
+        .replace(/S/gi, '5')
+        .replace(/l/g, '1')
+        .replace(/I/g, '1')
+        .replace(/\|/g, '1');
+
       // Remove common OCR noise/prefixes if they appear before the first number
       cleanedText = cleanedText.replace(/^[^0-9]+/, '');
 
-      // Flexible date match: finds 3 groups of numbers (2, 2, 4 digits typically)
-      // This handles 12-11-2025, 12/11/2025, or even 12.11.2025
-      const dateMatch = cleanedText.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+      // Improved date match: handles DD-MM-YYYY (Spanish), YYYY-MM-DD (ISO), etc.
+      let y = '',
+        m = '',
+        d = '';
+
+      // Match DD-MM-YYYY or DD/MM/YYYY
+      let dateMatch = cleanedText.match(/(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4})/);
+      if (dateMatch) {
+        d = dateMatch[1];
+        m = dateMatch[2];
+        y = dateMatch[3];
+      } else {
+        // Match YYYY-MM-DD
+        dateMatch = cleanedText.match(/(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})/);
+        if (dateMatch) {
+          y = dateMatch[1];
+          m = dateMatch[2];
+          d = dateMatch[3];
+        } else {
+          // Match DD-MM-YY
+          dateMatch = cleanedText.match(/(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{2})/);
+          if (dateMatch) {
+            d = dateMatch[1];
+            m = dateMatch[2];
+            y = dateMatch[3];
+          }
+        }
+      }
 
       // Strict time match: HH:MM:SS
       const timeMatch = cleanedText.match(/(\d{2}):(\d{2}):(\d{2})/);
@@ -150,9 +184,11 @@ export const OCRSynchronizer = {
         let dateStr = '';
 
         if (dateMatch) {
-          const d = dateMatch[1].padStart(2, '0');
-          const m = dateMatch[2].padStart(2, '0');
-          const y = dateMatch[3];
+          d = d.padStart(2, '0');
+          m = m.padStart(2, '0');
+          if (y.length === 2) {
+            y = `20${y}`;
+          }
           dateStr = `${d}/${m}/${y}`;
         } else {
           // Forense: NO fabricamos fecha - eso compromete la validez forense

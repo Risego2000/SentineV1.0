@@ -12,15 +12,34 @@ export interface LayoutState {
   // Array of active viewer IDs
   activeViewers: string[];
 
+  // Sidebar states
+  isSidebarCollapsed: boolean;
+  isRightSidebarCollapsed: boolean;
+
+  // Visibility toggles
+  showDetections: boolean;
+  showROIs: boolean;
+
   // Actions
   setGridSize: (size: GridSize) => void;
   setFocusedViewer: (id: string) => void;
+  toggleSidebar: () => void;
+  toggleRightSidebar: () => void;
+  toggleDetections: () => void;
+  toggleROIs: () => void;
+  setShowDetections: (show: boolean) => void;
+  setShowROIs: (show: boolean) => void;
+  setIsSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
   gridSize: 1,
   focusedViewerId: 'visor_0',
   activeViewers: ['visor_0'],
+  isSidebarCollapsed: false,
+  isRightSidebarCollapsed: false,
+  showDetections: true,
+  showROIs: true,
 
   setGridSize: (size) =>
     set((state) => {
@@ -38,4 +57,12 @@ export const useLayoutStore = create<LayoutState>((set) => ({
     }),
 
   setFocusedViewer: (id) => set({ focusedViewerId: id }),
+  toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+  toggleRightSidebar: () =>
+    set((state) => ({ isRightSidebarCollapsed: !state.isRightSidebarCollapsed })),
+  toggleDetections: () => set((state) => ({ showDetections: !state.showDetections })),
+  toggleROIs: () => set((state) => ({ showROIs: !state.showROIs })),
+  setShowDetections: (show) => set({ showDetections: show }),
+  setShowROIs: (show) => set({ showROIs: show }),
+  setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
 }));

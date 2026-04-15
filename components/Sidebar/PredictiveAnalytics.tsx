@@ -23,7 +23,7 @@ export const PredictiveAnalytics = () => {
     () =>
       tracks
         .filter((t) => t.isAnomalous && t.anomalyLabel)
-        .map((t) => `${t.anomalyLabel} [KINETIC_${t.id}]`)
+        .map((t) => `${t.anomalyLabel} [${(t.label || 'VEHÍCULO').toUpperCase()}_${t.id}]`)
         .slice(0, 3),
     [tracks]
   );
@@ -37,17 +37,17 @@ export const PredictiveAnalytics = () => {
         )}
       >
         <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] flex items-center gap-2">
-          <TrendingUp size={14} className="text-cyan-500" /> Analítica_Predictiva
+          <TrendingUp size={14} className="text-blue-500" /> Analítica_Predictiva
         </h3>
-        <div className="flex items-center gap-1.5 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
-          <div className="w-1 h-1 bg-cyan-500 rounded-full animate-pulse" />
-          <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">
+        <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500">
+          <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,1)]" />
+          <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">
             Live_Inf
           </span>
         </div>
       </div>
 
-      <div className="glass-card rounded-[32px] p-6 space-y-6 shadow-2xl relative overflow-hidden">
+      <div className="horizon-card rounded-[32px] p-6 space-y-6 relative overflow-hidden">
         <div className="absolute inset-0 hud-grid opacity-10 pointer-events-none" />
 
         {/* Congestion Meter */}
@@ -60,7 +60,7 @@ export const PredictiveAnalytics = () => {
           <div className="flex justify-between items-end text-[9px] uppercase font-black tracking-widest text-slate-500">
             <span className="italic">Nivel de Congestión</span>
             <span
-              className={`text-[11px] font-mono font-black ${congestionLevel > 70 ? 'text-red-500 text-glow-cyan' : 'text-cyan-400'}`}
+              className={`text-[11px] font-mono font-black ${congestionLevel > 70 ? 'text-red-500 text-glow-blue' : 'text-blue-500'}`}
             >
               {congestionLevel.toFixed(1)}%
             </span>
@@ -70,7 +70,7 @@ export const PredictiveAnalytics = () => {
               className={`h-full transition-all duration-1000 rounded-full relative ${
                 congestionLevel > 70
                   ? 'bg-gradient-to-r from-orange-600 to-red-600'
-                  : 'bg-gradient-to-r from-cyan-600 to-cyan-400'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-400'
               }`}
               style={{ width: `${congestionLevel}%` }}
             >
@@ -122,7 +122,7 @@ export const PredictiveAnalytics = () => {
                   <div className="w-5 h-5 rounded-lg bg-amber-500/20 flex items-center justify-center border border-amber-500/20">
                     <Zap size={10} className="text-amber-500" />
                   </div>
-                  <span className="flex-1 text-glow-cyan">{anom}</span>
+                  <span className="flex-1 text-glow-blue">{anom}</span>
                 </div>
               ))
             )}
@@ -138,7 +138,7 @@ export const PredictiveAnalytics = () => {
             <span className="block text-[8px] text-slate-500 font-black uppercase mb-1.5 tracking-widest">
               Risk_Score
             </span>
-            <span className="text-2xl font-black text-cyan-400 font-mono tracking-tighter text-glow-cyan">
+            <span className="text-2xl font-black text-blue-500 font-mono tracking-tighter text-glow-blue">
               0.04
             </span>
           </div>

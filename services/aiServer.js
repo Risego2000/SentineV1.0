@@ -219,6 +219,7 @@ export const analyzeTrajectoryWithGemini = async ({
       "plate": "Lectura OCR o DESCONOCIDO",
       "makeModel": "Identificación visual",
       "color": "Color visual",
+      "videoTimeCode": "Timestamp exacto visible en el OSD del video (ej: '12-11-2025 12:47:56')",
       "legalBase": "Artículo RGC aplicable según directiva",
       "reasoning": ["Punto A cruza Punto B", "Velocidad no disminuye", "Trayectoria invade carril"],
       "telemetry": {
@@ -243,6 +244,7 @@ export const analyzeTrajectoryWithGemini = async ({
     plate: sanitizeText(rawData.plate || 'DESCONOCIDO'),
     makeModel: sanitizeText(rawData.makeModel || 'DESCONOCIDO'),
     color: sanitizeText(rawData.color || 'DESCONOCIDO'),
+    videoTimeCode: sanitizeText(rawData.videoTimeCode || ''),
     description: sanitizeText(rawData.description || 'Análisis de trayectoria completado'),
     severity: rawData.severity || 'LOW',
     ruleCategory: sanitizeText(rawData.ruleCategory || line.label || 'TRAJECTORY'),

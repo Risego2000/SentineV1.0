@@ -106,8 +106,8 @@ export class EvidenceCaptureManager {
     };
     this.targets.set(key, target);
 
-    // Start 20s circular buffer
-    const recorder = new VideoBufferService(canvas);
+    // Iniciar buffer basado en ROI: inicia en ROI A
+    const recorder = new VideoBufferService(canvas, 'roi_based');
     recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
     recorder.start();
     this.recorders.set(key, recorder);
@@ -136,6 +136,13 @@ export class EvidenceCaptureManager {
   captureRoiB(track: Track, roiBLine: GeometryLine, video: HTMLVideoElement): void {
     const target = this.findTarget(track.id);
     if (!target) return;
+
+    // Detener grabación cuando entra en ROI B
+    const recorder = this.recorders.get(target.key);
+    if (recorder) {
+      recorder.stop();
+    }
+
     this.captureNamedSnapshot(video, track, 'roi_b', target.key);
   }
 
@@ -182,8 +189,8 @@ export class EvidenceCaptureManager {
       let ocrResults: string[] = [];
       if (detailFrames.length > 0) {
         try {
-          const plate = await OCRSynchronizer.extractLicensePlateFromBase64(detailFrames);
-          if (plate) ocrResults = [plate];
+          const result = await OCRSynchronizer.extractLicensePlate(detailFrames);
+          if (result && result.plate) ocrResults = [result.plate];
         } catch {
           // OCR is best-effort
         }
@@ -203,7 +210,7 @@ export class EvidenceCaptureManager {
       });
 
       forensicQueue.enqueueJob(
-        track,
+        { ...track, isAnomalous: !!track.isAnomalous } as any,
         geometry,
         evidenceId,
         localTime,
@@ -283,6 +290,22 @@ export class EvidenceCaptureManager {
     this.clear();
   }
 
+  /**
+   * Cleans up targets for tracks that have been dropped by the tracker.
+   */
+  syncActiveTracks(activeTrackIds: Set<number>): void {
+    const orphanedKeys: string[] = [];
+    for (const [key, target] of this.targets.entries()) {
+      if (!activeTrackIds.has(target.trackId)) {
+        orphanedKeys.push(key);
+      }
+    }
+    for (const key of orphanedKeys) {
+      console.warn(`[CAPTURE] Aborted dropped Track #${this.targets.get(key)?.trackId}`);
+      this.cleanup(key);
+    }
+  }
+
   getActiveCount(): number {
     return this.targets.size;
   }
@@ -345,17 +368,28 @@ export class EvidenceCaptureManager {
       ctx.drawImage(video, 0, 0, W, H);
       const generalData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
 
-      // Detail frame — vehicle crop with padding
-      const pad = 0.5;
+      // Detail frame — vehicle crop focused on the entire vehicle
+      const padX = 0.1;
+      const padY = 0.1;
       const vW = video.videoWidth;
       const vH = video.videoHeight;
-      const zX = Math.max(0, track.bbox.x - (track.bbox.w * pad) / 2) * vW;
-      const zY = Math.max(0, track.bbox.y - (track.bbox.h * pad) / 2) * vH;
-      const zW = Math.min(1, track.bbox.w * (1 + pad)) * vW;
-      const zH = Math.min(1, track.bbox.h * (1 + pad)) * vH;
 
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, W, H);
+      let zX = Math.max(0, track.bbox.x - (track.bbox.w * padX) / 2) * vW;
+      let zY = Math.max(0, track.bbox.y - (track.bbox.h * padY) / 2) * vH;
+      let zW = Math.min(1, track.bbox.w * (1 + padX)) * vW;
+      let zH = Math.min(1, track.bbox.h * (1 + padY)) * vH;
+
+      // Ensure we don't go out of bounds
+      if (zX + zW > vW) zW = vW - zX;
+      if (zY + zH > vH) zH = vH - zY;
+
+      // Maintain aspect ratio while ensuring a decent resolution for OCR
+      const targetW = 800;
+      const targetH = Math.max(1, Math.floor(targetW * (zH / Math.max(1, zW))));
+      canvas.width = targetW;
+      canvas.height = targetH;
+      ctx.clearRect(0, 0, targetW, targetH);
+      ctx.drawImage(video, zX, zY, zW, zH, 0, 0, targetW, targetH);
       const detailData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
 
       const storage = this.snapshotStorage.get(targetKey) || [];

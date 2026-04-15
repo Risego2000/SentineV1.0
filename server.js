@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -209,7 +209,7 @@ const finalizeFilename = sanitizeFilename;
 const validateCameraHost = (hostname) => _validateCameraHost(hostname, ALLOWED_CAMERA_HOSTS);
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use('/api', apiGuard, rateLimitApi);
 
 const upload = multer({ dest: os.tmpdir() });
@@ -479,12 +479,16 @@ app.post(
   express.raw({ type: 'application/pdf', limit: `${MAX_REPORT_MB}mb` }),
   (req, res) => {
     try {
-      fs.mkdirSync(REPORTS_DIR, { recursive: true });
+      const folderDate = req.query.date
+        ? sanitizeFilename(req.query.date)
+        : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const dailyDir = path.join(REPORTS_DIR, folderDate);
+      fs.mkdirSync(dailyDir, { recursive: true });
       const safeFilename = finalizeFilename(
         req.query.filename || `Sentinel_Report_${Date.now()}.pdf`,
         '.pdf'
       );
-      const targetPath = path.join(REPORTS_DIR, safeFilename);
+      const targetPath = path.join(dailyDir, safeFilename);
       if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
         res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });
         return;
@@ -502,26 +506,77 @@ app.post(
 
 app.post(
   '/api/reports/video',
-  express.raw({ type: 'video/webm', limit: `${MAX_REPORT_MB}mb` }),
-  (req, res) => {
+  express.raw({
+    type: ['video/mp4', 'video/webm', 'application/octet-stream'],
+    limit: `${MAX_REPORT_MB}mb`,
+  }),
+  async (req, res) => {
+    const tmpDir = os.tmpdir();
+    const timestamp = Date.now();
+    const tempInputPath = path.join(tmpDir, `sentinel_evidence_raw_${timestamp}`);
+    let targetPath = '';
+
     try {
-      fs.mkdirSync(REPORTS_DIR, { recursive: true });
+      const folderDate = req.query.date
+        ? sanitizeFilename(req.query.date)
+        : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const dailyDir = path.join(REPORTS_DIR, folderDate);
+      fs.mkdirSync(dailyDir, { recursive: true });
+
       const safeFilename = finalizeFilename(
-        req.query.filename || `Evidence_${Date.now()}.webm`,
-        '.webm'
+        req.query.filename || `Evidence_${timestamp}.mp4`,
+        '.mp4'
       );
-      const targetPath = path.join(REPORTS_DIR, safeFilename);
+      targetPath = path.join(dailyDir, safeFilename);
+
       if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
         res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });
         return;
       }
-      fs.writeFileSync(targetPath, req.body);
-      res.json({ saved: true, path: targetPath });
+
+      // 1. Write raw buffer to temp file
+      fs.writeFileSync(tempInputPath, req.body);
+
+      // 2. Transcode to MP4 if ffmpeg is available
+      if (ffmpegPath) {
+        console.log(`[EVIDENCE] Transcodificando evidencia a MP4: ${safeFilename}`);
+        const ffmpeg = spawnSync(ffmpegPath, [
+          '-i',
+          tempInputPath,
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-crf',
+          '28',
+          '-c:a',
+          'aac',
+          '-movflags',
+          '+faststart',
+          '-y',
+          targetPath,
+        ]);
+
+        if (ffmpeg.status === 0) {
+          res.json({ saved: true, path: targetPath, transcoded: true });
+        } else {
+          console.error(
+            '[EVIDENCE] Error transcodificando (code ' + ffmpeg.status + '), guardando original'
+          );
+          fs.copyFileSync(tempInputPath, targetPath);
+          res.json({ saved: true, path: targetPath, transcoded: false });
+        }
+      } else {
+        fs.copyFileSync(tempInputPath, targetPath);
+        res.json({ saved: true, path: targetPath, transcoded: false });
+      }
     } catch (error) {
       res.status(500).json({
         saved: false,
         error: error instanceof Error ? error.message : 'Failed to save video',
       });
+    } finally {
+      safeUnlink(tempInputPath);
     }
   }
 );
@@ -556,6 +611,59 @@ app.get('/api/health', (req, res) => {
     reportsDir: REPORTS_DIR,
     timestamp: new Date().toISOString(),
   });
+});
+
+app.post('/api/save-config', (req, res) => {
+  try {
+    const { fileName, config } = req.body;
+    if (!fileName || !config) {
+      return res.status(400).json({ error: 'Nombre de archivo o configuración faltante.' });
+    }
+    const PRESET_DIR = path.join(path.resolve(), 'preset');
+    if (!fs.existsSync(PRESET_DIR)) {
+      fs.mkdirSync(PRESET_DIR, { recursive: true });
+    }
+    const safeFilename = sanitizeFilename(fileName, '.json');
+    const targetPath = path.join(PRESET_DIR, safeFilename);
+
+    fs.writeFileSync(targetPath, JSON.stringify(config, null, 2));
+    res.json({ saved: true, path: targetPath });
+  } catch (error) {
+    res.status(500).json({
+      saved: false,
+      error: error instanceof Error ? error.message : 'Error al guardar configuración',
+    });
+  }
+});
+
+app.get('/api/presets', (req, res) => {
+  try {
+    const PRESET_DIR = path.join(path.resolve(), 'preset');
+    if (!fs.existsSync(PRESET_DIR)) {
+      return res.json({ presets: [] });
+    }
+    const files = fs.readdirSync(PRESET_DIR).filter((f) => f.endsWith('.json'));
+    res.json({ presets: files });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al listar presets' });
+  }
+});
+
+app.get('/api/presets/:filename', (req, res) => {
+  try {
+    const PRESET_DIR = path.join(path.resolve(), 'preset');
+    const safeFilename = sanitizeFilename(req.params.filename, '.json');
+    const targetPath = path.join(PRESET_DIR, safeFilename);
+
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ error: 'Preset no encontrado' });
+    }
+
+    const content = fs.readFileSync(targetPath, 'utf8');
+    res.json(JSON.parse(content));
+  } catch (error) {
+    res.status(500).json({ error: 'Error al leer preset' });
+  }
 });
 
 app.listen(port, () => {

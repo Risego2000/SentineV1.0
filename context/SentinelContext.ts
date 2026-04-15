@@ -59,6 +59,9 @@ export interface SentinelContextType {
   analysisGridSize: 1 | 2 | 3;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   viewerId?: string;
+  helpMsg: string | null;
+  selectedProtocolIds: string[];
+  setSelectedProtocolIds: (ids: string[]) => void;
 
   // Actions
   setSource: (s: 'none' | 'live' | 'upload' | 'ip') => void;
@@ -76,6 +79,7 @@ export interface SentinelContextType {
   generateGeometry: (instruction?: string, videoElement?: HTMLVideoElement | null) => Promise<void>;
   runAudit: (track: Track, line: GeometryLine) => Promise<void>;
   setStatusMsg: (msg: string | null) => void;
+  setHelpMsg: (msg: string | null) => void;
   setPerformanceMetrics: (fps: number, latency: number) => void;
   setAnalysisGridSize: (size: 1 | 2 | 3) => void;
   isAuditEnabled: boolean;
@@ -107,7 +111,7 @@ export interface SentinelContextType {
   ) => Promise<void>;
   updateBufferStatus: (status: Partial<SentinelContextType['bufferStatus']>) => void;
   clearLogs: () => void;
-  viewerId?: string;
+  validateInfraction: (id: number, status: 'validated' | 'rejected') => void;
 }
 
 export const SentinelContext = createContext<SentinelContextType | undefined>(undefined);
