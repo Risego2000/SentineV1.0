@@ -1,0 +1,79 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "description": "Default agent for full development work with all tools enabled",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "description": "Read-only agent for analysis and planning without making changes",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "code-reviewer": {
+      "mode": "subagent",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
+      "description": "Reviews code for best practices, potential issues, and improvements",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "debug": {
+      "mode": "subagent",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
+      "description": "Focused agent for debugging and investigating issues",
+      "tools": {
+        "write": false,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "docs": {
+      "mode": "subagent",
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "description": "Agent for writing and maintaining documentation",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": false
+      }
+    },
+    "explore": {
+      "mode": "subagent",
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "description": "Fast, read-only agent for exploring codebases",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "general": {
+      "mode": "subagent",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "description": "General-purpose agent for complex multi-step research tasks",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  },
+  "model": {
+    "default": "anthropic/claude-opus-4-5-20251101",
+    "small": "anthropic/claude-haiku-4-5-20251001"
+  }
+}
