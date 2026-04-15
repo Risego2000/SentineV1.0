@@ -171,14 +171,31 @@ export class EvidenceDB {
     try {
       const { supabase } = await import('./supabase');
 
+      const auditResultData = {
+        plate: infraction.plate,
+        makeModel: infraction.makeModel,
+        color: infraction.color,
+        description: infraction.description,
+        severity: infraction.severity,
+        ruleCategory: infraction.ruleCategory,
+        legalBase: infraction.legalBase,
+        reasoning: infraction.reasoning,
+        visualTimestamp: infraction.visualTimestamp,
+        videoTimeCode: infraction.videoTimeCode,
+        localTime: infraction.localTime,
+        telemetry: infraction.telemetry,
+      };
+
       const { error: errorInfractions } = await supabase.from(SUPABASE_TABLES.INFRACTIONS).insert({
+        status: 'completed',
         plate: infraction.plate,
         make_model: infraction.makeModel,
         color: infraction.color,
-        severity: infraction.severity,
         description: infraction.description,
+        severity: infraction.severity,
         rule_category: infraction.ruleCategory,
         legal_base: infraction.legalBase,
+        audit_result: auditResultData,
         reasoning: infraction.reasoning,
         visual_timestamp: infraction.visualTimestamp,
         video_time_code: infraction.videoTimeCode,
@@ -192,21 +209,24 @@ export class EvidenceDB {
         plate_ocr: infraction.plateOcr,
         plate_ocr_candidates: infraction.plateOcrCandidates,
         video_clip_url: infraction.videoClip,
+        telemetry: infraction.telemetry,
         roi_history: infraction.roiHistory,
         viewer_id: infraction.viewerId,
-        telemetry: infraction.telemetry,
         validation_status: 'pending',
+        extra_data: {},
       });
 
       // Also sync to incidents for backward compatibility
       const { error: errorIncidents } = await supabase.from(SUPABASE_TABLES.INCIDENTS).insert({
+        status: 'completed',
         plate: infraction.plate,
         make_model: infraction.makeModel,
         color: infraction.color,
-        severity: infraction.severity,
         description: infraction.description,
+        severity: infraction.severity,
         rule_category: infraction.ruleCategory,
         legal_base: infraction.legalBase,
+        audit_result: auditResultData,
         reasoning: infraction.reasoning,
         visual_timestamp: infraction.visualTimestamp,
         video_time_code: infraction.videoTimeCode,
@@ -218,11 +238,12 @@ export class EvidenceDB {
         zoom_snapshots: infraction.zoomSnapshots,
         ocr_results: infraction.ocrResults,
         plate_ocr: infraction.plateOcr,
-        plate_ocr_candidates: infraction.plateOcrCandidates,
         video_clip_url: infraction.videoClip,
+        telemetry: infraction.telemetry,
         roi_history: infraction.roiHistory,
         viewer_id: infraction.viewerId,
         validation_status: 'pending',
+        extra_data: {},
       });
 
       if (!errorInfractions && !errorIncidents) {
@@ -301,10 +322,26 @@ export class EvidenceDB {
         try {
           const { supabase } = await import('./supabase');
 
+          const auditResultData = {
+            plate: infraction.plate,
+            makeModel: infraction.makeModel,
+            color: infraction.color,
+            description: infraction.description,
+            severity: infraction.severity,
+            ruleCategory: infraction.ruleCategory,
+            legalBase: infraction.legalBase,
+            reasoning: infraction.reasoning,
+            visualTimestamp: infraction.visualTimestamp,
+            videoTimeCode: infraction.videoTimeCode,
+            localTime: infraction.localTime,
+            telemetry: infraction.telemetry,
+          };
+
           // Try to insert into both infractions and incidents for backward compatibility
           const { error: errorInfractions } = await supabase
             .from(SUPABASE_TABLES.INFRACTIONS)
             .insert({
+              status: 'completed',
               plate: infraction.plate,
               make_model: infraction.makeModel,
               color: infraction.color,
@@ -312,6 +349,7 @@ export class EvidenceDB {
               description: infraction.description,
               rule_category: infraction.ruleCategory,
               legal_base: infraction.legalBase,
+              audit_result: auditResultData,
               reasoning: infraction.reasoning,
               visual_timestamp: infraction.visualTimestamp,
               video_time_code: infraction.videoTimeCode,
@@ -325,14 +363,16 @@ export class EvidenceDB {
               plate_ocr: infraction.plateOcr,
               plate_ocr_candidates: infraction.plateOcrCandidates,
               video_clip_url: infraction.videoClip,
+              telemetry: infraction.telemetry,
               roi_history: infraction.roiHistory,
               viewer_id: infraction.viewerId,
-              telemetry: infraction.telemetry,
               validation_status: 'pending',
+              extra_data: {},
             });
 
           // Also keep syncing to incidents if it exists
           const { error: errorIncidents } = await supabase.from(SUPABASE_TABLES.INCIDENTS).insert({
+            status: 'completed',
             plate: infraction.plate,
             make_model: infraction.makeModel,
             color: infraction.color,
@@ -340,6 +380,7 @@ export class EvidenceDB {
             description: infraction.description,
             rule_category: infraction.ruleCategory,
             legal_base: infraction.legalBase,
+            audit_result: auditResultData,
             reasoning: infraction.reasoning,
             visual_timestamp: infraction.visualTimestamp,
             video_time_code: infraction.videoTimeCode,
@@ -353,10 +394,11 @@ export class EvidenceDB {
             plate_ocr: infraction.plateOcr,
             plate_ocr_candidates: infraction.plateOcrCandidates,
             video_clip_url: infraction.videoClip,
+            telemetry: infraction.telemetry,
             roi_history: infraction.roiHistory,
             viewer_id: infraction.viewerId,
-            telemetry: infraction.telemetry,
             validation_status: 'pending',
+            extra_data: {},
           });
 
           if (!errorInfractions || !errorIncidents) {
