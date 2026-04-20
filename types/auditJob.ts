@@ -9,7 +9,7 @@ export interface AuditJobSnapshot {
   /** Immutable evidence at capture time */
   contextSnapshots: string[]; // [Initial, Mid, Final] full scene
   zoomSnapshots: string[]; // [Initial, Mid, Final] zoomed vehicle
-  videoClip?: string; // 8s clip base64
+  videoClip?: string; // 30s clip base64
   ocrResults: string[]; // OCR text for each zoom snapshot
   localTime: string; // Wall-clock when evidence was captured
   videoTimeCode: string; // OSD timestamp from video

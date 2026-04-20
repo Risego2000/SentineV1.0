@@ -1,12 +1,12 @@
 /**
  * Evidence Capture System - Two-phase ROI forbidden-turn support.
- * Phase 1 (ROI A): start 20s circular buffer + capture ROI_A photos.
+ * Phase 1 (ROI A): start 30s circular buffer + capture ROI_A photos.
  * Phase 2 (ROI B): capture ROI_B photos + mid-path photos, then finalize.
  * If ROI B never comes: discard (buffer is overwritten by next activation).
  */
 
 import { evidenceDB } from '../services/EvidenceDB';
-import { VideoBufferService } from '../services/videoRecorder';
+import { VideoBufferService, FORENSIC_BUFFER_DURATION_SECONDS } from '../services/videoRecorder';
 import { forensicQueue } from '../services/ForensicQueue';
 import { OCRSynchronizer } from '../services/OCRSynchronizer';
 import { Track, GeometryLine } from '../types';
@@ -77,7 +77,7 @@ export class EvidenceCaptureManager {
 
   /**
    * PHASE 1 — ROI A entry.
-   * Starts the 20s circular buffer and captures FOTO_GENERAL_ROI_A + FOTO_DETALLE_ROI_A.
+   * Starts the 30s circular buffer and captures FOTO_GENERAL_ROI_A + FOTO_DETALLE_ROI_A.
    * Does NOT set track.audited so ROI B can still be detected.
    */
   startTurnCapture(
@@ -110,7 +110,9 @@ export class EvidenceCaptureManager {
     const recorder = new VideoBufferService(canvas, 'roi_based');
     recorder.setBufferCallback((seconds) => this.onBufferUpdate?.(key, seconds));
     recorder.onTimeout(async () => {
-      console.warn(`[CAPTURE] Timeout ROI B para Track #${track.id} - generando clip de 30s`);
+      console.warn(
+        `[CAPTURE] Timeout ROI B para Track #${track.id} - generando clip de ${FORENSIC_BUFFER_DURATION_SECONDS}s`
+      );
       await this.finalizeRoiATimeout(track, roiALine, video, key, recorder);
     });
     recorder.start();
@@ -412,8 +414,8 @@ export class EvidenceCaptureManager {
   }
 
   /**
-   * Finaliza captura cuando se alcanza el timeout de 30s sin ROI B.
-   * Genera evidencia con video de 30s y sin fotos de ROI B.
+   * Finaliza captura cuando se alcanza el timeout del buffer sin ROI B.
+   * Genera evidencia con video del buffer completo y sin fotos de ROI B.
    */
   private async finalizeRoiATimeout(
     track: Track,

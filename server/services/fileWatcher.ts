@@ -7,7 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { supabase, SUPABASE_TABLES } from '../../services/supabase';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { SUPABASE_TABLES } from '../../services/supabase';
 
 interface FileWatchConfig {
   folder: string;
@@ -23,6 +24,7 @@ interface WatchedFile {
 }
 
 class FileWatcherService {
+  private supabaseClient: SupabaseClient | null = null;
   private watchers: Map<string, fs.FSWatcher> = new Map();
   private watchedFiles: Map<string, WatchedFile> = new Map();
   private syncInterval: NodeJS.Timeout | null = null;
@@ -34,7 +36,7 @@ class FileWatcherService {
   private configs: FileWatchConfig[] = [
     {
       folder: process.env.REPORTS_DIR || 'C:\\Denuncias',
-      patterns: [/\.pdf$/i, /\.mp4$/i, /\.webm$/i],
+      patterns: [/\.xls$/i, /\.xlsx$/i, /\.mp4$/i, /\.webm$/i, /\.(jpg|jpeg|png)$/i],
       table: SUPABASE_TABLES.REPORTS,
       fieldMapper: (filePath: string, stats: fs.Stats) => {
         const filename = path.basename(filePath);
@@ -43,6 +45,10 @@ class FileWatcherService {
           file_path: filePath,
           created_at: stats.birthtime.toISOString(),
           file_size: stats.size,
+          metadata: {
+            extension: path.extname(filename).toLowerCase(),
+            parent_dir: path.basename(path.dirname(filePath)),
+          },
         };
       },
     },
@@ -73,11 +79,39 @@ class FileWatcherService {
     // Defer check to initialize() to allow loadLocalEnvFile() to run first
   }
 
+  private getSupabaseClient(): SupabaseClient {
+    if (this.supabaseClient) return this.supabaseClient;
+
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    const keyToUse = serviceRoleKey || anonKey;
+
+    if (!url || !keyToUse) {
+      throw new Error(
+        'Supabase no configurada para FileWatcher: faltan SUPABASE_URL/VITE_SUPABASE_URL y una key'
+      );
+    }
+
+    if (!serviceRoleKey) {
+      console.warn(
+        '[FileWatcher] SUPABASE_SERVICE_ROLE_KEY no definida. Se usará clave anon y puede fallar por RLS.'
+      );
+    }
+
+    this.supabaseClient = createClient(url, keyToUse, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return this.supabaseClient;
+  }
+
   private checkSupabaseConfigured(): boolean {
     if (this.supabaseConfigured !== null) return this.supabaseConfigured;
     this.supabaseConfigured = Boolean(
       (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
-      (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)
+      (process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY)
     );
     return this.supabaseConfigured;
   }
@@ -116,12 +150,12 @@ class FileWatcherService {
         if (eventType === 'rename' && fs.existsSync(fullPath)) {
           const stats = fs.statSync(fullPath);
           if (stats.isFile() && patterns.some((p) => p.test(filename))) {
-            this.handleNewFile(fullPath, stats);
+            this.handleNewFile(fullPath);
           }
         } else if (eventType === 'change' && fs.existsSync(fullPath)) {
           const stats = fs.statSync(fullPath);
           if (stats.isFile() && patterns.some((p) => p.test(filename))) {
-            this.handleModifiedFile(fullPath, stats);
+            this.handleModifiedFile(fullPath);
           }
         }
       });
@@ -165,7 +199,7 @@ class FileWatcherService {
     return files;
   }
 
-  private handleNewFile(filePath: string, stats: fs.Stats): void {
+  private handleNewFile(filePath: string): void {
     const existing = this.watchedFiles.get(filePath);
     if (existing) {
       existing.modified = Date.now();
@@ -180,7 +214,7 @@ class FileWatcherService {
     }
   }
 
-  private handleModifiedFile(filePath: string, stats: fs.Stats): void {
+  private handleModifiedFile(filePath: string): void {
     const existing = this.watchedFiles.get(filePath);
     if (existing) {
       console.log(`[FileWatcher] File modified: ${filePath}`);
@@ -210,6 +244,7 @@ class FileWatcherService {
         const stats = fs.statSync(filePath);
         const data = config.fieldMapper(filePath, stats);
 
+        const supabase = this.getSupabaseClient();
         const { error } = await supabase.from(config.table).insert(data);
 
         if (error) {
@@ -219,7 +254,6 @@ class FileWatcherService {
           watchedFile.synced = true;
           this.lastSyncTimes.set(filePath, Date.now());
           synced++;
-          console.log(`[FileWatcher] Synced: ${filePath}`);
         }
       } catch (error) {
         console.error(`[FileWatcher] Error syncing ${filePath}:`, error);

@@ -178,7 +178,11 @@ export interface InfractionLog extends AuditResponse {
   videoClip?: string; // Base64 or Blob URL of the 8s clip
   time: string;
   playbackTime?: number; // Time in seconds from the start of the video
-  reportPath?: string;
+  reportPath?: string; // Ruta del Excel diario donde queda registrada la infracción
+  generalImagePaths?: string[];
+  detailImagePaths?: string[];
+  videoPath?: string;
+  storageFolder?: string;
   viewerId?: string; // Multi-viewer support
   validationStatus?: 'pending' | 'validated' | 'rejected';
   validatedAt?: number;

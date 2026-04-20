@@ -1,6 +1,5 @@
-import { X, Scale, FileDown, CheckCircle, Ban } from 'lucide-react';
+import { X, Scale, CheckCircle, Ban } from 'lucide-react';
 import { InfractionLog } from '../types';
-import { ReportService } from '../services/ReportService';
 import { useSentinel } from '../hooks/useSentinel';
 import { useHelp } from '../hooks/useHelp';
 
@@ -12,13 +11,6 @@ interface InfractionModalProps {
 export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
   const { validateInfraction } = useSentinel();
   const { helpProps } = useHelp();
-
-  const generatePDF = async () => {
-    await ReportService.downloadInfractionPdf(
-      log,
-      `ACTA_PERICIAL_${log.plate || 'SENT'}_${log.id.toString().slice(0, 8)}.pdf`
-    );
-  };
 
   const handleValidate = () => {
     validateInfraction(log.id, 'validated');
@@ -182,13 +174,12 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                   <CheckCircle size={14} /> Validar
                 </button>
               </div>
-              <button
-                onClick={generatePDF}
-                className="w-full py-3 text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all"
-                {...helpProps('Descargar informe PDF certificado con evidencia fotográfica.')}
+              <div
+                className="w-full py-3 text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] text-center"
+                {...helpProps('La infracción ya queda registrada automáticamente en el Excel diario y en las carpetas de evidencias.')}
               >
-                <FileDown size={14} /> Generar Expediente PDF Certificado
-              </button>
+                Registro automático en Excel diario y evidencias
+              </div>
             </div>
           </div>
         </div>

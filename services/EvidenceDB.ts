@@ -1,5 +1,5 @@
 import { InfractionLog } from '../types';
-import { isSupabaseConfigured, SUPABASE_TABLES } from './supabase';
+import { supabase, isSupabaseConfigured, SUPABASE_TABLES } from './supabase';
 
 const getExpedienteNum = (infractionDate: Date): string => {
   const year = infractionDate.getFullYear();
@@ -192,11 +192,19 @@ export class EvidenceDB {
     }
   }
 
+  private buildStorageExtraData(infraction: InfractionLog) {
+    return {
+      reportPath: infraction.reportPath || null,
+      generalImagePaths: infraction.generalImagePaths || [],
+      detailImagePaths: infraction.detailImagePaths || [],
+      videoPath: infraction.videoPath || null,
+      storageFolder: infraction.storageFolder || null,
+    };
+  }
+
   // Sync single infraction immediately to Supabase
   private async syncInfractionToSupabase(infraction: InfractionLog): Promise<boolean> {
     try {
-      const { supabase } = await import('./supabase');
-
       const auditResultData = {
         plate: infraction.plate,
         makeModel: infraction.makeModel,
@@ -211,6 +219,8 @@ export class EvidenceDB {
         localTime: infraction.localTime,
         telemetry: infraction.telemetry,
       };
+
+      const storageExtraData = this.buildStorageExtraData(infraction);
 
       const { error: errorInfractions } = await supabase.from(SUPABASE_TABLES.INFRACTIONS).insert({
         status: 'completed',
@@ -241,7 +251,9 @@ export class EvidenceDB {
         viewer_id: infraction.viewerId,
         validation_status: 'pending',
         infraction_location: infraction.infractionLocation,
-        extra_data: {},
+        report_path: infraction.reportPath,
+        report_generated_at: infraction.reportPath ? new Date().toISOString() : null,
+        extra_data: storageExtraData,
       });
 
       // Also sync to incidents for backward compatibility
@@ -273,7 +285,9 @@ export class EvidenceDB {
         viewer_id: infraction.viewerId,
         validation_status: 'pending',
         infraction_location: infraction.infractionLocation,
-        extra_data: {},
+        report_path: infraction.reportPath,
+        report_generated_at: infraction.reportPath ? new Date().toISOString() : null,
+        extra_data: storageExtraData,
       });
 
       if (!errorInfractions && !errorIncidents) {
@@ -355,8 +369,6 @@ export class EvidenceDB {
 
       for (const infraction of unsynced) {
         try {
-          const { supabase } = await import('./supabase');
-
           const auditResultData = {
             plate: infraction.plate,
             makeModel: infraction.makeModel,
@@ -371,6 +383,8 @@ export class EvidenceDB {
             localTime: infraction.localTime,
             telemetry: infraction.telemetry,
           };
+
+          const storageExtraData = this.buildStorageExtraData(infraction);
 
           const { error: errorInfractions } = await supabase
             .from(SUPABASE_TABLES.INFRACTIONS)
@@ -403,7 +417,9 @@ export class EvidenceDB {
               viewer_id: infraction.viewerId,
               infraction_location: infraction.infractionLocation,
               validation_status: 'pendiente',
-              extra_data: {},
+              report_path: infraction.reportPath,
+              report_generated_at: infraction.reportPath ? new Date().toISOString() : null,
+              extra_data: storageExtraData,
             });
 
           const { error: errorIncidents } = await supabase.from(SUPABASE_TABLES.INCIDENTS).insert({
@@ -435,7 +451,9 @@ export class EvidenceDB {
             viewer_id: infraction.viewerId,
             infraction_location: infraction.infractionLocation,
             validation_status: 'pending',
-            extra_data: {},
+            report_path: infraction.reportPath,
+            report_generated_at: infraction.reportPath ? new Date().toISOString() : null,
+            extra_data: storageExtraData,
           });
 
           if (!errorInfractions || !errorIncidents) {
@@ -505,7 +523,6 @@ export async function getLugaresFromSupabase(): Promise<LugarInfraccion[]> {
     return saved ? JSON.parse(saved) : [];
   }
   try {
-    const { supabase } = await import('./supabase');
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.LUGARES_INFRACCION)
       .select('*')
@@ -534,7 +551,6 @@ export async function saveLugarToSupabase(lugar: LugarInfraccion): Promise<boole
     return true;
   }
   try {
-    const { supabase } = await import('./supabase');
     const { error } = await supabase.from(SUPABASE_TABLES.LUGARES_INFRACCION).insert({
       nombre: lugar.nombre,
       descripcion: lugar.descripcion,
@@ -568,7 +584,6 @@ export async function deleteLugarFromSupabase(id: string): Promise<boolean> {
     return true;
   }
   try {
-    const { supabase } = await import('./supabase');
     const { error } = await supabase.from(SUPABASE_TABLES.LUGARES_INFRACCION).delete().eq('id', id);
     if (error) {
       console.error('[EvidenceDB] Error deleting lugar:', error);
@@ -594,7 +609,6 @@ export async function updateLugarToSupabase(lugar: LugarInfraccion): Promise<boo
     return false;
   }
   try {
-    const { supabase } = await import('./supabase');
     const { error } = await supabase
       .from(SUPABASE_TABLES.LUGARES_INFRACCION)
       .update({

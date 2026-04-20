@@ -219,6 +219,147 @@ const safeUnlink = (filePath) => {
 const finalizeFilename = sanitizeFilename;
 const validateCameraHost = (hostname) => _validateCameraHost(hostname, ALLOWED_CAMERA_HOSTS);
 
+const padDatePart = (value) => String(value).padStart(2, '0');
+
+const normalizeFolderDate = (value) => {
+  const safe = sanitizeFilename(String(value || ''), '').replace(/\.$/, '');
+  const compact = safe.replace(/[^0-9]/g, '');
+  if (compact.length === 8) {
+    return `${compact.slice(0, 4)}_${compact.slice(4, 6)}_${compact.slice(6, 8)}`;
+  }
+  const today = new Date();
+  return `${today.getFullYear()}_${padDatePart(today.getMonth() + 1)}_${padDatePart(today.getDate())}`;
+};
+
+const getDailyDirectories = (folderDate) => {
+  const safeDate = normalizeFolderDate(folderDate);
+  const baseDir = path.join(REPORTS_DIR, safeDate);
+  const directories = {
+    baseDir,
+    tablesDir: path.join(baseDir, 'Tablas'),
+    imagesDir: path.join(baseDir, 'Imagenes'),
+    videosDir: path.join(baseDir, 'Videos'),
+  };
+
+  for (const dir of Object.values(directories)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  return { folderDate: safeDate, ...directories };
+};
+
+const xmlEscape = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const buildExcelXml = (rows) => {
+  const maxGeneralImages = Math.max(0, ...rows.map((row) => (row.generalImagePaths || []).length));
+  const maxDetailImages = Math.max(0, ...rows.map((row) => (row.detailImagePaths || []).length));
+
+  const generalImageHeaders = Array.from({ length: maxGeneralImages }, (_, index) => {
+    return `Imagen General ${index + 1}`;
+  });
+  const detailImageHeaders = Array.from({ length: maxDetailImages }, (_, index) => {
+    return `Imagen Detalle ${index + 1}`;
+  });
+
+  const headers = [
+    'Placa de Matricula',
+    'Lugar de Infraccion',
+    'Dia de Infraccion',
+    'Hora de Infraccion',
+    ...generalImageHeaders,
+    ...detailImageHeaders,
+  ];
+
+  const buildCell = (value) =>
+    `<Cell><Data ss:Type="String">${xmlEscape(value)}</Data></Cell>`;
+
+  const headerRow = `<Row>${headers.map((header) => buildCell(header)).join('')}</Row>`;
+  const bodyRows = rows
+    .map((row) => {
+      const generalImageCells = Array.from({ length: maxGeneralImages }, (_, index) => {
+        return row.generalImagePaths?.[index] || '';
+      });
+      const detailImageCells = Array.from({ length: maxDetailImages }, (_, index) => {
+        return row.detailImagePaths?.[index] || '';
+      });
+
+      return `<Row>${[
+        row.plate,
+        row.infractionLocation || '',
+        row.day,
+        row.time,
+        ...generalImageCells,
+        ...detailImageCells,
+      ]
+        .map((value) => buildCell(value))
+        .join('')}</Row>`;
+    })
+    .join('');
+
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Worksheet ss:Name="Infracciones">
+  <Table>
+   ${headerRow}
+   ${bodyRows}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+};
+
+const saveBase64Image = (base64, targetPath) => {
+  const normalized = String(base64 || '').replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+  if (!normalized) return false;
+  fs.writeFileSync(targetPath, Buffer.from(normalized, 'base64'));
+  return true;
+};
+
+const detectVideoExtensionFromMime = (mimeType = '') => {
+  const normalized = String(mimeType).toLowerCase();
+  if (normalized.includes('video/webm')) return 'webm';
+  if (normalized.includes('video/mp4')) return 'mp4';
+  return 'mp4';
+};
+
+const decodeBase64Payload = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return { mimeType: '', base64Data: '' };
+
+  if (!raw.startsWith('data:')) {
+    return { mimeType: '', base64Data: raw };
+  }
+
+  const commaIndex = raw.indexOf(',');
+  if (commaIndex === -1) return { mimeType: '', base64Data: '' };
+
+  const meta = raw.slice(5, commaIndex); // remove "data:"
+  const payload = raw.slice(commaIndex + 1).trim();
+  const parts = meta.split(';').map((p) => p.trim()).filter(Boolean);
+  const mimeType = parts[0] || '';
+  const isBase64 = parts.some((p) => p.toLowerCase() === 'base64');
+
+  if (!isBase64) return { mimeType, base64Data: '' };
+  return { mimeType, base64Data: payload };
+};
+
+const saveBase64Video = (videoClip, targetPath) => {
+  const { base64Data } = decodeBase64Payload(videoClip);
+  if (!base64Data) return false;
+  fs.writeFileSync(targetPath, Buffer.from(base64Data, 'base64'));
+  return true;
+};
+
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '100mb' }));
 app.use('/api', apiGuard, rateLimitApi);
@@ -486,20 +627,118 @@ app.get('/api/ip-camera/stream/:sessionId', async (req, res) => {
 });
 
 app.post(
+  '/api/reports/infraction',
+  express.json({ limit: `${MAX_REPORT_MB}mb` }),
+  (req, res) => {
+    try {
+      const {
+        sourceId,
+        plate,
+        day,
+        time,
+        folderDate,
+        infractionLocation,
+        generalImages,
+        detailImages,
+        videoClip,
+      } =
+        req.body || {};
+
+      if (!sourceId) {
+        res.status(400).json({ saved: false, error: 'sourceId es obligatorio.' });
+        return;
+      }
+
+      const dirs = getDailyDirectories(folderDate);
+      const safePlateBase = sanitizeFilename(plate || 'SIN_PLACA', '').replace(/\.$/, '') || 'SIN_PLACA';
+      const safePrefix = sanitizeFilename(`${sourceId}_${safePlateBase}`, '').replace(/\.$/, '');
+
+      const generalImagePaths = [];
+      for (const [index, image] of (generalImages || []).entries()) {
+        const imageFilename = `${safePrefix}_GENERAL_${String(index + 1).padStart(2, '0')}.jpg`;
+        const imagePath = path.join(dirs.imagesDir, imageFilename);
+        if (!isPathWithinDir(imagePath, REPORTS_DIR)) continue;
+        if (saveBase64Image(image, imagePath)) {
+          generalImagePaths.push(imagePath);
+        }
+      }
+
+      const detailImagePaths = [];
+      for (const [index, image] of (detailImages || []).entries()) {
+        const imageFilename = `${safePrefix}_DETALLE_${String(index + 1).padStart(2, '0')}.jpg`;
+        const imagePath = path.join(dirs.imagesDir, imageFilename);
+        if (!isPathWithinDir(imagePath, REPORTS_DIR)) continue;
+        if (saveBase64Image(image, imagePath)) {
+          detailImagePaths.push(imagePath);
+        }
+      }
+
+      let videoPath = null;
+      if (videoClip) {
+        const { mimeType } = decodeBase64Payload(videoClip);
+        const extension = detectVideoExtensionFromMime(mimeType);
+        const videoFilename = `${safePrefix}.${extension}`;
+        const targetPath = path.join(dirs.videosDir, videoFilename);
+        if (isPathWithinDir(targetPath, REPORTS_DIR) && saveBase64Video(videoClip, targetPath)) {
+          videoPath = targetPath;
+        }
+      }
+
+      const tableJsonPath = path.join(dirs.tablesDir, `Infracciones_${dirs.folderDate}.json`);
+      const tablePath = path.join(dirs.tablesDir, `Infracciones_${dirs.folderDate}.xls`);
+
+      let records = [];
+      if (fs.existsSync(tableJsonPath)) {
+        records = JSON.parse(fs.readFileSync(tableJsonPath, 'utf-8'));
+      }
+
+      const nextRecord = {
+        sourceId: String(sourceId),
+        plate: plate || '',
+        day: day || dirs.folderDate.replace(/_/g, '-'),
+        time: time || '',
+        infractionLocation: infractionLocation || '',
+        generalImagePaths,
+        detailImagePaths,
+        videoPath,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const existingIndex = records.findIndex((record) => record.sourceId === nextRecord.sourceId);
+      if (existingIndex >= 0) {
+        records[existingIndex] = nextRecord;
+      } else {
+        records.push(nextRecord);
+      }
+
+      fs.writeFileSync(tableJsonPath, JSON.stringify(records, null, 2), 'utf-8');
+      fs.writeFileSync(tablePath, buildExcelXml(records), 'utf-8');
+
+      res.json({
+        saved: true,
+        folderPath: dirs.baseDir,
+        tablePath,
+        generalImagePaths,
+        detailImagePaths,
+        videoPath,
+      });
+    } catch (error) {
+      res.status(500).json({
+        saved: false,
+        error: error instanceof Error ? error.message : 'No se pudo registrar la infracción',
+      });
+    }
+  }
+);
+
+app.post(
   '/api/reports/save',
   express.raw({ type: 'application/pdf', limit: `${MAX_REPORT_MB}mb` }),
   (req, res) => {
     try {
-      const folderDate = req.query.date
-        ? sanitizeFilename(req.query.date)
-        : new Date().toISOString().slice(0, 10).replace(/-/g, '_');
-      const dailyDir = path.join(REPORTS_DIR, folderDate);
-      fs.mkdirSync(dailyDir, { recursive: true });
-      const safeFilename = finalizeFilename(
-        req.query.filename || `Sentinel_Report_${Date.now()}.pdf`,
-        '.pdf'
-      );
-      const targetPath = path.join(dailyDir, safeFilename);
+      const dirs = getDailyDirectories(req.query.date);
+      const safeFilename = finalizeFilename(req.query.filename || `Infracciones_${dirs.folderDate}.xls`, '.xls');
+      const targetPath = path.join(dirs.tablesDir, safeFilename);
       if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
         res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });
         return;
@@ -528,17 +767,13 @@ app.post(
     let targetPath = '';
 
     try {
-      const folderDate = req.query.date
-        ? sanitizeFilename(req.query.date)
-        : new Date().toISOString().slice(0, 10).replace(/-/g, '_');
-      const dailyDir = path.join(REPORTS_DIR, folderDate);
-      fs.mkdirSync(dailyDir, { recursive: true });
+      const dirs = getDailyDirectories(req.query.date);
 
       const safeFilename = finalizeFilename(
         req.query.filename || `Evidence_${timestamp}.mp4`,
         '.mp4'
       );
-      targetPath = path.join(dailyDir, safeFilename);
+      targetPath = path.join(dirs.videosDir, safeFilename);
 
       if (!isPathWithinDir(targetPath, REPORTS_DIR)) {
         res.status(403).json({ saved: false, error: 'Ruta de archivo no permitida.' });

@@ -1,5 +1,7 @@
 import { logger } from './logger';
 
+export const FORENSIC_BUFFER_DURATION_SECONDS = 30;
+
 /**
  * Servicio de Grabación Forense.
  * Modos de operación:
@@ -10,7 +12,7 @@ export class VideoBufferService {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private readonly maxSeconds = 30;
+  private readonly maxSeconds = FORENSIC_BUFFER_DURATION_SECONDS;
   private bufferCallback?: (seconds: number) => void;
   private timeoutCallback?: () => void;
   private mode: 'circular' | 'roi_based' = 'circular';
@@ -92,10 +94,13 @@ export class VideoBufferService {
 
         this.timeoutId = setTimeout(() => {
           if (this.isRecording) {
-            logger.info('RECORDER', 'Timeout de 30s alcanzado sin ROI B - forzando parada');
+            logger.info(
+              'RECORDER',
+              `Timeout de ${FORENSIC_BUFFER_DURATION_SECONDS}s alcanzado sin ROI B - forzando parada`
+            );
             this.timeoutCallback?.();
           }
-        }, 30000);
+        }, FORENSIC_BUFFER_DURATION_SECONDS * 1000);
       } else {
         logger.info('RECORDER', 'Buffer Circular de Video Iniciado');
       }
@@ -104,7 +109,7 @@ export class VideoBufferService {
   }
 
   /**
-   * Callback para notificar timeout (cuando no se detecta ROI B en 30s).
+   * Callback para notificar timeout cuando no se detecta ROI B dentro del buffer.
    */
   onTimeout(callback: () => void) {
     this.timeoutCallback = callback;
@@ -136,7 +141,7 @@ export class VideoBufferService {
   }
 
   /**
-   * Extrae el clip: modo circular = últimos 21 seg, modo roi_based = desde inicio hasta stop.
+   * Extrae el clip: modo circular = últimos N segundos, modo roi_based = desde inicio hasta stop.
    */
   async getClip(): Promise<string> {
     return new Promise((resolve) => {

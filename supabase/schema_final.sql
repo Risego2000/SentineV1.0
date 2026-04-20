@@ -49,6 +49,7 @@ CREATE TABLE infractions (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   status TEXT DEFAULT 'completed',
+  expediente_num TEXT,
   evidence_id UUID REFERENCES evidence(id) ON DELETE SET NULL,
   plate TEXT,
   make_model TEXT,
@@ -85,6 +86,7 @@ CREATE TABLE infractions (
 
 CREATE INDEX idx_infractions_created_at ON infractions(created_at DESC);
 CREATE INDEX idx_infractions_plate ON infractions(plate);
+CREATE INDEX idx_infractions_expediente_num ON infractions(expediente_num);
 CREATE INDEX idx_infractions_severity ON infractions(severity);
 CREATE INDEX idx_infractions_validation_status ON infractions(validation_status);
 CREATE INDEX idx_infractions_time ON infractions(time);
@@ -98,6 +100,7 @@ CREATE TABLE incidents (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   status TEXT DEFAULT 'completed',
+  expediente_num TEXT,
   evidence_id UUID,
   plate TEXT,
   make_model TEXT,
@@ -114,6 +117,7 @@ CREATE TABLE incidents (
   video_clip_url TEXT,
   ocr_results TEXT[],
   plate_ocr TEXT,
+  plate_ocr_candidates TEXT[],
   time TEXT,
   playback_time DOUBLE PRECISION,
   local_time TIMESTAMPTZ,
@@ -130,6 +134,8 @@ CREATE TABLE incidents (
   extra_data JSONB DEFAULT '{}',
   viewer_id TEXT
 );
+
+CREATE INDEX idx_incidents_expediente_num ON incidents(expediente_num);
 
 -- ============================================
 -- AUDIT_JOBS
@@ -213,6 +219,11 @@ CREATE TABLE reports (
   file_url TEXT,
   file_size BIGINT,
   file_hash TEXT,
+  report_date DATE,
+  folder_path TEXT,
+  table_path TEXT,
+  images_dir_path TEXT,
+  videos_dir_path TEXT,
   total_videos INTEGER DEFAULT 0,
   total_infractiones INTEGER DEFAULT 0,
   start_time TIMESTAMPTZ,
@@ -356,8 +367,12 @@ CREATE TABLE lugares_infraccion (
   direccion TEXT,
   municipio TEXT DEFAULT 'Daganzo de Arriba',
   provincia TEXT DEFAULT 'Madrid',
+  tipo_via TEXT DEFAULT 'urbana',
+  coordenadas JSONB DEFAULT '{}',
   activo BOOLEAN DEFAULT TRUE,
-  orden INTEGER DEFAULT 0
+  orden INTEGER DEFAULT 0,
+  metadata JSONB DEFAULT '{}',
+  operator_id TEXT
 );
 
 INSERT INTO lugares_infraccion (id, nombre, direccion, municipio, activo, orden) VALUES

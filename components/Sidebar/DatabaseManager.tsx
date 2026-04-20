@@ -88,7 +88,7 @@ const TABLE_SCHEMAS: Record<TableName, string[]> = {
     'priority',
   ],
   audit_jobs: ['status', 'auditPreset', 'ruleId', 'viewerId'],
-  reports: ['filename', 'totalVideos', 'totalInfractions', 'startTime', 'endTime'],
+  reports: ['filename', 'file_path', 'file_size', 'created_at', 'metadata'],
   system_logs: ['type', 'content'],
 };
 

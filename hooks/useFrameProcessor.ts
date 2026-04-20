@@ -342,7 +342,7 @@ export const useFrameProcessor = () => {
                     (g) => g.type === 'roi_turn' && g.label.toUpperCase().includes('ROI A')
                   ) || geometry.find((g) => g.type === 'roi_turn');
 
-                // PHASE 1: ROI A — start 20s buffer only when entering the designated ROI A
+                // PHASE 1: ROI A — start 30s buffer only when entering the designated ROI A
                 if (
                   uniqueTurnRois.length === 1 &&
                   !t.roiATurnCaptureKey &&

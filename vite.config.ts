@@ -48,10 +48,18 @@ export default defineConfig(() => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            mediapipe: ['@mediapipe/tasks-vision'],
-            ui: ['lucide-react'],
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+
+            if (id.includes('@mediapipe/tasks-vision')) return 'mediapipe';
+            if (id.includes('@supabase/supabase-js')) return 'supabase';
+            if (id.includes('tesseract.js')) return 'tesseract';
+            if (id.includes('lucide-react')) return 'ui';
+            if (id.includes('zustand')) return 'state';
+            if (id.includes('jspdf')) return 'pdf';
+            if (id.includes('react') || id.includes('react-dom')) return 'react-vendor';
+
+            return 'vendor';
           },
         },
       },

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { FORENSIC_BUFFER_DURATION_SECONDS } from '../../services/videoRecorder';
 
 const PHASE_CONFIG = {
   standby: {
@@ -70,9 +71,12 @@ export const NeuralStatusHUD = () => {
   const phase = bufferStatus.phase ?? 'standby';
   const cfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.standby;
 
-  const totalSeg = 20;
+  const totalSeg = FORENSIC_BUFFER_DURATION_SECONDS;
   const activeSeg = Math.min(totalSeg, Math.floor(bufferStatus.seconds));
-  const pct = Math.round((bufferStatus.seconds / 20) * 100);
+  const pct = Math.min(
+    100,
+    Math.round((bufferStatus.seconds / FORENSIC_BUFFER_DURATION_SECONDS) * 100)
+  );
 
   const roiA = bufferStatus.roiALabel ?? 'ROI A';
   const roiB = bufferStatus.roiBLabel ?? 'ROI B';
@@ -144,7 +148,7 @@ export const NeuralStatusHUD = () => {
         <div className={'flex flex-col justify-center flex-1 border-r border-white/5 ' + pad}>
           <div className="flex items-center justify-between mb-1">
             <span className={'font-mono font-bold text-slate-500 ' + txtLabel}>
-              {bufferStatus.seconds.toFixed(1)}s / 20.0s
+              {bufferStatus.seconds.toFixed(1)}s / {FORENSIC_BUFFER_DURATION_SECONDS.toFixed(1)}s
             </span>
             <span className={'font-black text-white font-mono leading-none ' + txtPct}>
               {pct}
