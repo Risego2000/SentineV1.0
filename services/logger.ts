@@ -115,6 +115,96 @@ class TacticalLogger {
   public getLogs(): LogEntry[] {
     return [...this.logs];
   }
+
+  /**
+   * Logging para servidor (JSON estructurado)
+   */
+  public errorWithContext(
+    context: string,
+    error: unknown,
+    metadata?: Record<string, any>
+  ) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const entry = {
+      level: 'ERROR',
+      context,
+      message: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString(),
+      ...metadata
+    };
+
+    // En servidor: logging a stdout para centralized logging
+    if (typeof window === 'undefined') {
+      console.error(JSON.stringify(entry));
+    } else {
+      this.error(context, err.message, metadata);
+    }
+
+    return entry;
+  }
+
+  /**
+   * Logging de acceso API (auditoría)
+   */
+  public auditLog(
+    method: string,
+    path: string,
+    status: number,
+    metadata?: Record<string, any>
+  ) {
+    const entry = {
+      level: 'INFO',
+      context: 'API_AUDIT',
+      method,
+      path,
+      status,
+      timestamp: new Date().toISOString(),
+      ...metadata
+    };
+
+    if (typeof window === 'undefined') {
+      console.log(JSON.stringify(entry));
+    } else {
+      this.info('API_AUDIT', `${method} ${path} [${status}]`, metadata);
+    }
+
+    return entry;
+  }
+
+  /**
+   * Logging de validación fallida
+   */
+  public validationError(
+    context: string,
+    field: string,
+    reason: string,
+    value?: unknown
+  ) {
+    this.warn(context, `Validación fallida: ${field} - ${reason}`, {
+      field,
+      reason,
+      value: typeof value === 'object' ? '[object]' : value
+    });
+  }
+
+  /**
+   * Limpiar logs antiguos
+   */
+  public clearOldLogs(maxAgeHours: number = 24) {
+    const cutoffTime = Date.now() - maxAgeHours * 60 * 60 * 1000;
+    const initialCount = this.logs.length;
+
+    this.logs = this.logs.filter(log => {
+      const logTime = new Date(log.timestamp).getTime();
+      return logTime > cutoffTime;
+    });
+
+    const removedCount = initialCount - this.logs.length;
+    if (removedCount > 0) {
+      this.debug('LOGGER', `Limpiados ${removedCount} logs antiguos`);
+    }
+  }
 }
 
 export const logger = TacticalLogger.getInstance();

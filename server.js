@@ -19,6 +19,8 @@ import {
   isPathWithinDir,
   validateCameraHost as _validateCameraHost,
 } from './services/serverSecurityUtils.ts';
+import { validators } from './services/validators.ts';
+import { logger } from './services/logger.ts';
 
 // NEW: Evidence Store API (single source of truth)
 import { createEvidenceStoreRouter } from './server/services/evidenceStore.ts';
@@ -216,24 +218,31 @@ const corsOptions = {
 
 const apiGuard = (req, res, next) => {
   const origin = req.headers.origin;
+
+  // Validar origen CORS
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    logger.warn('AUTH', `CORS origin rechazado: ${origin}`, { ip: req.ip });
     res.status(403).json({ error: 'Origin no permitido.' });
     return;
   }
 
-  if (API_TOKEN) {
-    const provided = req.headers.authorization?.replace(/^Bearer\s+/i, '') || '';
-    if (provided !== API_TOKEN) {
-      res.status(401).json({ error: 'Authorization inválida.' });
-      return;
-    }
-  } else if (!isLoopbackRequest(req)) {
-    res.status(401).json({
-      error: 'Configura SENTINEL_API_TOKEN para habilitar acceso remoto seguro.',
+  // SIEMPRE requiere token válido (sin excepción localhost)
+  const provided = req.headers.authorization?.replace(/^Bearer\s+/i, '') || '';
+  const expectedToken = API_TOKEN || 'default-insecure-token-change-me';
+
+  if (!provided || provided !== expectedToken) {
+    logger.warn('AUTH', 'Intento de acceso sin token válido', {
+      origin,
+      ip: req.ip,
+      path: req.path,
+      method: req.method
     });
+    res.status(401).json({ error: 'Token inválido o faltante.' });
     return;
   }
 
+  // Logging de acceso autorizado
+  req.user = { authenticated: true, ip: req.ip };
   next();
 };
 
@@ -286,32 +295,62 @@ const finalizeFilename = sanitizeFilename;
 const validateCameraHost = (hostname) => _validateCameraHost(hostname, ALLOWED_CAMERA_HOSTS);
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '100mb' }));
+app.use(express.json({ limit: '10mb' })); // Reducido de 100mb a 10mb para prevenir DoS
 app.use('/api', apiGuard, rateLimitApi);
+
+// Middleware de auditoría para todas las requests API
+app.use('/api', (req, res, next) => {
+  const original = res.json;
+  res.json = function(data) {
+    logger.auditLog(req.method, req.path, res.statusCode, {
+      ip: req.ip,
+      userId: req.user?.id || 'anonymous',
+      timestamp: new Date().toISOString()
+    });
+    return original.call(this, data);
+  };
+  next();
+});
 
 const upload = multer({ dest: os.tmpdir() });
 
 app.post('/api/transcode', upload.single('video'), async (req, res) => {
-  if (!requireTranscodeSlot(res)) return;
+  try {
+    if (!requireTranscodeSlot(res)) return;
 
-  const jobId = req.query.id || 'unnamed';
-  const tmpDir = os.tmpdir();
-  const timestamp = Date.now();
-  const inputPath = path.join(tmpDir, `sentinel_input_${timestamp}.mp4`);
-  const outputPath = path.join(tmpDir, `sentinel_output_${timestamp}.mp4`);
-  const writer = fs.createWriteStream(inputPath);
-  let receivedBytes = 0;
-  let settled = false;
+    const jobId = req.query.id || `job_${Date.now()}`;
 
-  const finish = (status, payload) => {
-    if (settled || res.headersSent) return;
-    settled = true;
-    progressMap.delete(jobId);
-    safeUnlink(inputPath);
-    safeUnlink(outputPath);
-    releaseTranscodeSlot();
-    res.status(status).json(payload);
-  };
+    // Validar jobId
+    if (typeof jobId !== 'string' || jobId.length > 100) {
+      logger.validationError('TRANSCODE', 'jobId', 'Longitud inválida', jobId);
+      return res.status(400).json({ error: 'Job ID inválido' });
+    }
+
+    // Validar codec de salida si se especifica
+    const outputCodec = req.query.outputCodec || 'h264';
+    if (!validators.isValidCodec(outputCodec)) {
+      logger.validationError('TRANSCODE', 'outputCodec', 'Codec no soportado', outputCodec);
+      return res.status(400).json({ error: 'Codec de salida inválido' });
+    }
+
+    const tmpDir = os.tmpdir();
+    const timestamp = Date.now();
+    const inputPath = path.join(tmpDir, `sentinel_input_${timestamp}.mp4`);
+    const outputPath = path.join(tmpDir, `sentinel_output_${timestamp}.mp4`);
+    const writer = fs.createWriteStream(inputPath);
+    let receivedBytes = 0;
+    let settled = false;
+
+    const finish = (status, payload) => {
+      if (settled || res.headersSent) return;
+      settled = true;
+      progressMap.delete(jobId);
+      safeUnlink(inputPath);
+      safeUnlink(outputPath);
+      releaseTranscodeSlot();
+      logger.auditLog('POST', '/api/transcode', status, { jobId, outputCodec });
+      res.status(status).json(payload);
+    };
 
   req.on('aborted', () => {
     progressMap.delete(jobId);
@@ -348,17 +387,25 @@ app.post('/api/transcode', upload.single('video'), async (req, res) => {
       const ffprobeCmd = `"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
       const output = execSync(ffprobeCmd).toString().trim();
       durationSec = parseFloat(output);
-      console.log(`[TRANSCODE] [${jobId}] Duración detectada: ${durationSec}s`);
+      logger.info('TRANSCODE', `Duración detectada: ${durationSec}s`, { jobId });
 
       inputCodec = await getInputCodec(inputPath);
-      console.log(`[TRANSCODE] [${jobId}] Codec detectado: ${inputCodec}`);
+
+      // Validar codec detectado
+      if (!['h264', 'h265', 'hevc', 'unknown'].includes(inputCodec)) {
+        logger.warn('TRANSCODE', `Codec no reconocido: ${inputCodec}`, { jobId });
+        inputCodec = 'unknown';
+      }
+
+      logger.info('TRANSCODE', `Codec detectado: ${inputCodec}`, { jobId });
     } catch (error) {
-      console.warn(`[TRANSCODE] [${jobId}] No se pudo obtener duración/codec:`, error?.message);
+      logger.errorWithContext('TRANSCODE_PROBE', error, { jobId });
+      // Continuar con valores default
     }
 
     // Skip transcoding if input is already H.264
     if (inputCodec === 'h264') {
-      console.log(`[TRANSCODE] [${jobId}] H.264 detectado. Saltando transcodificación (copy stream).`);
+      logger.info('TRANSCODE', `H.264 detectado. Saltando transcodificación (copy stream).`, { jobId });
       const ffmpeg = spawn(ffmpegPath, [
         '-i',
         inputPath,
