@@ -15,6 +15,7 @@ import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
 import { evidenceDB } from './EvidenceDB';
 import { logger } from './logger';
 import { OCRSynchronizer } from './OCRSynchronizer';
+import { forensicQueuePersistence } from './ForensicQueuePersistence';
 
 /**
  * Queue item with mutable status tracking.
@@ -26,6 +27,8 @@ interface QueueItem {
   resolvedAt?: number;
   currentStatus: AuditJob['status'];
   retries: number;
+  lastRetryAt?: number;
+  nextRetryAt?: number;
 }
 
 export interface ForensicQueueEvent {
@@ -41,9 +44,10 @@ export class ForensicQueueV3 {
   private onEvent?: (event: ForensicQueueEvent) => void;
   private idleResolvers: Array<() => void> = [];
   private maxQueueSize = 50;
-  private maxRetries = 3;
-  private retryDelayMs = 1250;
+  private maxRetries = 5;
+  private baseRetryDelayMs = 500; // Base delay for exponential backoff
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
+  private persistenceInitialized = false;
 
   // Dynamic context at job creation time (frozen in each job)
   private directives: string = '';
@@ -52,6 +56,61 @@ export class ForensicQueueV3 {
 
   constructor(callback?: (log: InfractionLog) => void) {
     if (callback) this.listeners.add(callback);
+    this.loadPersistedQueue();
+  }
+
+  /**
+   * Load persisted queue items from IndexedDB
+   */
+  private async loadPersistedQueue() {
+    try {
+      const persistedItems = await forensicQueuePersistence.loadQueueItems();
+
+      // Restore jobs that were pending or processing
+      const restoredJobs = persistedItems.filter(
+        (item) => item.currentStatus === 'pending' || item.currentStatus === 'processing'
+      );
+
+      if (restoredJobs.length > 0) {
+        this.queue = restoredJobs as QueueItem[];
+        logger.info(
+          'FORENSIC_QUEUE',
+          `Restaurados ${restoredJobs.length} trabajos forenses de persistencia`
+        );
+        this.processNext();
+      }
+
+      this.persistenceInitialized = true;
+    } catch (error) {
+      logger.warn(
+        'FORENSIC_QUEUE',
+        `Error cargando cola persistida: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.persistenceInitialized = true;
+    }
+  }
+
+  /**
+   * Save queue state to IndexedDB
+   */
+  private async saveQueueState() {
+    if (!this.persistenceInitialized) return;
+
+    try {
+      await forensicQueuePersistence.saveQueueItems(
+        this.queue.map((item) => ({
+          job: item.job,
+          evidenceId: item.evidenceId,
+          resolvedAt: item.resolvedAt,
+          currentStatus: item.currentStatus,
+          retries: item.retries,
+          lastRetryAt: item.lastRetryAt,
+          nextRetryAt: item.nextRetryAt,
+        }))
+      );
+    } catch (error) {
+      logger.warn('FORENSIC_QUEUE', `Error guardando estado de cola: ${error}`);
+    }
   }
 
   /**
@@ -166,6 +225,9 @@ export class ForensicQueueV3 {
       `Job ${job.id} enqueued for Vehicle #${track.id}. Rule: ${effectiveRule?.name || 'default'}. Queue: ${this.queue.length}`
     );
 
+    // Save queue state to persistence
+    this.saveQueueState();
+
     this.processNext();
     return job;
   }
@@ -201,6 +263,7 @@ export class ForensicQueueV3 {
       item.currentStatus = 'aborted';
       this.queue.splice(index, 1);
       logger.info('FORENSIC_QUEUE', `Job ${jobId} aborted.`);
+      this.saveQueueState();
       return true;
     }
     return false;
@@ -408,6 +471,8 @@ export class ForensicQueueV3 {
 
         // Cleanup evidence
         await evidenceDB.deleteEvidence(current.job.id);
+        // Save final state
+        await this.saveQueueState();
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -453,9 +518,23 @@ export class ForensicQueueV3 {
     this.isProcessing = false;
     this.resolveIdleIfNeeded();
 
-    // Small cooldown between AI calls and retry reschedules
-    const nextDelay = current.currentStatus === 'pending' ? this.retryDelayMs : 0;
-    setTimeout(() => this.processNext(), nextDelay);
+    // Calculate appropriate delay based on whether this is a retry
+    let nextDelay = 0;
+    if (current.currentStatus === 'pending' && current.nextRetryAt) {
+      // For retries, respect the exponential backoff delay
+      const now = Date.now();
+      nextDelay = Math.max(0, current.nextRetryAt - now);
+    } else if (current.currentStatus === 'pending') {
+      // For regular pending (non-retry), small cooldown
+      nextDelay = 100;
+    }
+
+    if (nextDelay > 0) {
+      setTimeout(() => this.processNext(), nextDelay);
+    } else {
+      // No delay needed, process immediately
+      this.processNext();
+    }
   }
 
   /**
@@ -482,19 +561,51 @@ export class ForensicQueueV3 {
     return this.aiServicePromise;
   }
 
+  /**
+   * Calculate exponential backoff delay: baseDelay * (2 ^ retryCount)
+   * Max delay capped at 30 seconds
+   */
+  private calculateBackoffDelay(retries: number): number {
+    const exponentialDelay = this.baseRetryDelayMs * Math.pow(2, retries);
+    const maxDelay = 30000; // 30 seconds
+    return Math.min(exponentialDelay, maxDelay);
+  }
+
   private requeueWithRetry(item: QueueItem, message: string): boolean {
     if (item.retries >= this.maxRetries) {
       return false;
     }
+
     item.retries += 1;
+    item.lastRetryAt = Date.now();
+
+    // Calculate exponential backoff delay
+    const backoffDelay = this.calculateBackoffDelay(item.retries - 1);
+    item.nextRetryAt = Date.now() + backoffDelay;
     item.currentStatus = 'pending';
+
+    // Log detailed retry information
+    const logMessage = `${message} [Backoff: ${backoffDelay}ms, Attempt: ${item.retries}/${this.maxRetries}]`;
+    logger.warn('FORENSIC_QUEUE', logMessage);
+
+    // Audit logging for retry attempt
+    logger.auditLog('RETRY', `/forensic/job/${item.job.id}`, 202, {
+      retryCount: item.retries,
+      maxRetries: this.maxRetries,
+      backoffDelayMs: backoffDelay,
+      nextRetryAt: new Date(item.nextRetryAt).toISOString(),
+      reason: message.substring(0, 100), // Truncate for audit log
+    });
+
     this.queue.push(item);
-    logger.warn('FORENSIC_QUEUE', message);
+    this.saveQueueState();
+
     this.onEvent?.({
       type: 'retry',
-      message,
+      message: logMessage,
       jobId: item.job.id,
     });
+
     return true;
   }
 
@@ -505,6 +616,26 @@ export class ForensicQueueV3 {
     this.queue = [];
     this.isProcessing = false;
     this.idleResolvers = [];
+    this.saveQueueState();
+  }
+
+  /**
+   * Cleanup expired/old jobs from persistence (called periodically)
+   */
+  async cleanupExpiredJobs(): Promise<number> {
+    try {
+      const deletedCount = await forensicQueuePersistence.cleanupExpiredJobs();
+      if (deletedCount > 0) {
+        logger.info('FORENSIC_QUEUE', `Limpiados ${deletedCount} trabajos expirados de persistencia`);
+      }
+      return deletedCount;
+    } catch (error) {
+      logger.warn(
+        'FORENSIC_QUEUE',
+        `Error limpiando trabajos expirados: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return 0;
+    }
   }
 }
 
