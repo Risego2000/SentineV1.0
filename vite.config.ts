@@ -33,7 +33,7 @@ export default defineConfig(() => {
       },
       proxy: {
         '/api': {
-          target: 'http://localhost:3002',
+          target: `http://localhost:${process.env.VITE_API_PORT || 3002}`,
           changeOrigin: true,
           secure: false,
         },
