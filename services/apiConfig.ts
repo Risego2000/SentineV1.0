@@ -16,13 +16,21 @@ const getApiBaseUrl = (): string => {
   // Try to detect from current location
   const protocol = window.location.protocol; // 'http:' or 'https:'
   const hostname = window.location.hostname; // 'localhost'
+  const currentPort = window.location.port;
 
-  // If running on port 3001 (frontend), redirect API calls to port 3002 (backend)
-  if (window.location.port === '3001') {
+  // In production (localhost:3002 or no port), use same origin
+  if (!currentPort || currentPort === '3002') {
+    return '';
+  }
+
+  // In development, if running on any port except 3002,
+  // assume backend is on 3002 (standard Sentinel port configuration)
+  // This handles all dev server ports: 3001, 3003, 3004, etc.
+  if (hostname === 'localhost' && currentPort !== '3002') {
     return `${protocol}//${hostname}:3002`;
   }
 
-  // If on same port, use relative URLs (will use Vite proxy or same origin)
+  // Fallback: use relative URLs
   return '';
 };
 
