@@ -185,7 +185,8 @@ const getEncoderArgs = (outputCodec = 'h264') => {
     if (hardwareAccel === 'apple') {
       return ['-c:v', 'h264_videotoolbox'];
     }
-    return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '26', '-profile:v', 'baseline'];
+    // CPU encoding: ultrafast for speed, faster than 'fast' on CPU
+    return ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-profile:v', 'baseline'];
   }
 };
 
