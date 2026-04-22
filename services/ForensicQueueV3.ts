@@ -740,6 +740,46 @@ export class ForensicQueueV3 {
       return 0;
     }
   }
+
+  /**
+   * Get queue statistics for monitoring and diagnostics
+   */
+  getQueueStats() {
+    const pendingJobs = this.queue.filter((item) => item.currentStatus === 'pending').length;
+    const processingJobs = this.queue.filter((item) => item.currentStatus === 'processing').length;
+    const totalRetries = this.queue.reduce((sum, item) => sum + item.retries, 0);
+    const avgRetries =
+      this.queue.length > 0 ? Math.round((totalRetries / this.queue.length) * 10) / 10 : 0;
+
+    return {
+      totalJobs: this.queue.length,
+      pendingJobs,
+      processingJobs,
+      maxQueueSize: this.maxQueueSize,
+      queueUtilization: Math.round((this.queue.length / this.maxQueueSize) * 100),
+      totalRetries,
+      avgRetries,
+      listeners: this.listeners.size,
+      isProcessing: this.isProcessing,
+    };
+  }
 }
 
 export const forensicQueueV3 = new ForensicQueueV3();
+
+/**
+ * Periodic maintenance task: cleanup expired jobs every 5 minutes
+ * This prevents the queue from growing indefinitely
+ */
+if (typeof window !== 'undefined') {
+  setInterval(async () => {
+    try {
+      await forensicQueueV3.cleanupExpiredJobs();
+    } catch (error) {
+      console.warn(
+        '[FORENSIC_QUEUE] Error during cleanup:',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+}
