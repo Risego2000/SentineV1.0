@@ -105,6 +105,7 @@ let activeTranscodes = 0;
 
 let ffmpegPath;
 let ffprobePath;
+let hardwareAccel = 'none'; // 'none', 'amd', 'nvidia', 'intel', 'apple'
 try {
   ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
   ffprobePath = _require('@ffprobe-installer/ffprobe').path;
@@ -112,6 +113,81 @@ try {
   ffmpegPath = 'ffmpeg';
   ffprobePath = 'ffprobe';
 }
+
+// Detect available hardware acceleration
+const detectHardwareAccel = () => {
+  try {
+    const ffmpegHelp = execSync(`"${ffmpegPath}" -encoders 2>&1`).toString();
+
+    if (ffmpegHelp.includes('hevc_amf') || ffmpegHelp.includes('h264_amf')) {
+      console.log('[FFMPEG] ✓ AMD Hardware Acceleration (AMF) detectada');
+      return 'amd';
+    }
+    if (ffmpegHelp.includes('hevc_nvenc') || ffmpegHelp.includes('h264_nvenc')) {
+      console.log('[FFMPEG] ✓ NVIDIA Hardware Acceleration (NVENC) detectada');
+      return 'nvidia';
+    }
+    if (ffmpegHelp.includes('hevc_qsv') || ffmpegHelp.includes('h264_qsv')) {
+      console.log('[FFMPEG] ✓ Intel Hardware Acceleration (QSV) detectada');
+      return 'intel';
+    }
+    if (ffmpegHelp.includes('hevc_videotoolbox') || ffmpegHelp.includes('h264_videotoolbox')) {
+      console.log('[FFMPEG] ✓ Apple Hardware Acceleration (VideoToolbox) detectada');
+      return 'apple';
+    }
+  } catch (error) {
+    console.warn('[FFMPEG] No se pudo detectar aceleración hardware:', error.message);
+  }
+  console.log('[FFMPEG] ⚠ Sin aceleración hardware disponible. Usando CPU (más lento).');
+  return 'none';
+};
+
+hardwareAccel = detectHardwareAccel();
+
+// Get input video codec using ffprobe
+const getInputCodec = async (inputPath) => {
+  try {
+    const cmd = `"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
+    const output = execSync(cmd).toString().trim();
+    return output || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
+// Get FFmpeg encoder args based on hardware acceleration
+const getEncoderArgs = (outputCodec = 'h264') => {
+  if (outputCodec === 'hevc' || outputCodec === 'h265') {
+    if (hardwareAccel === 'amd') {
+      return ['-c:v', 'hevc_amf', '-quality', '7']; // 0=best (slow), 7=balanced
+    }
+    if (hardwareAccel === 'nvidia') {
+      return ['-c:v', 'hevc_nvenc', '-preset', 'fast'];
+    }
+    if (hardwareAccel === 'intel') {
+      return ['-c:v', 'hevc_qsv', '-preset', 'fast'];
+    }
+    if (hardwareAccel === 'apple') {
+      return ['-c:v', 'hevc_videotoolbox'];
+    }
+    return ['-c:v', 'libx265', '-preset', 'ultrafast', '-crf', '28'];
+  } else {
+    // H.264
+    if (hardwareAccel === 'amd') {
+      return ['-c:v', 'h264_amf', '-quality', '7'];
+    }
+    if (hardwareAccel === 'nvidia') {
+      return ['-c:v', 'h264_nvenc', '-preset', 'fast'];
+    }
+    if (hardwareAccel === 'intel') {
+      return ['-c:v', 'h264_qsv', '-preset', 'fast'];
+    }
+    if (hardwareAccel === 'apple') {
+      return ['-c:v', 'h264_videotoolbox'];
+    }
+    return ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23'];
+  }
+};
 
 const isLoopbackRequest = (req) => {
   const remote = req.ip || req.socket?.remoteAddress || '';
@@ -266,34 +342,76 @@ app.post('/api/transcode', upload.single('video'), async (req, res) => {
     }
 
     let durationSec = 0;
+    let inputCodec = 'unknown';
     try {
       const ffprobeCmd = `"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
       const output = execSync(ffprobeCmd).toString().trim();
       durationSec = parseFloat(output);
       console.log(`[TRANSCODE] [${jobId}] Duración detectada: ${durationSec}s`);
+
+      inputCodec = await getInputCodec(inputPath);
+      console.log(`[TRANSCODE] [${jobId}] Codec detectado: ${inputCodec}`);
     } catch (error) {
-      console.warn(`[TRANSCODE] [${jobId}] No se pudo obtener duración:`, error?.message);
+      console.warn(`[TRANSCODE] [${jobId}] No se pudo obtener duración/codec:`, error?.message);
     }
 
-    console.log(`[TRANSCODE] [${jobId}] Iniciando transcodificación...`);
+    // Skip transcoding if input is already H.264
+    if (inputCodec === 'h264') {
+      console.log(`[TRANSCODE] [${jobId}] H.264 detectado. Saltando transcodificación (copy stream).`);
+      const ffmpeg = spawn(ffmpegPath, [
+        '-i',
+        inputPath,
+        '-c:v',
+        'copy',
+        '-c:a',
+        'aac',
+        '-movflags',
+        '+faststart',
+        '-y',
+        outputPath,
+      ]);
+
+      ffmpeg.on('close', (code) => {
+        safeUnlink(inputPath);
+        if (code !== 0) {
+          finish(500, { error: 'Stream copy failed' });
+          return;
+        }
+        progressMap.set(jobId, 100);
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Length', stat.size);
+        const readStream = fs.createReadStream(outputPath);
+        readStream.pipe(res);
+        readStream.on('end', () => {
+          safeUnlink(outputPath);
+          setTimeout(() => progressMap.delete(jobId), 10_000);
+          if (!settled) {
+            settled = true;
+            releaseTranscodeSlot();
+          }
+        });
+      });
+      return;
+    }
+
+    console.log(`[TRANSCODE] [${jobId}] Iniciando transcodificación (aceleración: ${hardwareAccel})...`);
     progressMap.set(jobId, 0);
 
-    const ffmpeg = spawn(ffmpegPath, [
+    const encoderArgs = getEncoderArgs('h264');
+    const ffmpegArgs = [
       '-i',
       inputPath,
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '23',
+      ...encoderArgs,
       '-c:a',
       'aac',
       '-movflags',
       '+faststart',
       '-y',
       outputPath,
-    ]);
+    ];
+
+    const ffmpeg = spawn(ffmpegPath, ffmpegArgs);
 
     ffmpeg.stderr.on('data', (data) => {
       const text = data.toString();
@@ -537,34 +655,62 @@ app.post(
       // 1. Write raw buffer to temp file
       fs.writeFileSync(tempInputPath, req.body);
 
-      // 2. Transcode to MP4 if ffmpeg is available
+      // 2. Detect input codec and transcode if needed
       if (ffmpegPath) {
-        console.log(`[EVIDENCE] Transcodificando evidencia a MP4: ${safeFilename}`);
-        const ffmpeg = spawnSync(ffmpegPath, [
-          '-i',
-          tempInputPath,
-          '-c:v',
-          'libx264',
-          '-preset',
-          'ultrafast',
-          '-crf',
-          '28',
-          '-c:a',
-          'aac',
-          '-movflags',
-          '+faststart',
-          '-y',
-          targetPath,
-        ]);
+        let inputCodec = 'unknown';
+        try {
+          inputCodec = await getInputCodec(tempInputPath);
+        } catch {
+          // Fallback to unknown
+        }
 
-        if (ffmpeg.status === 0) {
-          res.json({ saved: true, path: targetPath, transcoded: true });
+        // Skip transcoding if input is already H.264
+        if (inputCodec === 'h264') {
+          console.log(`[EVIDENCE] H.264 detectado. Copiando stream (sin transcodificación): ${safeFilename}`);
+          const ffmpeg = spawnSync(ffmpegPath, [
+            '-i',
+            tempInputPath,
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-movflags',
+            '+faststart',
+            '-y',
+            targetPath,
+          ]);
+
+          if (ffmpeg.status === 0) {
+            res.json({ saved: true, path: targetPath, transcoded: false, codec: inputCodec });
+          } else {
+            console.error('[EVIDENCE] Error copiando stream, intentando transcodificar...');
+            // Fallthrough to normal transcode
+          }
         } else {
-          console.error(
-            '[EVIDENCE] Error transcodificando (code ' + ffmpeg.status + '), guardando original'
-          );
-          fs.copyFileSync(tempInputPath, targetPath);
-          res.json({ saved: true, path: targetPath, transcoded: false });
+          // Transcode with hardware acceleration
+          console.log(`[EVIDENCE] Transcodificando evidencia a MP4 (aceleración: ${hardwareAccel}): ${safeFilename}`);
+          const encoderArgs = getEncoderArgs('h264');
+          const ffmpeg = spawnSync(ffmpegPath, [
+            '-i',
+            tempInputPath,
+            ...encoderArgs,
+            '-c:a',
+            'aac',
+            '-movflags',
+            '+faststart',
+            '-y',
+            targetPath,
+          ]);
+
+          if (ffmpeg.status === 0) {
+            res.json({ saved: true, path: targetPath, transcoded: true, codec: inputCodec });
+          } else {
+            console.error(
+              '[EVIDENCE] Error transcodificando (code ' + ffmpeg.status + '), guardando original'
+            );
+            fs.copyFileSync(tempInputPath, targetPath);
+            res.json({ saved: true, path: targetPath, transcoded: false, codec: inputCodec });
+          }
         }
       } else {
         fs.copyFileSync(tempInputPath, targetPath);
@@ -608,6 +754,7 @@ app.get('/api/health', (req, res) => {
     activeTranscodes,
     pendingAudits: 0,
     ffmpegAvailable: ffmpegPath !== 'ffmpeg',
+    hardwareAcceleration: hardwareAccel,
     reportsDir: REPORTS_DIR,
     timestamp: new Date().toISOString(),
   });

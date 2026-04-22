@@ -5,7 +5,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(gh pr create --title 'fix: buffer ROI A-only + pipeline Gemini activado para giro prohibido' --body ':*)",
       "Bash(where gh:*)",
-      "Bash(winget list:*)"
+      "Bash(winget list:*)",
+      "Bash(git add *)"
     ]
   }
 }

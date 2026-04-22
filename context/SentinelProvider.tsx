@@ -500,6 +500,63 @@ export const SentinelProvider = ({
     [startScreenShare]
   );
 
+  const canPlayHevc = () => {
+    if (typeof document === 'undefined') return false;
+    const video = document.createElement('video');
+    return (
+      video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"') !== '' ||
+      video.canPlayType('video/mp4; codecs="hvc1"') !== ''
+    );
+  };
+
+  const transcodeVideo = async (
+    file: File,
+    video: HTMLVideoElement,
+    url: string,
+    autoPlay: boolean
+  ) => {
+    const jobId = 'sentinel_' + Math.random().toString(36).substring(7);
+    addLog('WARN', `Iniciando transcodificación a H.264 con aceleración GPU...`);
+    setStatusMsg('TRANSCODIFICANDO... (0%)');
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const pRes = await fetch(`/api/transcode/progress?id=${jobId}`);
+        const pData = await pRes.json();
+        if (pData.progress >= 0 && pData.progress < 100) {
+          setStatusMsg(`TRANSCODIFICANDO... (${pData.progress}%)`);
+        }
+      } catch {
+        // Progress polling is best-effort only.
+      }
+    }, 2000);
+
+    try {
+      const fileBuffer = await file.arrayBuffer();
+      const response = await fetch(`/api/transcode?id=${jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: fileBuffer,
+      });
+      clearInterval(pollInterval);
+      if (!response.ok) throw new Error(`Transcode failed: ${response.statusText}`);
+
+      const transcodedBlob = await response.blob();
+      const transcodedUrl = URL.createObjectURL(transcodedBlob);
+      URL.revokeObjectURL(url);
+      video.src = transcodedUrl;
+      video.onloadeddata = () => {
+        addLog('SUCCESS', `Video transcodificado listo (H.264 compatible).`);
+        setStatusMsg('CARGA_COMPLETA');
+        if (autoPlay) setIsPlaying(true);
+      };
+    } catch (error) {
+      clearInterval(pollInterval);
+      addLog('ERROR', `Error en transcodificador: ${error}`);
+      setStatusMsg('ERROR_CARGA');
+    }
+  };
+
   const loadVideo = useCallback(
     async (
       file: File,
@@ -525,50 +582,27 @@ export const SentinelProvider = ({
       video.src = url;
       video.currentTime = 0;
 
-      // H.265/HEVC Transcoding Logic
+      const hevcSupported = canPlayHevc();
+      let transcodeAttempted = false;
+
       const handleError = async () => {
         video.removeEventListener('error', handleError);
-        const jobId = 'sentinel_' + Math.random().toString(36).substring(7);
-        addLog('WARN', `Codec no soportado (H.265). Iniciando transcodificación...`);
-        setStatusMsg('TRANSCODIFICANDO... (0%)');
 
-        const pollInterval = setInterval(async () => {
-          try {
-            const pRes = await fetch(`/api/transcode/progress?id=${jobId}`);
-            const pData = await pRes.json();
-            if (pData.progress >= 0 && pData.progress < 100) {
-              setStatusMsg(`TRANSCODIFICANDO... (${pData.progress}%)`);
-            }
-          } catch {
-            // Progress polling is best-effort only.
-          }
-        }, 2000);
-
-        try {
-          const fileBuffer = await file.arrayBuffer();
-          const response = await fetch(`/api/transcode?id=${jobId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/octet-stream' },
-            body: fileBuffer,
-          });
-          clearInterval(pollInterval);
-          if (!response.ok) throw new Error(`Transcode failed: ${response.statusText}`);
-
-          const transcodedBlob = await response.blob();
-          const transcodedUrl = URL.createObjectURL(transcodedBlob);
-          URL.revokeObjectURL(url);
-          video.src = transcodedUrl;
-          video.onloadeddata = () => {
-            addLog('SUCCESS', `Video transcodificado listo.`);
-            setStatusMsg('CARGA_COMPLETA');
-            if (autoPlay) setIsPlaying(true);
-          };
-        } catch (error) {
-          clearInterval(pollInterval);
-          addLog('ERROR', `Error en transcodificador: ${error}`);
+        if (!transcodeAttempted && !hevcSupported) {
+          transcodeAttempted = true;
+          addLog('WARN', `Codec H.265 no soportado en este navegador.`);
+          await transcodeVideo(file, video, url, autoPlay);
+        } else {
+          addLog('ERROR', `No se pudo cargar el video. Intenta transcodificar manualmente.`);
           setStatusMsg('ERROR_CARGA');
         }
       };
+
+      if (!hevcSupported) {
+        addLog('INFO', `H.265 no soportado. Detectado: ${file.name} será transcodificado automáticamente.`);
+      } else {
+        addLog('INFO', `H.265 soportado. Reproduciendo nativamente sin transcodificar.`);
+      }
 
       video.addEventListener('error', handleError, { once: true });
       video.onloadeddata = () => {
