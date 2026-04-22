@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { X, Scale, FileDown, CheckCircle, Ban } from 'lucide-react';
 import { InfractionLog } from '../types';
 import { ReportService } from '../services/ReportService';
 import { useSentinel } from '../hooks/useSentinel';
 import { useHelp } from '../hooks/useHelp';
+import { EvidenceGallery } from './RightSidebar/EvidenceGallery';
 
 interface InfractionModalProps {
   log: InfractionLog;
@@ -10,6 +12,7 @@ interface InfractionModalProps {
 }
 
 export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
+  const [activeTab, setActiveTab] = useState<'evidence' | 'gallery'>('evidence');
   const { validateInfraction } = useSentinel();
   const { helpProps } = useHelp();
 
@@ -53,51 +56,84 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left Column - Evidence Viewer */}
-          <div className="flex-1 bg-black/40 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Evidencia Fotográfica Certificada
-              </h3>
-              {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { img: log.extraSnapshots[0], label: 'FOTOGRAMA 01 - ENTRADA EN ROI' },
-                    { img: log.extraSnapshots[1], label: 'FOTOGRAMA 02 - POSICIÓN CRÍTICA' },
-                    { img: log.extraSnapshots[2], label: 'FOTOGRAMA 03 - SALIDA / CONFIRMACIÓN' },
-                  ].map((frame, idx) => (
-                    <div
-                      key={idx}
-                      className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-slate-900/40"
-                    >
-                      <img
-                        src={`data:image/jpeg;base64,${frame.img}`}
-                        className="w-full h-full object-contain"
-                        alt={frame.label}
-                      />
-                      <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2 py-1 border border-white/10 rounded">
-                        <span className="text-[8px] font-bold text-white uppercase tracking-wider">
-                          {frame.label}
-                        </span>
-                      </div>
+          <div className="flex-1 bg-black/40 flex flex-col">
+            {/* Tab Navigation */}
+            <div className="flex border-b border-white/5 bg-black/60">
+              <button
+                onClick={() => setActiveTab('evidence')}
+                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 ${
+                  activeTab === 'evidence'
+                    ? 'text-blue-500 border-blue-500'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                Evidencia AI
+              </button>
+              <button
+                onClick={() => setActiveTab('gallery')}
+                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 ${
+                  activeTab === 'gallery'
+                    ? 'text-blue-500 border-blue-500'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                Galería
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'evidence' && (
+              <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Evidencia Fotográfica Certificada
+                  </h3>
+                  {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        { img: log.extraSnapshots[0], label: 'FOTOGRAMA 01 - ENTRADA EN ROI' },
+                        { img: log.extraSnapshots[1], label: 'FOTOGRAMA 02 - POSICIÓN CRÍTICA' },
+                        { img: log.extraSnapshots[2], label: 'FOTOGRAMA 03 - SALIDA / CONFIRMACIÓN' },
+                      ].map((frame, idx) => (
+                        <div
+                          key={idx}
+                          className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-slate-900/40"
+                        >
+                          <img
+                            src={`data:image/jpeg;base64,${frame.img}`}
+                            className="w-full h-full object-contain"
+                            alt={frame.label}
+                          />
+                          <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2 py-1 border border-white/10 rounded">
+                            <span className="text-[8px] font-bold text-white uppercase tracking-wider">
+                              {frame.label}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-black">
-                  {log.videoClip ? (
-                    <video
-                      src={log.videoClip}
-                      controls
-                      autoPlay
-                      loop
-                      className="w-full h-full object-contain"
-                    />
                   ) : (
-                    <img src={log.image} className="w-full h-full object-contain" />
+                    <div className="relative aspect-video rounded-md overflow-hidden border border-white/5 bg-black">
+                      {log.videoClip ? (
+                        <video
+                          src={log.videoClip}
+                          controls
+                          autoPlay
+                          loop
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <img src={log.image} className="w-full h-full object-contain" />
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {activeTab === 'gallery' && (
+              <EvidenceGallery infractionId={log.id} />
+            )}
           </div>
 
           {/* Right Column - Data & Actions */}
