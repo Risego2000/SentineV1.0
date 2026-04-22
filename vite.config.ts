@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -15,6 +16,34 @@ export default defineConfig(() => {
     }
     return start;
   };
+
+  // Auto-detect backend API port
+  const getApiPort = (): number => {
+    // Priority 1: Environment variable
+    if (process.env.VITE_API_PORT) {
+      return parseInt(process.env.VITE_API_PORT);
+    }
+
+    // Priority 2: Read from backend port file
+    try {
+      const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
+      if (fs.existsSync(portFile)) {
+        const port = parseInt(fs.readFileSync(portFile, 'utf8').trim());
+        if (Number.isFinite(port)) {
+          console.log(`[VITE] Auto-detected API port: ${port}`);
+          return port;
+        }
+      }
+    } catch (err) {
+      console.warn(`[VITE] Could not read API port file: ${err}`);
+    }
+
+    // Priority 3: Default port
+    console.log(`[VITE] Using default API port: 3002`);
+    return 3002;
+  };
+
+  const apiPort = getApiPort();
 
   return {
     envDir: findEnvDir(__dirname),
@@ -33,7 +62,7 @@ export default defineConfig(() => {
       },
       proxy: {
         '/api': {
-          target: `http://localhost:${process.env.VITE_API_PORT || 3002}`,
+          target: `http://localhost:${apiPort}`,
           changeOrigin: true,
           secure: false,
         },

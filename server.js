@@ -817,4 +817,13 @@ app.listen(port, () => {
   console.log(`[SENTINEL_SYSTEM] Activo en: http://localhost:${port}`);
   console.log(`[SENTINEL_SYSTEM] Modo: ${fs.existsSync(distPath) ? 'FULL_STACK' : 'API_ONLY'}`);
   console.log(`[SENTINEL_SYSTEM] FFmpeg: ${ffmpegPath}`);
+
+  // Write port to file for frontend auto-discovery
+  try {
+    const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
+    fs.writeFileSync(portFile, String(port), 'utf8');
+    console.log(`[SENTINEL_SYSTEM] Puerto guardado en: ${portFile}`);
+  } catch (err) {
+    console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
+  }
 });
