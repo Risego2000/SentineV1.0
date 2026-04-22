@@ -159,7 +159,7 @@ const getInputCodec = async (inputPath) => {
 const getEncoderArgs = (outputCodec = 'h264') => {
   if (outputCodec === 'hevc' || outputCodec === 'h265') {
     if (hardwareAccel === 'amd') {
-      return ['-c:v', 'hevc_amf', '-quality', '7']; // 0=best (slow), 7=balanced
+      return ['-c:v', 'hevc_amf', '-usage', 'transcoding'];
     }
     if (hardwareAccel === 'nvidia') {
       return ['-c:v', 'hevc_nvenc', '-preset', 'fast'];
@@ -174,7 +174,7 @@ const getEncoderArgs = (outputCodec = 'h264') => {
   } else {
     // H.264
     if (hardwareAccel === 'amd') {
-      return ['-c:v', 'h264_amf', '-quality', '7'];
+      return ['-c:v', 'h264_amf', '-usage', 'transcoding'];
     }
     if (hardwareAccel === 'nvidia') {
       return ['-c:v', 'h264_nvenc', '-preset', 'fast'];
