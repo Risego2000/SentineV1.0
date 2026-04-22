@@ -8,19 +8,17 @@ import {
   LogOut,
   Database,
   Shield,
-  Image,
 } from 'lucide-react';
 import { InfractionFeed } from './RightSidebar/InfractionFeed';
 import { SystemTerminal } from './RightSidebar/SystemTerminal';
 import { DatabasePanel } from './RightSidebar/DatabasePanel';
-import { MediaGalleryPanel } from './RightSidebar/MediaGalleryPanel';
 import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useHelp } from '../hooks/useHelp';
 import { useAuth } from '../hooks/useAuth';
 
 export const RightSidebar = memo(() => {
-  const [activeTab, setActiveTab] = useState<'infractions' | 'analytics' | 'terminal' | 'database' | 'gallery'>(
+  const [activeTab, setActiveTab] = useState<'infractions' | 'analytics' | 'terminal' | 'database'>(
     'infractions'
   );
   const { isRightSidebarCollapsed, toggleRightSidebar, setView } = useLayoutStore();
@@ -122,17 +120,6 @@ export const RightSidebar = memo(() => {
           >
             DB
           </button>
-          <button
-            onClick={() => setActiveTab('gallery')}
-            className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-              activeTab === 'gallery'
-                ? 'text-blue-500 bg-blue-500/5'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
-            {...helpProps('Ver galería de evidencias fotográficas y de video.')}
-          >
-            Galería
-          </button>
         </div>
       )}
 
@@ -199,7 +186,6 @@ export const RightSidebar = memo(() => {
             )}
             {activeTab === 'terminal' && <SystemTerminal />}
             {activeTab === 'database' && <DatabasePanel />}
-            {activeTab === 'gallery' && <MediaGalleryPanel />}
           </>
         )}
 
