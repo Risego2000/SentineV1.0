@@ -7,19 +7,21 @@ import {
   ChevronRight,
   LogOut,
   Shield,
+  Database,
 } from 'lucide-react';
 import { InfractionFeed } from './RightSidebar/InfractionFeed';
 import { SystemTerminal } from './RightSidebar/SystemTerminal';
+import { DatabasePanel } from './RightSidebar/DatabasePanel';
 import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useHelp } from '../hooks/useHelp';
 import { useAuth } from '../hooks/useAuth';
 
 export const RightSidebar = memo(() => {
-  const [activeTab, setActiveTab] = useState<'infractions' | 'analytics' | 'terminal'>(
+  const [activeTab, setActiveTab] = useState<'infractions' | 'analytics' | 'terminal' | 'database'>(
     'infractions'
   );
-  const { isRightSidebarCollapsed, toggleRightSidebar } = useLayoutStore();
+  const { isRightSidebarCollapsed, toggleRightSidebar, setView } = useLayoutStore();
   const { helpProps } = useHelp();
   const { user, logout, isLoading: isLoggingOut } = useAuth();
 
@@ -104,6 +106,20 @@ export const RightSidebar = memo(() => {
           >
             Terminal
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('database');
+              setView('database');
+            }}
+            className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              activeTab === 'database'
+                ? 'text-blue-500 bg-blue-500/5'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+            {...helpProps('Acceder a la base de datos de evidencias (Pantalla Completa).')}
+          >
+            DB
+          </button>
         </div>
       )}
 
@@ -169,6 +185,7 @@ export const RightSidebar = memo(() => {
               </div>
             )}
             {activeTab === 'terminal' && <SystemTerminal />}
+            {activeTab === 'database' && <DatabasePanel />}
           </>
         )}
 

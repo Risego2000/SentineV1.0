@@ -1,10 +1,14 @@
 import { create } from 'zustand';
 
 export type GridSize = 1 | 2 | 3 | 4;
+export type AppView = 'analysis' | 'database';
 
 export interface LayoutState {
   // Number of active viewers (1 to 4)
   gridSize: GridSize;
+
+  // Current active view
+  currentView: AppView;
 
   // The viewer currently focused in the UI (for sidebars)
   focusedViewerId: string;
@@ -22,6 +26,7 @@ export interface LayoutState {
 
   // Actions
   setGridSize: (size: GridSize) => void;
+  setView: (view: AppView) => void;
   setFocusedViewer: (id: string) => void;
   toggleSidebar: () => void;
   toggleRightSidebar: () => void;
@@ -34,6 +39,7 @@ export interface LayoutState {
 
 export const useLayoutStore = create<LayoutState>((set) => ({
   gridSize: 1,
+  currentView: 'analysis',
   focusedViewerId: 'visor_0',
   activeViewers: ['visor_0'],
   isSidebarCollapsed: false,
@@ -56,6 +62,7 @@ export const useLayoutStore = create<LayoutState>((set) => ({
       };
     }),
 
+  setView: (view) => set({ currentView: view }),
   setFocusedViewer: (id) => set({ focusedViewerId: id }),
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
   toggleRightSidebar: () =>
