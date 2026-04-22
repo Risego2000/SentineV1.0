@@ -8,7 +8,6 @@ import {
   LogOut,
   Database,
   Shield,
-  Database,
 } from 'lucide-react';
 import { InfractionFeed } from './RightSidebar/InfractionFeed';
 import { SystemTerminal } from './RightSidebar/SystemTerminal';
