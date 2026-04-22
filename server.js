@@ -520,9 +520,34 @@ app.get('/api/transcode/status', (req, res) => {
 
 app.post('/api/ai/geometry', async (req, res) => {
   try {
-    const result = await generateGeometryWithGemini(req.body || {});
+    const body = req.body || {};
+
+    // Validar entrada
+    if (typeof body.directives !== 'string' && body.directives !== undefined) {
+      logger.validationError('AI_GEOMETRY', 'directives', 'Debe ser string', body.directives);
+      return res.status(400).json({ error: 'Las directivas deben ser texto.' });
+    }
+
+    if (typeof body.instruction !== 'string' && body.instruction !== undefined) {
+      logger.validationError('AI_GEOMETRY', 'instruction', 'Debe ser string', body.instruction);
+      return res.status(400).json({ error: 'La instrucción debe ser texto.' });
+    }
+
+    if (body.image !== undefined && typeof body.image !== 'string') {
+      logger.validationError('AI_GEOMETRY', 'image', 'Debe ser string base64', typeof body.image);
+      return res.status(400).json({ error: 'La imagen debe estar en formato base64.' });
+    }
+
+    // Validar tamaño de imagen (máximo 5MB)
+    if (body.image && body.image.length > 5 * 1024 * 1024) {
+      logger.validationError('AI_GEOMETRY', 'image', 'Tamaño excesivo', 'base64 image');
+      return res.status(413).json({ error: 'La imagen excede 5MB.' });
+    }
+
+    const result = await generateGeometryWithGemini(body);
     res.json(result);
   } catch (error) {
+    logger.errorWithContext('API_AI_GEOMETRY', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error generando geometría',
     });
@@ -531,9 +556,42 @@ app.post('/api/ai/geometry', async (req, res) => {
 
 app.post('/api/ai/audit', async (req, res) => {
   try {
-    const result = await analyzeTrajectoryWithGemini(req.body || {});
+    const body = req.body || {};
+
+    // Validar estructura básica de track
+    if (!validators.isValidTrack(body.track)) {
+      logger.validationError('AI_AUDIT', 'track', 'Estructura de track inválida', body.track);
+      return res.status(400).json({ error: 'Track inválido o faltante.' });
+    }
+
+    // Validar geometría de línea
+    if (!body.line || typeof body.line !== 'object') {
+      logger.validationError('AI_AUDIT', 'line', 'Línea requerida', body.line);
+      return res.status(400).json({ error: 'Línea de geometría requerida.' });
+    }
+
+    if (!validators.isValidGeometry(body.line)) {
+      logger.validationError('AI_AUDIT', 'line', 'Geometría inválida', body.line);
+      return res.status(400).json({ error: 'Geometría de línea inválida (coordenadas 0-1).' });
+    }
+
+    // Validar directivas
+    if (typeof body.directives !== 'string') {
+      logger.validationError('AI_AUDIT', 'directives', 'Debe ser string', body.directives);
+      return res.status(400).json({ error: 'Directivas deben ser texto.' });
+    }
+
+    // Validar audit preset
+    const validPresets = ['standard', 'strict', 'permissive'];
+    if (body.auditPreset && !validPresets.includes(body.auditPreset)) {
+      logger.validationError('AI_AUDIT', 'auditPreset', 'Preset no válido', body.auditPreset);
+      return res.status(400).json({ error: `Preset debe ser uno de: ${validPresets.join(', ')}` });
+    }
+
+    const result = await analyzeTrajectoryWithGemini(body);
     res.json(result);
   } catch (error) {
+    logger.errorWithContext('API_AI_AUDIT', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error analizando trayectoria',
     });
@@ -812,19 +870,44 @@ app.get('/api/health', (req, res) => {
 app.post('/api/save-config', (req, res) => {
   try {
     const { fileName, config } = req.body;
-    if (!fileName || !config) {
-      return res.status(400).json({ error: 'Nombre de archivo o configuración faltante.' });
+
+    // Validar entrada
+    if (typeof fileName !== 'string' || !fileName.trim()) {
+      logger.validationError('SAVE_CONFIG', 'fileName', 'Debe ser string no vacío', fileName);
+      return res.status(400).json({ error: 'Nombre de archivo requerido.' });
     }
+
+    if (!config || typeof config !== 'object') {
+      logger.validationError('SAVE_CONFIG', 'config', 'Debe ser objeto', typeof config);
+      return res.status(400).json({ error: 'Configuración debe ser un objeto válido.' });
+    }
+
+    // Validar que no sea muy grande
+    const configStr = JSON.stringify(config);
+    if (configStr.length > 1 * 1024 * 1024) {
+      logger.validationError('SAVE_CONFIG', 'config', 'Tamaño excesivo', 'config too large');
+      return res.status(413).json({ error: 'Configuración excede 1MB.' });
+    }
+
     const PRESET_DIR = path.join(path.resolve(), 'preset');
     if (!fs.existsSync(PRESET_DIR)) {
       fs.mkdirSync(PRESET_DIR, { recursive: true });
     }
+
     const safeFilename = sanitizeFilename(fileName, '.json');
     const targetPath = path.join(PRESET_DIR, safeFilename);
 
+    // Prevenir path traversal
+    if (!isPathWithinDir(targetPath, PRESET_DIR)) {
+      logger.warn('SAVE_CONFIG', 'Intento de path traversal', { targetPath, PRESET_DIR });
+      return res.status(403).json({ error: 'Ruta de archivo no permitida.' });
+    }
+
     fs.writeFileSync(targetPath, JSON.stringify(config, null, 2));
+    logger.auditLog('POST', '/api/save-config', 200, { fileName: safeFilename });
     res.json({ saved: true, path: targetPath });
   } catch (error) {
+    logger.errorWithContext('API_SAVE_CONFIG', error);
     res.status(500).json({
       saved: false,
       error: error instanceof Error ? error.message : 'Error al guardar configuración',
