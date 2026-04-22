@@ -6,7 +6,24 @@
       "Bash(gh pr create --title 'fix: buffer ROI A-only + pipeline Gemini activado para giro prohibido' --body ':*)",
       "Bash(where gh:*)",
       "Bash(winget list:*)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cp \"/c/Users/riseg/Desktop/Apps/SentinelV16/.claude/worktrees/frosty-brattain-6c3f4a/server.js\" \"/c/Users/riseg/Desktop/Apps/SentinelV16/server.js\")",
+      "Bash(cp \"/c/Users/riseg/Desktop/Apps/SentinelV16/.claude/worktrees/frosty-brattain-6c3f4a/context/SentinelProvider.tsx\" \"/c/Users/riseg/Desktop/Apps/SentinelV16/context/SentinelProvider.tsx\")",
+      "Bash(git commit *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 66320 /F)",
+      "Bash(cp \"/c/Users/riseg/Desktop/Apps/SentinelV16/.claude/worktrees/frosty-brattain-6c3f4a/vite.config.ts\" \"/c/Users/riseg/Desktop/Apps/SentinelV16/vite.config.ts\")",
+      "Bash(cp \"/c/Users/riseg/Desktop/Apps/SentinelV16/.claude/worktrees/frosty-brattain-6c3f4a/.claude/launch.json\" \"/c/Users/riseg/Desktop/Apps/SentinelV16/.claude/launch.json\")",
+      "Bash(curl -s http://localhost:3002/api/health)",
+      "Bash(curl -v http://127.0.0.1:3002/api/health)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill /PID 66320 /PID 74620 /PID 80044)",
+      "PowerShell(Stop-Process -Name node -Force -ErrorAction SilentlyContinue)",
+      "Bash(\"C:\\\\Users\\\\riseg\\\\Desktop\\\\Apps\\\\SentinelV16\\\\node_modules\\\\@ffmpeg-installer\\\\win32-x64\\\\ffmpeg.exe\" -encoders)",
+      "Bash(\"C:\\\\Users\\\\riseg\\\\Desktop\\\\Apps\\\\SentinelV16\\\\node_modules\\\\@ffmpeg-installer\\\\win32-x64\\\\ffmpeg.exe\" -h encoder=h264_amf)",
+      "Bash(npx tsc *)",
+      "mcp__Claude_in_Chrome__computer"
     ]
   }
 }

@@ -142,7 +142,8 @@ const detectHardwareAccel = () => {
   return 'none';
 };
 
-hardwareAccel = detectHardwareAccel();
+hardwareAccel = 'none'; // Force CPU encoding to avoid AMF issues
+// hardwareAccel = detectHardwareAccel();
 
 // Get input video codec using ffprobe
 const getInputCodec = async (inputPath) => {

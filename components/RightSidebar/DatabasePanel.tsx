@@ -4,8 +4,10 @@ import {
   ChevronDown,
   AlertTriangle,
   Loader,
+  Image,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../services/supabase';
+import { MediaGalleryPanel } from './MediaGalleryPanel';
 
 type TableName = 'evidence' | 'infractions' | 'geometry_lines' | 'forensic_rules' | 'audit_jobs' | 'reports' | 'system_logs';
 
@@ -20,6 +22,7 @@ const TABLES: Array<{ name: TableName; label: string }> = [
 ];
 
 export const DatabasePanel: React.FC = () => {
+  const [activePanel, setActivePanel] = useState<'tables' | 'gallery'>('tables');
   const [selectedTable, setSelectedTable] = useState<TableName>('evidence');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,20 +63,37 @@ export const DatabasePanel: React.FC = () => {
       {/* Status Bar */}
       <div className="p-3 border-b border-white/5 bg-black/20 space-y-2">
         <div className="flex items-center justify-between">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-2 text-slate-400 hover:text-white text-[9px] font-bold uppercase tracking-wider transition-colors"
-          >
-            <span>Tablas</span>
-            <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-          </button>
-          <button
-            onClick={() => fetchData(selectedTable)}
-            disabled={loading}
-            className="p-1 rounded hover:bg-white/5 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex items-center gap-3">
+            {activePanel === 'tables' && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-2 text-slate-400 hover:text-white text-[9px] font-bold uppercase tracking-wider transition-colors"
+              >
+                <span>Tablas</span>
+                <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+            <button
+              onClick={() => setActivePanel(activePanel === 'gallery' ? 'tables' : 'gallery')}
+              className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded ${
+                activePanel === 'gallery'
+                  ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Image size={12} />
+              <span>Galería</span>
+            </button>
+          </div>
+          {activePanel === 'tables' && (
+            <button
+              onClick={() => fetchData(selectedTable)}
+              disabled={loading}
+              className="p-1 rounded hover:bg-white/5 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+          )}
         </div>
 
         {expanded && (
@@ -97,13 +117,16 @@ export const DatabasePanel: React.FC = () => {
           </div>
         )}
 
-        <div className="text-[8px] text-slate-600 font-mono">
-          {TABLES.find((t) => t.name === selectedTable)?.label} • {data.length} registros
-        </div>
+        {activePanel === 'tables' && (
+          <div className="text-[8px] text-slate-600 font-mono">
+            {TABLES.find((t) => t.name === selectedTable)?.label} • {data.length} registros
+          </div>
+        )}
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+      {activePanel === 'tables' ? (
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
         {!isSupabaseConfigured ? (
           <div className="flex items-start gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-[8px] text-red-400">
             <AlertTriangle size={12} className="shrink-0 mt-0.5" />
@@ -141,7 +164,10 @@ export const DatabasePanel: React.FC = () => {
             </div>
           ))
         )}
-      </div>
+        </div>
+      ) : (
+        <MediaGalleryPanel />
+      )}
     </div>
   );
 };

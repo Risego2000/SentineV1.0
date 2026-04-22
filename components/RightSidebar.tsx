@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Database,
   Shield,
   Database,
 } from 'lucide-react';
