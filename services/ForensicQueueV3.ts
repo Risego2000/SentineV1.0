@@ -305,9 +305,15 @@ export class ForensicQueueV3 {
     // Update status (mutable, not frozen)
     current.currentStatus = 'processing';
 
+    // Variables for error handling (declared at outer scope)
+    let evidence: any = null;
+    let contextSnapshots: string[] = [];
+    let zoomSnapshots: string[] = [];
+    let plateOCR: any = null;
+
     try {
       // Fetch evidence from IndexedDB using the original capture key
-      const evidence = await evidenceDB.getEvidence(current.evidenceId);
+      evidence = await evidenceDB.getEvidence(current.evidenceId);
 
       if (!evidence) {
         const didRequeue = this.requeueWithRetry(
@@ -321,17 +327,17 @@ export class ForensicQueueV3 {
         }
       } else {
         // Select frames for analysis
-        const contextSnapshots = this.selectTriplet(
+        contextSnapshots = this.selectTriplet(
           evidence.contextSnapshots,
           evidence.snapshots.filter((_, i) => i % 2 === 0)
         );
-        const zoomSnapshots = this.selectTriplet(
+        zoomSnapshots = this.selectTriplet(
           evidence.zoomSnapshots,
           evidence.snapshots.filter((_, i) => i % 2 === 1)
         );
 
         // OCR processing
-        const plateOCR = await OCRSynchronizer.extractLicensePlate(zoomSnapshots);
+        plateOCR = await OCRSynchronizer.extractLicensePlate(zoomSnapshots);
 
         logger.info(
           'FORENSIC_QUEUE',
@@ -502,6 +508,16 @@ export class ForensicQueueV3 {
             `Job ${current.job.id} failed definitively after max retries: ${errorMessage}`,
             error
           );
+
+          // Create fallback audit log for manual review
+          await this.createAndEmitFallbackAuditLog(
+            current,
+            evidence,
+            plateOCR,
+            contextSnapshots,
+            zoomSnapshots,
+            `Fallo después de ${this.maxRetries} reintentos: ${errorMessage}`
+          );
         }
       } else {
         current.currentStatus = 'failed';
@@ -512,6 +528,16 @@ export class ForensicQueueV3 {
         });
 
         logger.error('FORENSIC_QUEUE', `Job ${current.job.id} failed: ${errorMessage}`, error);
+
+        // Create fallback audit log for manual review (non-recoverable error)
+        await this.createAndEmitFallbackAuditLog(
+          current,
+          evidence,
+          plateOCR,
+          contextSnapshots,
+          zoomSnapshots,
+          `Error no recuperable: ${errorMessage}`
+        );
       }
     }
 
@@ -559,6 +585,83 @@ export class ForensicQueueV3 {
       this.aiServicePromise = import('./aiService');
     }
     return this.aiServicePromise;
+  }
+
+  /**
+   * Creates a fallback audit log entry when AI analysis fails permanently.
+   * This allows manual review of the evidence without automatic determination.
+   */
+  private async createAndEmitFallbackAuditLog(
+    current: QueueItem,
+    evidence: any,
+    plateOCR: any,
+    contextSnapshots: string[],
+    zoomSnapshots: string[],
+    failureReason: string
+  ): Promise<void> {
+    try {
+      const fallbackLog: InfractionLog = {
+        id: Date.now(),
+        infraction: false, // Mark as unresolved, not as infraction
+        severity: 'CRITICAL', // Mark for urgent manual review
+        ruleCategory: 'MANUAL_REVIEW',
+        description: `Análisis automático falló. Requiere revisión manual: ${failureReason}`,
+        plate: plateOCR?.plate || 'DESCONOCIDO',
+        makeModel: 'DESCONOCIDO',
+        color: 'DESCONOCIDO',
+        videoTimeCode: current.job.snapshot.videoTimeCode,
+        legalBase: 'Revisión Manual',
+        reasoning: [
+          `Error en auditoría forense: ${failureReason}`,
+          `Vehículo #${current.job.trackState.id} en zona: ${current.job.geometryState.lineLabel}`,
+          `Reintentos realizados: ${current.retries}/${this.maxRetries}`,
+          'La evidencia se preserva para revisión manual por operador.',
+        ],
+        image: zoomSnapshots?.[zoomSnapshots.length - 1] || evidence?.snapshots?.[0],
+        extraSnapshots: contextSnapshots || [],
+        zoomSnapshots: zoomSnapshots || [],
+        ocrResults: evidence?.ocrResults || [],
+        plateOcr: plateOCR?.plate,
+        plateOcrCandidates: plateOCR?.candidates || [],
+        videoClip: evidence?.clip,
+        time: new Date().toLocaleTimeString(),
+        localTime: current.job.snapshot.localTime,
+        playbackTime: current.job.snapshot.playbackTime,
+        viewerId: current.job.viewerId,
+        telemetry: {
+          speedEstimated: `${current.job.trackState.avgVelocity || 0} km/h`,
+          behaviorAnomalies: current.job.trackState.anomalyLabel || 'None',
+        },
+      };
+
+      // Emit to listeners for UI display and storage
+      if (this.listeners.size > 0) {
+        this.listeners.forEach((listener) => listener(fallbackLog));
+      }
+
+      // Audit log the fallback creation
+      logger.auditLog('FALLBACK_AUDIT', `/forensic/job/${current.job.id}/manual-review`, 202, {
+        reason: failureReason.substring(0, 100),
+        retries: current.retries,
+        maxRetries: this.maxRetries,
+        plate: fallbackLog.plate,
+      });
+
+      logger.warn(
+        'FORENSIC_QUEUE',
+        `Registro de revisión manual creado para Job ${current.job.id}: ${failureReason}`
+      );
+
+      // Cleanup evidence after creating fallback log
+      await evidenceDB.deleteEvidence(current.job.id);
+      await this.saveQueueState();
+    } catch (fallbackError) {
+      logger.error(
+        'FORENSIC_QUEUE',
+        `Error creando registro de revisión manual para ${current.job.id}: ${fallbackError}`,
+        fallbackError
+      );
+    }
   }
 
   /**
