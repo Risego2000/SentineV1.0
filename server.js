@@ -208,19 +208,23 @@ const cleanupExpiredIpCameraSessions = () => {
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // In development, allow localhost on any port
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
       return;
     }
     callback(new Error('Origin no permitido por CORS.'));
   },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 const apiGuard = (req, res, next) => {
   const origin = req.headers.origin;
 
-  // Validar origen CORS
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  // Validar origen CORS - allow localhost in development
+  if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1') && !ALLOWED_ORIGINS.includes(origin)) {
     logger.warn('AUTH', `CORS origin rechazado: ${origin}`, { ip: req.ip });
     res.status(403).json({ error: 'Origin no permitido.' });
     return;
