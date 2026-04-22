@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { uploadEvidenceFile, compressImage } from '../../services/evidenceStorageService';
+import { detectVideoCodec } from '../../services/videoCodecDetector';
 
 interface EvidenceUploadDialogProps {
   infractionId: string;
@@ -20,6 +21,8 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [showH265Warning, setShowH265Warning] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -59,9 +62,20 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
       setError(null);
       setSuccess(false);
       setUploadProgress(0);
-      setIsUploading(true);
 
       const fileType = file.type.startsWith('video') ? 'video' : 'photo';
+
+      // Check for H.265 codec in video files
+      if (fileType === 'video') {
+        const codec = await detectVideoCodec(file);
+        if (codec === 'hevc') {
+          setPendingFile(file);
+          setShowH265Warning(true);
+          return;
+        }
+      }
+
+      setIsUploading(true);
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -94,6 +108,79 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
       handleFileUpload(file);
     }
   };
+
+  const handleUploadAsIs = async () => {
+    setShowH265Warning(false);
+    if (!pendingFile) return;
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const fileType = 'video';
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + Math.random() * 30, 95));
+      }, 500);
+
+      const result = await uploadEvidenceFile(infractionId, pendingFile, fileType, pendingFile.name, true);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (result) {
+        setSuccess(true);
+        setTimeout(() => {
+          onSuccess?.();
+          onClose();
+        }, 2000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+      setUploadProgress(0);
+    } finally {
+      setIsUploading(false);
+      setPendingFile(null);
+    }
+  };
+
+  // H.265 warning dialog
+  if (showH265Warning && pendingFile) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-[#0d0d0f] border border-white/10 rounded-xl w-full max-w-md mx-4 p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <AlertTriangle className="text-yellow-500 flex-shrink-0 mt-1" size={24} />
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-white mb-2">Vídeo H.265 Detectado</h2>
+              <p className="text-slate-400 text-sm">
+                Este vídeo usa codec H.265 (HEVC). La mayoría de navegadores no lo soportan nativamente.
+              </p>
+              <p className="text-slate-500 text-xs mt-3">
+                <strong>Opción 1:</strong> Subir tal cual (se convertirá en el servidor, ~2-5 minutos)<br/>
+                <strong>Opción 2:</strong> Cancelar y convertir el vídeo antes de subir
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setShowH265Warning(false);
+                setPendingFile(null);
+              }}
+              className="flex-1 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleUploadAsIs}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Subir de Todas Formas
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
