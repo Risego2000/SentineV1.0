@@ -588,12 +588,12 @@ export const SentinelProvider = ({
       const handleError = async () => {
         video.removeEventListener('error', handleError);
 
-        if (!transcodeAttempted && !hevcSupported) {
+        if (!transcodeAttempted) {
           transcodeAttempted = true;
-          addLog('WARN', `Codec H.265 no soportado en este navegador.`);
+          addLog('WARN', `Fallo de reproducción. Iniciando transcodificación con GPU...`);
           await transcodeVideo(file, video, url, autoPlay);
         } else {
-          addLog('ERROR', `No se pudo cargar el video. Intenta transcodificar manualmente.`);
+          addLog('ERROR', `No se pudo cargar el video incluso después de transcodificar.`);
           setStatusMsg('ERROR_CARGA');
         }
       };
