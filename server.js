@@ -315,42 +315,43 @@ app.use('/api', (req, res, next) => {
 const upload = multer({ dest: os.tmpdir() });
 
 app.post('/api/transcode', upload.single('video'), async (req, res) => {
-  try {
-    if (!requireTranscodeSlot(res)) return;
+  if (!requireTranscodeSlot(res)) return;
 
-    const jobId = req.query.id || `job_${Date.now()}`;
+  const jobId = req.query.id || `job_${Date.now()}`;
 
-    // Validar jobId
-    if (typeof jobId !== 'string' || jobId.length > 100) {
-      logger.validationError('TRANSCODE', 'jobId', 'Longitud inválida', jobId);
-      return res.status(400).json({ error: 'Job ID inválido' });
-    }
+  // Validar jobId
+  if (typeof jobId !== 'string' || jobId.length > 100) {
+    logger.validationError('TRANSCODE', 'jobId', 'Longitud inválida', jobId);
+    releaseTranscodeSlot();
+    return res.status(400).json({ error: 'Job ID inválido' });
+  }
 
-    // Validar codec de salida si se especifica
-    const outputCodec = req.query.outputCodec || 'h264';
-    if (!validators.isValidCodec(outputCodec)) {
-      logger.validationError('TRANSCODE', 'outputCodec', 'Codec no soportado', outputCodec);
-      return res.status(400).json({ error: 'Codec de salida inválido' });
-    }
+  // Validar codec de salida si se especifica
+  const outputCodec = req.query.outputCodec || 'h264';
+  if (!validators.isValidCodec(outputCodec)) {
+    logger.validationError('TRANSCODE', 'outputCodec', 'Codec no soportado', outputCodec);
+    releaseTranscodeSlot();
+    return res.status(400).json({ error: 'Codec de salida inválido' });
+  }
 
-    const tmpDir = os.tmpdir();
-    const timestamp = Date.now();
-    const inputPath = path.join(tmpDir, `sentinel_input_${timestamp}.mp4`);
-    const outputPath = path.join(tmpDir, `sentinel_output_${timestamp}.mp4`);
-    const writer = fs.createWriteStream(inputPath);
-    let receivedBytes = 0;
-    let settled = false;
+  const tmpDir = os.tmpdir();
+  const timestamp = Date.now();
+  const inputPath = path.join(tmpDir, `sentinel_input_${timestamp}.mp4`);
+  const outputPath = path.join(tmpDir, `sentinel_output_${timestamp}.mp4`);
+  const writer = fs.createWriteStream(inputPath);
+  let receivedBytes = 0;
+  let settled = false;
 
-    const finish = (status, payload) => {
-      if (settled || res.headersSent) return;
-      settled = true;
-      progressMap.delete(jobId);
-      safeUnlink(inputPath);
-      safeUnlink(outputPath);
-      releaseTranscodeSlot();
-      logger.auditLog('POST', '/api/transcode', status, { jobId, outputCodec });
-      res.status(status).json(payload);
-    };
+  const finish = (status, payload) => {
+    if (settled || res.headersSent) return;
+    settled = true;
+    progressMap.delete(jobId);
+    safeUnlink(inputPath);
+    safeUnlink(outputPath);
+    releaseTranscodeSlot();
+    logger.auditLog('POST', '/api/transcode', status, { jobId, outputCodec });
+    res.status(status).json(payload);
+  };
 
   req.on('aborted', () => {
     progressMap.delete(jobId);
