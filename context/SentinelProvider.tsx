@@ -22,6 +22,7 @@ import { CacheService } from '../services/cacheService';
 import { forensicQueue } from '../services/ForensicQueue';
 import { evidenceDB } from '../services/EvidenceDB';
 import { ReportService } from '../services/ReportService';
+import { getApiUrl } from '../services/apiConfig';
 import {
   createIpCameraSession,
   isSupportedIpCameraUrl,
@@ -536,7 +537,8 @@ export const SentinelProvider = ({
 
     const pollInterval = setInterval(async () => {
       try {
-        const pRes = await fetch(`/api/transcode/progress?id=${jobId}`);
+        const progressUrl = getApiUrl(`/api/transcode/progress?id=${jobId}`);
+        const pRes = await fetch(progressUrl);
         const pData = await pRes.json();
         if (pData.progress >= 0 && pData.progress < 100) {
           const currentTime = Date.now();
@@ -565,7 +567,8 @@ export const SentinelProvider = ({
 
     try {
       const fileBuffer = await file.arrayBuffer();
-      const response = await fetch(`/api/transcode?id=${jobId}`, {
+      const transcodeUrl = getApiUrl(`/api/transcode?id=${jobId}`);
+      const response = await fetch(transcodeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: fileBuffer,

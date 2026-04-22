@@ -1,4 +1,5 @@
 import { InfractionLog } from '../types';
+import { getApiUrl } from './apiConfig';
 
 type JsPDFType = typeof import('jspdf').jsPDF;
 
@@ -434,7 +435,8 @@ export const ReportService = {
   async savePdfToDisk(buffer: ArrayBuffer, filename: string, dateStr?: string): Promise<string> {
     const query = new URLSearchParams({ filename });
     if (dateStr) query.append('date', dateStr);
-    const response = await fetch(`/api/reports/save?${query.toString()}`, {
+    const saveUrl = getApiUrl(`/api/reports/save?${query.toString()}`);
+    const response = await fetch(saveUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/pdf',
@@ -453,7 +455,8 @@ export const ReportService = {
   async saveVideoToDisk(buffer: ArrayBuffer, filename: string, dateStr?: string): Promise<string> {
     const query = new URLSearchParams({ filename });
     if (dateStr) query.append('date', dateStr);
-    const response = await fetch(`/api/reports/video?${query.toString()}`, {
+    const videoUrl = getApiUrl(`/api/reports/video?${query.toString()}`);
+    const response = await fetch(videoUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',

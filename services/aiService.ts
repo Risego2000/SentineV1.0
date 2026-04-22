@@ -1,4 +1,5 @@
 import { GeometryLine, Track, AuditResponse, AuditPresetType } from '../types';
+import { getApiUrl } from './apiConfig';
 
 /**
  * Sanitizes text to prevent basic XSS and injection.
@@ -18,7 +19,8 @@ export interface GeometryResponse {
 }
 
 const postJson = async <T>(url: string, payload: unknown): Promise<T> => {
-  const response = await fetch(url, {
+  const fullUrl = getApiUrl(url);
+  const response = await fetch(fullUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -28,7 +30,7 @@ const postJson = async <T>(url: string, payload: unknown): Promise<T> => {
 
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(data.error || `Fallo en ${url}`);
+    throw new Error(data.error || `Fallo en ${fullUrl}`);
   }
 
   return (await response.json()) as T;

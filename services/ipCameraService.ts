@@ -1,4 +1,5 @@
 import { IpCameraConfig } from '../types';
+import { getApiUrl } from './apiConfig';
 
 const SUPPORTED_PROTOCOLS = new Set(['http:', 'https:']);
 
@@ -31,7 +32,8 @@ export const isSupportedIpCameraUrl = (rawUrl: string): boolean => {
 export const createIpCameraSession = async (
   config: IpCameraConfig
 ): Promise<{ sessionId: string; streamUrl: string }> => {
-  const response = await fetch('/api/ip-camera/session', {
+  const sessionUrl = getApiUrl('/api/ip-camera/session');
+  const response = await fetch(sessionUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
