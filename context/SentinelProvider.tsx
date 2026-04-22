@@ -500,6 +500,17 @@ export const SentinelProvider = ({
     [startScreenShare]
   );
 
+  const formatEstimatedTime = (seconds: number): string => {
+    if (seconds < 0 || !Number.isFinite(seconds)) return '?';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
   const canPlayHevc = () => {
     if (typeof document === 'undefined') return false;
     const video = document.createElement('video');
@@ -519,12 +530,33 @@ export const SentinelProvider = ({
     addLog('WARN', `Iniciando transcodificación a H.264 con aceleración GPU...`);
     setStatusMsg('TRANSCODIFICANDO... (0%)');
 
+    const startTime = Date.now();
+    let lastProgress = 0;
+    let lastProgressTime = startTime;
+
     const pollInterval = setInterval(async () => {
       try {
         const pRes = await fetch(`/api/transcode/progress?id=${jobId}`);
         const pData = await pRes.json();
         if (pData.progress >= 0 && pData.progress < 100) {
-          setStatusMsg(`TRANSCODIFICANDO... (${pData.progress}%)`);
+          const currentTime = Date.now();
+          const timePassed = (currentTime - startTime) / 1000; // seconds
+          const progressDelta = pData.progress - lastProgress;
+          const timeDelta = (currentTime - lastProgressTime) / 1000; // seconds
+
+          let estimatedTotal = '?';
+          if (progressDelta > 0 && timeDelta > 0) {
+            const secondsPerPercent = timeDelta / progressDelta;
+            const remainingSeconds = secondsPerPercent * (100 - pData.progress);
+            estimatedTotal = formatEstimatedTime(remainingSeconds);
+          }
+
+          lastProgress = pData.progress;
+          lastProgressTime = currentTime;
+
+          setStatusMsg(
+            `TRANSCODIFICANDO... (${pData.progress}%) - ETA: ${estimatedTotal}`
+          );
         }
       } catch {
         // Progress polling is best-effort only.
