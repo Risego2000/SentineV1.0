@@ -462,33 +462,54 @@ export const SentinelProvider = ({
         });
 
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          const video = videoRef.current;
+          video.srcObject = stream;
 
-          // Start playing immediately
-          videoRef.current.onloadedmetadata = () => {
-            const playPromise = videoRef.current?.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((err: Error) => {
-                addLog('ERROR', `Error al reproducir stream: ${err.message}`);
-              });
-            }
+          // Handle both loadeddata and playing events
+          const onVideoReady = () => {
+            addLog('CORE', `Video ready - readyState: ${video.readyState}, playing: ${!video.paused}`);
             setSource('live');
             setStatusMsg('STREAM_ACTIVO');
             addLog('CORE', 'Captura de pantalla sincronizada. Señal en vivo lista.');
+
+            // Remove listeners to avoid duplicate calls
+            video.removeEventListener('loadeddata', onVideoReady);
+            video.removeEventListener('playing', onVideoReady);
           };
 
-          // Try playing immediately (autoPlay may fail, this is backup)
-          const playPromise = videoRef.current.play();
+          // Listen for loadeddata or playing events
+          video.addEventListener('loadeddata', onVideoReady);
+          video.addEventListener('playing', onVideoReady);
+
+          // Set onloadedmetadata as backup
+          video.onloadedmetadata = () => {
+            addLog('CORE', 'Video metadata loaded');
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((err: Error) => {
+                addLog('ERROR', `Error al reproducir: ${err.message}`);
+              });
+            }
+          };
+
+          // Try playing immediately
+          const playPromise = video.play();
           if (playPromise !== undefined) {
-            playPromise.catch((err: Error) => {
-              addLog('WARN', `Autoplay bloqueado, esperando interacción: ${err.message}`);
-            });
+            playPromise
+              .then(() => {
+                addLog('CORE', 'Video comenzó a reproducir');
+              })
+              .catch((err: Error) => {
+                addLog('WARN', `Autoplay falló: ${err.message}`);
+              });
           }
 
           // Handle when user stops sharing via browser UI
           stream.getVideoTracks()[0].onended = () => {
             addLog('WARN', 'Captura de pantalla finalizada por el usuario.');
             setSource('none');
+            video.removeEventListener('loadeddata', onVideoReady);
+            video.removeEventListener('playing', onVideoReady);
           };
         }
         return stream;

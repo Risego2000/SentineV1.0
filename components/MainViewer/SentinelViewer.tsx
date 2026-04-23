@@ -51,7 +51,9 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     if (!v || !canvas || source === 'none') return;
 
     const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx || v.readyState < 2) return;
+    if (!ctx) return;
+    // Allow rendering if video has at least metadata (readyState >= 1) and is playing
+    if (v.readyState < 1 || v.paused) return;
 
     try {
       if (isPlaying) {
