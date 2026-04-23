@@ -1,6 +1,6 @@
 /**
  * Evidence Capture System - Two-phase ROI forbidden-turn support.
- * Phase 1 (ROI A): start 20s circular buffer + capture ROI_A photos.
+ * Phase 1 (ROI A): start 30s circular buffer + capture ROI_A photos.
  * Phase 2 (ROI B): capture ROI_B photos + mid-path photos, then finalize.
  * If ROI B never comes: discard (buffer is overwritten by next activation).
  */
@@ -77,7 +77,7 @@ export class EvidenceCaptureManager {
 
   /**
    * PHASE 1 — ROI A entry.
-   * Starts the 20s circular buffer and captures FOTO_GENERAL_ROI_A + FOTO_DETALLE_ROI_A.
+   * Starts the 30s circular buffer and captures FOTO_GENERAL_ROI_A + FOTO_DETALLE_ROI_A.
    * Does NOT set track.audited so ROI B can still be detected.
    */
   startTurnCapture(

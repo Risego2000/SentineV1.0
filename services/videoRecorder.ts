@@ -10,7 +10,7 @@ export class VideoBufferService {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private readonly maxSeconds = 21;
+  private readonly maxSeconds = 31;
   private bufferCallback?: (seconds: number) => void;
   private mode: 'circular' | 'roi_based' = 'circular';
   private recordingStartTime: number = 0;
@@ -116,7 +116,7 @@ export class VideoBufferService {
   }
 
   /**
-   * Extrae el clip: modo circular = últimos 21 seg, modo roi_based = desde inicio hasta stop.
+   * Extrae el clip: modo circular = últimos 31 seg, modo roi_based = desde inicio hasta stop.
    */
   async getClip(): Promise<string> {
     return new Promise((resolve) => {
