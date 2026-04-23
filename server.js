@@ -223,15 +223,23 @@ const corsOptions = {
 
 const apiGuard = (req, res, next) => {
   const origin = req.headers.origin;
+  const isLocalhost = origin?.includes('localhost') || origin?.includes('127.0.0.1') || !origin;
 
   // Validar origen CORS - allow localhost in development
-  if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1') && !ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && !isLocalhost && !ALLOWED_ORIGINS.includes(origin)) {
     logger.warn('AUTH', `CORS origin rechazado: ${origin}`, { ip: req.ip });
     res.status(403).json({ error: 'Origin no permitido.' });
     return;
   }
 
-  // SIEMPRE requiere token válido (sin excepción localhost)
+  // Skip token validation for localhost (development)
+  if (isLocalhost) {
+    req.user = { authenticated: true, ip: req.ip, isLocalhost: true };
+    next();
+    return;
+  }
+
+  // Require token for non-localhost origins (production)
   const provided = req.headers.authorization?.replace(/^Bearer\s+/i, '') || '';
   const expectedToken = API_TOKEN || 'default-insecure-token-change-me';
 
