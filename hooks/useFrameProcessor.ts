@@ -132,6 +132,28 @@ export const useFrameProcessor = () => {
               ? track.snapshots
               : [canvas.toDataURL('image/jpeg')]; // Fallback to current frame
 
+            // Extract timestamp from OSD (first snapshot with visible timestamp)
+            let osdTimestamp = null;
+            for (const snapshot of snapshots) {
+              try {
+                const tsResponse = await fetch(getApiUrl('/api/ocr/timestamp'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ image: snapshot }),
+                });
+                if (tsResponse.ok) {
+                  const tsResult = await tsResponse.json();
+                  if (tsResult.timestamp && tsResult.confidence > 0.7) {
+                    osdTimestamp = tsResult.timestamp;
+                    break; // Found a good timestamp
+                  }
+                }
+              } catch (err) {
+                // Continue to next snapshot if timestamp extraction fails
+                continue;
+              }
+            }
+
             // Call server endpoint for best OCR accuracy (Gemini Vision - multi-image)
             const response = await fetch(getApiUrl('/api/ocr/plate'), {
               method: 'POST',
@@ -145,12 +167,19 @@ export const useFrameProcessor = () => {
                 ? ocrResult.plate
                 : 'MATRÍCULA NO DETECTADA';
 
+              const timestamp = osdTimestamp ? new Date(osdTimestamp).toLocaleString('es-ES') : 'Hora desconocida';
+
               addLog(
                 'AI',
                 `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Placa: ${plate} ${
                   ocrResult.confidence ? `(${(ocrResult.confidence * 100).toFixed(0)}%)` : ''
-                }`
+                } - ${timestamp}`
               );
+
+              // Store the OSD timestamp for forensic report
+              if (osdTimestamp) {
+                track.infractionTimestamp = osdTimestamp;
+              }
             } else {
               throw new Error(`OCR API error: ${response.status}`);
             }

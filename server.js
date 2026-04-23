@@ -13,6 +13,7 @@ import {
   generateGeometryWithGemini,
   loadLocalEnvFile,
   extractLicensePlateWithGemini,
+  extractTimestampFromOSD,
 } from './services/aiServer.js';
 import {
   isPrivateAddress,
@@ -637,6 +638,26 @@ app.post('/api/ocr/plate', async (req, res) => {
     logger.errorWithContext('API_OCR_PLATE', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error extracting license plate',
+    });
+  }
+});
+
+// OSD Timestamp extraction endpoint
+// Extracts date/time from top-left corner of video frame
+app.post('/api/ocr/timestamp', async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'Base64 image required' });
+    }
+
+    const result = await extractTimestampFromOSD(image);
+    res.json(result);
+  } catch (error) {
+    logger.errorWithContext('API_OCR_TIMESTAMP', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error extracting timestamp',
     });
   }
 });

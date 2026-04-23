@@ -463,3 +463,129 @@ export const extractLicensePlateFromMultiple = async (base64Images = []) => {
 export const extractLicensePlateWithGemini = async (base64Image) => {
   return extractLicensePlateFromMultiple([base64Image]);
 };
+
+/**
+ * Extract timestamp from OSD (On-Screen Display) in video.
+ * Reads date/time from top-left corner and converts to ISO timestamp.
+ * Supports various formats: DD-MM-YYYY HH:MM:SS, YYYY-MM-DD HH:MM:SS, etc.
+ */
+export const extractTimestampFromOSD = async (base64Image) => {
+  try {
+    if (!base64Image) {
+      return { timestamp: null, osdText: null, confidence: 0 };
+    }
+
+    loadLocalEnvFile();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return { timestamp: null, osdText: null, confidence: 0 };
+    }
+
+    const client = new GoogleGenAI({ apiKey });
+    const model = client.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
+
+    const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+
+    const response = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: imageData,
+        },
+      },
+      {
+        text: `Read the timestamp/date-time from the top-left corner of this video frame (OSD - On-Screen Display).
+        Return ONLY a JSON object with:
+        {
+          "osdText": "exact text you read from OSD (e.g. '12-04-2026 14:30:45')",
+          "confidence": 0.95
+        }
+        If you cannot read a timestamp, return {"osdText": null, "confidence": 0}.
+        Be very precise with numbers.`,
+      },
+    ]);
+
+    const responseText = response.response.text();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      return { timestamp: null, osdText: null, confidence: 0 };
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
+    const osdText = String(result.osdText || '').trim();
+    const confidence = Number(result.confidence) || 0;
+
+    if (!osdText || osdText === 'null') {
+      return { timestamp: null, osdText: null, confidence: 0 };
+    }
+
+    // Parse various timestamp formats
+    const timestamp = parseOSDTimestamp(osdText);
+
+    return {
+      timestamp,
+      osdText,
+      confidence,
+    };
+  } catch (error) {
+    console.error('[Gemini OSD] Error extracting timestamp:', error);
+    return { timestamp: null, osdText: null, confidence: 0 };
+  }
+};
+
+/**
+ * Parse OSD timestamp in various formats
+ * Supports: DD-MM-YYYY HH:MM:SS, YYYY-MM-DD HH:MM:SS, etc.
+ */
+const parseOSDTimestamp = (osdText) => {
+  if (!osdText) return null;
+
+  try {
+    // Common formats: DD-MM-YYYY HH:MM:SS or YYYY-MM-DD HH:MM:SS
+    let date;
+
+    // Try DD-MM-YYYY HH:MM:SS format
+    let match = osdText.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10);
+      const year = parseInt(match[3], 10);
+      const hours = parseInt(match[4], 10);
+      const minutes = parseInt(match[5], 10);
+      const seconds = parseInt(match[6], 10);
+
+      // Check if it's DD-MM-YYYY (day > 12) or MM-DD-YYYY (day <= 12)
+      if (day > 12) {
+        date = new Date(year, month - 1, day, hours, minutes, seconds);
+      } else {
+        // Ambiguous, assume DD-MM-YYYY for safety
+        date = new Date(year, month - 1, day, hours, minutes, seconds);
+      }
+    }
+
+    // Try YYYY-MM-DD HH:MM:SS format
+    if (!date) {
+      match = osdText.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10);
+        const day = parseInt(match[3], 10);
+        const hours = parseInt(match[4], 10);
+        const minutes = parseInt(match[5], 10);
+        const seconds = parseInt(match[6], 10);
+
+        date = new Date(year, month - 1, day, hours, minutes, seconds);
+      }
+    }
+
+    if (date && !isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[OSD Parser] Error parsing timestamp:', osdText, err.message);
+    return null;
+  }
+};
