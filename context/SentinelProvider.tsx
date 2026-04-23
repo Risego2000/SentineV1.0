@@ -471,6 +471,9 @@ export const SentinelProvider = ({
             setSource('live');
             setStatusMsg('STREAM_ACTIVO');
             addLog('CORE', 'Captura de pantalla sincronizada. Señal en vivo lista.');
+            setIsPlaying(true); // Activate detection automatically for live streams
+            setStats({ det: 0, inf: 0 }); // Reset stats for new stream
+            setLogs([]); // Clear logs for new stream
 
             // Remove listeners to avoid duplicate calls
             video.removeEventListener('loadeddata', onVideoReady);
