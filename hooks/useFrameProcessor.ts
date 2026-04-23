@@ -462,9 +462,10 @@ export const useFrameProcessor = () => {
     async (v: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> => {
       if (!v || v.paused || v.ended || isProcessingRef.current) return;
 
-      // Throttle to ~30fps max
+      // Throttle to ~20fps max for detection processing
+      // (allows 60fps rendering separately)
       const now = Date.now();
-      if (now - lastProcessTimeRef.current < 33) return;
+      if (now - lastProcessTimeRef.current < 50) return;
       lastProcessTimeRef.current = now;
 
       isProcessingRef.current = true;
