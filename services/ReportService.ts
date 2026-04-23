@@ -3,6 +3,109 @@ import { getApiUrl } from './apiConfig';
 
 type JsPDFType = typeof import('jspdf').jsPDF;
 
+/**
+ * Load template PDF and fill with infraction data using pdf-lib
+ */
+const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer> => {
+  try {
+    // Dynamically import pdf-lib (only available in browser environment)
+    const { PDFDocument, rgb, degrees } = await import('pdf-lib');
+
+    // Fetch the template PDF from public directory
+    const templateResponse = await fetch('/boletin_v4.pdf');
+    if (!templateResponse.ok) {
+      throw new Error('No se pudo cargar el template del boletín');
+    }
+    const templateBytes = await templateResponse.arrayBuffer();
+
+    // Load the template PDF
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
+
+    if (!firstPage) {
+      throw new Error('El template no tiene páginas');
+    }
+
+    const { height, width } = firstPage.getSize();
+
+    // Helper function to draw text at specific coordinates
+    const drawTextField = (
+      text: string,
+      x: number,
+      y: number,
+      fontSize: number = 10,
+      bold: boolean = false
+    ) => {
+      try {
+        firstPage.drawText(text, {
+          x,
+          y: height - y, // PDF coordinates are bottom-up
+          size: fontSize,
+          color: rgb(0, 0, 0),
+          maxWidth: width - x - 10,
+          lineHeight: fontSize * 1.2,
+        });
+      } catch (e) {
+        console.warn(`Error drawing text "${text.substring(0, 20)}" at (${x}, ${y}):`, e);
+      }
+    };
+
+    // Fill template with infraction data
+    // These coordinates need to be adjusted based on the actual template layout
+    // The template should have specific zones for:
+
+    // 1. Header/Date section (top area)
+    const dateStr = log.localTime || log.time || new Date().toLocaleString('es-ES');
+    const [date, time] = dateStr.split(' ');
+    drawTextField(date || 'Fecha desconocida', 120, 50, 11, true);
+
+    // 2. Vehicle/License Plate section
+    drawTextField(log.plate || 'NO DETECTADA', 120, 85, 14, true);
+    if (log.makeModel) {
+      drawTextField(`Marca/Modelo: ${log.makeModel}`, 20, 110, 10);
+    }
+    if (log.color) {
+      drawTextField(`Color: ${log.color}`, 20, 125, 10);
+    }
+
+    // 3. Infraction details section
+    drawTextField(`Tipo: ${log.ruleCategory || 'Infracción de tráfico'}`, 20, 160, 10);
+
+    const severityText = log.severity === 'CRITICAL' ? 'CRÍTICA'
+      : log.severity === 'HIGH' ? 'ALTA'
+        : log.severity === 'MEDIUM' ? 'MEDIA'
+          : 'BAJA';
+    drawTextField(`Gravedad: ${severityText}`, 20, 175, 10);
+
+    // 4. Description section (wrapped)
+    if (log.description) {
+      const descLines = log.description.match(/.{1,70}/g) || [];
+      let descY = 200;
+      descLines.forEach((line) => {
+        drawTextField(line, 20, descY, 9);
+        descY += 12;
+      });
+    }
+
+    // 5. Location section
+    if (log.localTime) {
+      drawTextField(log.localTime, 120, 280, 9);
+    }
+
+    // Serialize the PDF to bytes
+    const pdfBytes = await pdfDoc.save();
+    return pdfBytes.buffer;
+  } catch (error) {
+    console.warn(
+      'Error loading template PDF, falling back to generated PDF:',
+      error instanceof Error ? error.message : String(error)
+    );
+    // If template loading fails, fall back to generated PDF
+    return null as any;
+  }
+};
+
 const escapeCsvCell = (value: unknown): string => {
   const normalized = String(value ?? '');
   const formulaSafe = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
@@ -382,6 +485,17 @@ export const ReportService = {
   },
 
   async generateInfractionPdf(log: InfractionLog): Promise<ArrayBuffer> {
+    // Try to use template PDF first
+    try {
+      const templateResult = await loadTemplateAndFill(log);
+      if (templateResult) {
+        return templateResult;
+      }
+    } catch (error) {
+      console.warn('Template PDF generation failed, using fallback:', error);
+    }
+
+    // Fallback to generated PDF if template fails
     const doc = await createDoc();
     await buildInfractionPages(doc, log, 1, 1);
     return doc.output('arraybuffer');
