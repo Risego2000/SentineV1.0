@@ -16,6 +16,7 @@ import {
   extractTimestampFromOSD,
 } from './services/aiServer.js';
 import { generateBoletin } from './services/boletin-generator.js';
+import { infractionBuffer } from './services/infraction-buffer.js';
 import {
   isPrivateAddress,
   sanitizeFilename,
@@ -663,6 +664,109 @@ app.post('/api/ocr/timestamp', async (req, res) => {
   }
 });
 
+// Boletín buffer status endpoint
+// Check how long an infraction has been buffered
+app.get('/api/boletin/buffer/status/:plate', (req, res) => {
+  try {
+    const { plate } = req.params;
+    const status = infractionBuffer.getStatus(decodeURIComponent(plate));
+
+    res.json({
+      plate,
+      ...status,
+    });
+  } catch (error) {
+    logger.errorWithContext('API_BOLETIN_BUFFER_STATUS', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Boletín buffer endpoint
+// Accumulates infractions for 30 seconds before generating report
+app.post('/api/boletin/buffer', async (req, res) => {
+  try {
+    const {
+      plate,
+      infractionType,
+      timestamp,
+      location,
+      description,
+      severity,
+      makeModel,
+      color,
+    } = req.body;
+
+    if (!plate || !infractionType) {
+      return res.status(400).json({ error: 'Plate and infractionType required' });
+    }
+
+    console.log(`[API_BOLETIN_BUFFER] Infracción recibida para ${plate}`);
+
+    // Add to buffer (will generate boletín after 30 seconds)
+    infractionBuffer.addInfraction(
+      plate,
+      {
+        plate,
+        infractionType,
+        timestamp,
+        location,
+        description,
+        severity,
+        makeModel,
+        color,
+      },
+      async (bufferPlate, infractions) => {
+        // Callback: Generate boletín after buffer expires
+        try {
+          const aggregated = infractionBuffer.constructor.aggregateInfractions(
+            infractions
+          );
+
+          console.log(
+            `[INFRACTION_BUFFER] Generando boletín para ${bufferPlate} con ${infractions.length} infracción(es)`
+          );
+
+          const pdfBuffer = await generateBoletin(aggregated);
+
+          // Save boletín to reports directory
+          const reportsDir = REPORTS_DIR || 'C:\\Denuncias';
+          if (!fs.existsSync(reportsDir)) {
+            fs.mkdirSync(reportsDir, { recursive: true });
+          }
+
+          const filename = `Boletin_${bufferPlate}_${Date.now()}.pdf`;
+          const filepath = path.join(reportsDir, filename);
+
+          fs.writeFileSync(filepath, Buffer.from(pdfBuffer));
+
+          console.log(
+            `[INFRACTION_BUFFER] Boletín guardado: ${filepath}`
+          );
+        } catch (error) {
+          console.error(
+            '[INFRACTION_BUFFER] Error generating boletín from buffer:',
+            error
+          );
+        }
+      }
+    );
+
+    // Return buffer status
+    const status = infractionBuffer.getStatus(plate);
+    res.status(202).json({
+      message: 'Infraction buffered',
+      plate,
+      bufferStatus: status,
+      bufferedUntilMs: status.remainingMs,
+    });
+  } catch (error) {
+    logger.errorWithContext('API_BOLETIN_BUFFER', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error buffering infraction',
+    });
+  }
+});
+
 // Boletín de denuncia generation endpoint
 // Generates formal infraction report PDF
 app.post('/api/boletin/generate', async (req, res) => {
@@ -682,7 +786,8 @@ app.post('/api/boletin/generate', async (req, res) => {
       return res.status(400).json({ error: 'Plate and infractionType required' });
     }
 
-    const pdfBuffer = generateBoletin({
+    // generateBoletin is now async and uses pdf-lib to fill the template
+    const pdfBuffer = await generateBoletin({
       plate,
       infractionType,
       timestamp,
