@@ -97,19 +97,16 @@ const compressImageForAI = (base64Image) => {
 };
 
 /**
- * Filter snapshots to only most relevant ones for analysis
+ * Filter snapshots to only the most critical one for analysis
+ * Using only 1 image is more efficient and reduces payload
  */
 const filterSnapshotsForAI = (snapshots = []) => {
-  if (snapshots.length <= 3) return snapshots;
+  if (!snapshots || snapshots.length === 0) return [];
 
-  // Keep first, middle, and last snapshot (most informative)
-  const filtered = [
-    snapshots[0],
-    snapshots[Math.floor(snapshots.length / 2)],
-    snapshots[snapshots.length - 1],
-  ].filter(Boolean);
-
-  return filtered;
+  // Return ONLY the most informative snapshot (middle frame)
+  // This is sufficient for trajectory analysis and significantly reduces payload
+  const middleIndex = Math.floor(snapshots.length / 2);
+  return [snapshots[middleIndex]];
 };
 
 export const generateGeometryWithGemini = async ({ directives, instruction, image }) => {
