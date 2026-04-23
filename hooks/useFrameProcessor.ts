@@ -10,6 +10,7 @@ import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
 import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
+import { OCRSynchronizer } from '../services/OCRSynchronizer';
 
 const MAX_TAIL_POINTS = 50;
 const MIN_FINALIZE_DELAY_MS = 0;
@@ -123,11 +124,26 @@ export const useFrameProcessor = () => {
         track.auditStatus = 'processing';
         updateBufferStatus({ state: 'recording', activeTracks: manager.getActiveCount() });
 
-        // Add infraction to panel immediately when detected
-        addLog(
-          'AI',
-          `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Vehículo ID: ${track.id}`
-        );
+        // Extract license plate from current frame and add infraction to panel
+        (async () => {
+          try {
+            // Convert canvas to base64 for OCR
+            const base64Frame = canvas.toDataURL('image/jpeg');
+            const ocrResult = await OCRSynchronizer.extractLicensePlate([base64Frame]);
+
+            const plate = ocrResult.plate || 'MATRÍCULA NO DETECTADA';
+            addLog(
+              'AI',
+              `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Placa: ${plate}`
+            );
+          } catch (err) {
+            // Fallback if OCR fails
+            addLog(
+              'AI',
+              `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Vehículo ID: ${track.id}`
+            );
+          }
+        })();
       }
     },
     [findRulesForGeometry, updateBufferStatus, addLog]
