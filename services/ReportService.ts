@@ -5,11 +5,22 @@ type JsPDFType = typeof import('jspdf').jsPDF;
 
 /**
  * Load template PDF and fill with infraction data using pdf-lib
+ * Note: This function is designed to work in the browser environment
  */
-const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer> => {
+const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer | null> => {
   try {
-    // Dynamically import pdf-lib (only available in browser environment)
-    const { PDFDocument, rgb, degrees } = await import('pdf-lib');
+    // Lazily import pdf-lib only when needed (browser environment)
+    let PDFDocument: any, rgb: any;
+
+    try {
+      // @ts-ignore - pdf-lib is dynamically imported
+      const pdfLib = await import('pdf-lib');
+      PDFDocument = pdfLib.PDFDocument;
+      rgb = pdfLib.rgb;
+    } catch (importError) {
+      console.warn('pdf-lib not available in browser, using fallback:', importError);
+      return null;
+    }
 
     // Fetch the template PDF from public directory
     const templateResponse = await fetch('/boletin_v4.pdf');
@@ -34,8 +45,7 @@ const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer> => 
       text: string,
       x: number,
       y: number,
-      fontSize: number = 10,
-      bold: boolean = false
+      fontSize: number = 10
     ) => {
       try {
         firstPage.drawText(text, {
@@ -57,11 +67,11 @@ const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer> => 
 
     // 1. Header/Date section (top area)
     const dateStr = log.localTime || log.time || new Date().toLocaleString('es-ES');
-    const [date, time] = dateStr.split(' ');
-    drawTextField(date || 'Fecha desconocida', 120, 50, 11, true);
+    const [date] = dateStr.split(' ');
+    drawTextField(date || 'Fecha desconocida', 120, 50, 11);
 
     // 2. Vehicle/License Plate section
-    drawTextField(log.plate || 'NO DETECTADA', 120, 85, 14, true);
+    drawTextField(log.plate || 'NO DETECTADA', 120, 85, 14);
     if (log.makeModel) {
       drawTextField(`Marca/Modelo: ${log.makeModel}`, 20, 110, 10);
     }
@@ -102,7 +112,7 @@ const loadTemplateAndFill = async (log: InfractionLog): Promise<ArrayBuffer> => 
       error instanceof Error ? error.message : String(error)
     );
     // If template loading fails, fall back to generated PDF
-    return null as any;
+    return null;
   }
 };
 
