@@ -3,12 +3,7 @@
  * Handles file uploads to Supabase Storage and database record management
  */
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from './supabase';
 const BUCKET_NAME = 'evidence';
 const MAX_PHOTO_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
