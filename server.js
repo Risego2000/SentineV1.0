@@ -300,7 +300,8 @@ const finalizeFilename = sanitizeFilename;
 const validateCameraHost = (hostname) => _validateCameraHost(hostname, ALLOWED_CAMERA_HOSTS);
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' })); // Reducido de 100mb a 10mb para prevenir DoS
+app.use(express.json({ limit: '50mb' })); // Allow larger payloads for image forensics
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api', apiGuard, rateLimitApi);
 
 // Middleware de auditoría para todas las requests API

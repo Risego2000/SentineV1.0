@@ -80,6 +80,38 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+/**
+ * Estimate size of base64 image in bytes
+ */
+const estimateBase64Size = (base64String) => {
+  return Math.ceil(base64String.length * 0.75); // base64 is ~33% larger than binary
+};
+
+/**
+ * Compress image by removing data URI prefix
+ */
+const compressImageForAI = (base64Image) => {
+  if (!base64Image) return null;
+  // Remove data URI prefix if present
+  return base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+};
+
+/**
+ * Filter snapshots to only most relevant ones for analysis
+ */
+const filterSnapshotsForAI = (snapshots = []) => {
+  if (snapshots.length <= 3) return snapshots;
+
+  // Keep first, middle, and last snapshot (most informative)
+  const filtered = [
+    snapshots[0],
+    snapshots[Math.floor(snapshots.length / 2)],
+    snapshots[snapshots.length - 1],
+  ].filter(Boolean);
+
+  return filtered;
+};
+
 export const generateGeometryWithGemini = async ({ directives, instruction, image }) => {
   try {
     const ai = getAIClient();
@@ -210,12 +242,27 @@ export const analyzeTrajectoryWithGemini = async ({
       zoneName: line.label,
     };
 
-    const evidenceParts = (track.snapshots || []).map((data) => ({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data,
-      },
-    }));
+    // Filter to most relevant snapshots and compress
+    const selectedSnapshots = filterSnapshotsForAI(track.snapshots || []);
+    const evidenceParts = selectedSnapshots
+      .map((data) => {
+        const compressedData = compressImageForAI(data);
+        const sizeBytes = estimateBase64Size(compressedData || '');
+
+        // Skip images larger than 5MB (Gemini has limits)
+        if (sizeBytes > 5 * 1024 * 1024) {
+          console.warn(`[GEMINI] Snapshot too large (${(sizeBytes / 1024 / 1024).toFixed(1)}MB), skipping`);
+          return null;
+        }
+
+        return {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: compressedData,
+          },
+        };
+      })
+      .filter(Boolean);
 
     const promptText = `
     SISTEMA DE ANÁLISIS DE TRAYECTORIA - SENTINEL AI
