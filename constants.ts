@@ -360,7 +360,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.3,
       nmsThreshold: 0.3,
-      detectionSkip: 1,
+      detectionSkip: 2,
       persistence: 5,
       predictionLookahead: 10,
     },
@@ -371,7 +371,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.35,
       nmsThreshold: 0.4,
-      detectionSkip: 1,
+      detectionSkip: 3,
       persistence: 10,
       predictionLookahead: 20,
     },
@@ -382,7 +382,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.45,
       nmsThreshold: 0.5,
-      detectionSkip: 1,
+      detectionSkip: 5,
       persistence: 15,
       predictionLookahead: 30,
     },
@@ -393,7 +393,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.25,
       nmsThreshold: 0.3,
-      detectionSkip: 1,
+      detectionSkip: 6,
       persistence: 25,
       predictionLookahead: 40,
     },

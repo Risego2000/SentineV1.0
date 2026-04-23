@@ -486,9 +486,10 @@ export const useFrameProcessor = () => {
           processTrackResults(trackerRef.current.tracks, v, canvas);
         }
 
-        if (isPoseEnabled) {
-          await detectPose(v);
-        }
+        // Pose detection disabled for traffic enforcement (not needed)
+        // if (isPoseEnabled) {
+        //   await detectPose(v);
+        // }
 
         // Cleanup any captures for tracks that have been dropped
         const activeTrackIds = new Set(trackerRef.current.tracks.map((t) => t.id));
