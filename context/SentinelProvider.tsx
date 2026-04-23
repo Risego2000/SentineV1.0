@@ -467,15 +467,7 @@ export const SentinelProvider = ({
             videoRef.current?.play();
             setSource('live');
             setStatusMsg('STREAM_ACTIVO');
-            addLog('CORE', 'Captura de pantalla sincronizada. Detectando flujo biónico...');
-
-            // Auto-detect geometry for the shared window/application
-            setTimeout(() => {
-              generateGeometry(
-                'Analiza esta ventana compartida de cámara de tráfico. Genera el PROTOCOLO DE SEGURIDAD ajustado a la perspectiva de esta cámara específica.',
-                videoRef.current
-              );
-            }, 2000);
+            addLog('CORE', 'Captura de pantalla sincronizada. Señal en vivo lista.');
           };
 
           // Handle when user stops sharing via browser UI
@@ -490,7 +482,7 @@ export const SentinelProvider = ({
         throw e;
       }
     },
-    [addLog, setStatusMsg, generateGeometry, handleError, setSource]
+    [addLog, setStatusMsg, handleError, setSource]
   );
 
   const startLiveFeed = useCallback(
