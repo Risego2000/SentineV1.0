@@ -91,13 +91,48 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
   useEffect(() => {
     let anim: number;
-    const frameLoop = async () => {
-      await loop();
-      anim = requestAnimationFrame(frameLoop);
+    let interval: NodeJS.Timeout | null = null;
+    let isPageVisible = true;
+
+    // Handle visibility changes (tab focus/blur)
+    const handleVisibilityChange = () => {
+      isPageVisible = document.visibilityState === 'visible';
+
+      if (isPageVisible && interval) {
+        // Resume requestAnimationFrame when tab becomes visible
+        clearInterval(interval);
+        interval = null;
+        anim = requestAnimationFrame(frameLoop);
+        addLog('SYSTEM', '🔄 Reanudando detección en foreground');
+      } else if (!isPageVisible && !interval) {
+        // Switch to setInterval for background processing
+        cancelAnimationFrame(anim);
+        interval = setInterval(async () => {
+          await loop();
+        }, 50); // 20fps background processing
+        addLog('SYSTEM', '📱 Continuando detección en background');
+      }
     };
+
+    const frameLoop = async () => {
+      if (isPageVisible) {
+        await loop();
+        anim = requestAnimationFrame(frameLoop);
+      }
+    };
+
+    // Start with requestAnimationFrame
     anim = requestAnimationFrame(frameLoop);
-    return () => cancelAnimationFrame(anim);
-  }, [loop]);
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelAnimationFrame(anim);
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loop, addLog]);
 
   // --- EVENT HANDLERS ---
   const handleFileSelect = React.useCallback(() => fileInputRef.current?.click(), []);
