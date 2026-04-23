@@ -10,7 +10,7 @@ import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
 import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
-import { OCRSynchronizer } from '../services/OCRSynchronizer';
+import { getApiUrl } from '../services/apiConfig';
 
 const MAX_TAIL_POINTS = 50;
 const MIN_FINALIZE_DELAY_MS = 0;
@@ -124,18 +124,34 @@ export const useFrameProcessor = () => {
         track.auditStatus = 'processing';
         updateBufferStatus({ state: 'recording', activeTracks: manager.getActiveCount() });
 
-        // Extract license plate from current frame and add infraction to panel
+        // Extract license plate from current frame using Gemini Vision API and add infraction to panel
         (async () => {
           try {
             // Convert canvas to base64 for OCR
             const base64Frame = canvas.toDataURL('image/jpeg');
-            const ocrResult = await OCRSynchronizer.extractLicensePlate([base64Frame]);
 
-            const plate = ocrResult.plate || 'MATRÍCULA NO DETECTADA';
-            addLog(
-              'AI',
-              `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Placa: ${plate}`
-            );
+            // Call server endpoint for best OCR accuracy (Gemini Vision)
+            const response = await fetch(getApiUrl('/api/ocr/plate'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: base64Frame }),
+            });
+
+            if (response.ok) {
+              const ocrResult = await response.json();
+              const plate = ocrResult.plate && ocrResult.plate !== 'NO_PLATE'
+                ? ocrResult.plate
+                : 'MATRÍCULA NO DETECTADA';
+
+              addLog(
+                'AI',
+                `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Placa: ${plate} ${
+                  ocrResult.confidence ? `(${(ocrResult.confidence * 100).toFixed(0)}%)` : ''
+                }`
+              );
+            } else {
+              throw new Error(`OCR API error: ${response.status}`);
+            }
           } catch (err) {
             // Fallback if OCR fails
             addLog(

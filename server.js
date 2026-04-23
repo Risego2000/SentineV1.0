@@ -12,6 +12,7 @@ import {
   analyzeTrajectoryWithGemini,
   generateGeometryWithGemini,
   loadLocalEnvFile,
+  extractLicensePlateWithGemini,
 } from './services/aiServer.js';
 import {
   isPrivateAddress,
@@ -598,6 +599,24 @@ app.post('/api/ai/audit', async (req, res) => {
     logger.errorWithContext('API_AI_AUDIT', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error analizando trayectoria',
+    });
+  }
+});
+
+// OCR endpoint using Gemini Vision API (best accuracy for license plates)
+app.post('/api/ocr/plate', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'Base64 image required' });
+    }
+
+    const result = await extractLicensePlateWithGemini(image);
+    res.json(result);
+  } catch (error) {
+    logger.errorWithContext('API_OCR_PLATE', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error extracting license plate',
     });
   }
 });
