@@ -15,6 +15,7 @@ import {
   extractLicensePlateWithGemini,
   extractTimestampFromOSD,
 } from './services/aiServer.js';
+import { generateBoletin } from './services/boletin-generator.js';
 import {
   isPrivateAddress,
   sanitizeFilename,
@@ -658,6 +659,47 @@ app.post('/api/ocr/timestamp', async (req, res) => {
     logger.errorWithContext('API_OCR_TIMESTAMP', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error extracting timestamp',
+    });
+  }
+});
+
+// Boletín de denuncia generation endpoint
+// Generates formal infraction report PDF
+app.post('/api/boletin/generate', async (req, res) => {
+  try {
+    const {
+      plate,
+      infractionType,
+      timestamp,
+      location,
+      description,
+      severity,
+      makeModel,
+      color,
+    } = req.body;
+
+    if (!plate || !infractionType) {
+      return res.status(400).json({ error: 'Plate and infractionType required' });
+    }
+
+    const pdfBuffer = generateBoletin({
+      plate,
+      infractionType,
+      timestamp,
+      location: location || 'Ubicación no disponible',
+      description,
+      severity: severity || 'MEDIUM',
+      makeModel,
+      color,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Boletin_${plate}_${Date.now()}.pdf"`);
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    logger.errorWithContext('API_BOLETIN_GENERATE', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error generating boletín',
     });
   }
 });
