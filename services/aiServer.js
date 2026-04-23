@@ -392,11 +392,15 @@ export const analyzeTrajectoryWithGemini = async ({
 };
 
 /**
- * Extract license plate from image using Gemini Vision API.
- * Much more accurate than Tesseract for license plates.
+ * Extract license plate from multiple images for maximum accuracy.
+ * Tries all images and returns the highest confidence result.
  */
-export const extractLicensePlateWithGemini = async (base64Image) => {
+export const extractLicensePlateFromMultiple = async (base64Images = []) => {
   try {
+    if (!base64Images || base64Images.length === 0) {
+      return { plate: 'NO_IMAGES', confidence: 0 };
+    }
+
     loadLocalEnvFile();
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -406,45 +410,56 @@ export const extractLicensePlateWithGemini = async (base64Image) => {
     const client = new GoogleGenAI({ apiKey });
     const model = client.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
 
-    // Remove data URI prefix if present
-    const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+    let bestResult = { plate: 'NO_PLATE', confidence: 0 };
 
-    const response = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageData,
-        },
-      },
-      {
-        text: 'Extract the license plate/vehicle registration number from this image. Return ONLY the plate number in this format: {"plate": "XXXXX", "confidence": 0.95}. If no plate is visible, return {"plate": "NO_PLATE", "confidence": 0}. Be very precise with the characters.',
-      },
-    ]);
+    // Process each image and keep best result
+    for (const base64Image of base64Images) {
+      if (!base64Image) continue;
 
-    const responseText = response.response.text();
+      try {
+        const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
 
-    // Parse JSON response
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        return {
-          plate: String(result.plate || 'NO_PLATE').toUpperCase(),
-          confidence: Number(result.confidence) || 0,
-        };
+        const response = await model.generateContent([
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: imageData,
+            },
+          },
+          {
+            text: 'Extract ONLY the license plate number from this image. Return JSON: {"plate": "XXXXX", "confidence": 0.95}. If no plate visible: {"plate": "NO_PLATE", "confidence": 0}.',
+          },
+        ]);
+
+        const responseText = response.response.text();
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0]);
+          const plate = String(result.plate || 'NO_PLATE').toUpperCase();
+          const confidence = Number(result.confidence) || 0;
+
+          // Keep best result
+          if (plate !== 'NO_PLATE' && confidence > bestResult.confidence) {
+            bestResult = { plate, confidence };
+          }
+        }
+      } catch (err) {
+        console.warn('[Gemini OCR] Error processing image:', err.message);
+        continue;
       }
-    } catch (parseErr) {
-      console.error('[Gemini OCR] Failed to parse response:', responseText);
     }
 
-    // Fallback: extract any alphanumeric sequence that looks like a plate
-    const plateMatch = responseText.match(/[A-Z0-9]{4,8}/i);
-    return {
-      plate: plateMatch ? plateMatch[0].toUpperCase() : 'NO_PLATE',
-      confidence: plateMatch ? 0.7 : 0,
-    };
+    return bestResult;
   } catch (error) {
-    console.error('[Gemini OCR] Error extracting license plate:', error);
+    console.error('[Gemini OCR Multi] Error:', error);
     return { plate: 'ERROR', confidence: 0 };
   }
+};
+
+/**
+ * Extract license plate from single image using Gemini Vision API.
+ * Used as fallback for single image OCR.
+ */
+export const extractLicensePlateWithGemini = async (base64Image) => {
+  return extractLicensePlateFromMultiple([base64Image]);
 };

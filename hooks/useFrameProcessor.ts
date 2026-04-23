@@ -127,14 +127,16 @@ export const useFrameProcessor = () => {
         // Extract license plate from current frame using Gemini Vision API and add infraction to panel
         (async () => {
           try {
-            // Convert canvas to base64 for OCR
-            const base64Frame = canvas.toDataURL('image/jpeg');
+            // Collect all snapshots for OCR (better accuracy with multiple angles)
+            const snapshots = track.snapshots && track.snapshots.length > 0
+              ? track.snapshots
+              : [canvas.toDataURL('image/jpeg')]; // Fallback to current frame
 
-            // Call server endpoint for best OCR accuracy (Gemini Vision)
+            // Call server endpoint for best OCR accuracy (Gemini Vision - multi-image)
             const response = await fetch(getApiUrl('/api/ocr/plate'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image: base64Frame }),
+              body: JSON.stringify({ images: snapshots }),
             });
 
             if (response.ok) {
