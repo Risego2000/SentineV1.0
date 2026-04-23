@@ -52,8 +52,9 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
-    // Allow rendering if video has at least metadata (readyState >= 1) and is playing
-    if (v.readyState < 1 || v.paused) return;
+    // Allow rendering if video has at least metadata (readyState >= 1)
+    // Don't check paused state as getDisplayMedia streams report paused even when playing
+    if (v.readyState < 1) return;
 
     try {
       if (isPlaying) {
