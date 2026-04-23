@@ -202,6 +202,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
       <video
         ref={videoRef}
+        autoPlay
         playsInline
         muted
         className="absolute inset-0 w-full h-full object-contain pointer-events-none"

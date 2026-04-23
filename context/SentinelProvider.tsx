@@ -463,12 +463,27 @@ export const SentinelProvider = ({
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+
+          // Start playing immediately
           videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play();
+            const playPromise = videoRef.current?.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((err: Error) => {
+                addLog('ERROR', `Error al reproducir stream: ${err.message}`);
+              });
+            }
             setSource('live');
             setStatusMsg('STREAM_ACTIVO');
             addLog('CORE', 'Captura de pantalla sincronizada. Señal en vivo lista.');
           };
+
+          // Try playing immediately (autoPlay may fail, this is backup)
+          const playPromise = videoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err: Error) => {
+              addLog('WARN', `Autoplay bloqueado, esperando interacción: ${err.message}`);
+            });
+          }
 
           // Handle when user stops sharing via browser UI
           stream.getVideoTracks()[0].onended = () => {

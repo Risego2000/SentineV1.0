@@ -54,7 +54,7 @@ export default defineConfig(() => {
       hmr: {
         protocol: 'ws',
         host: 'localhost',
-        port: parseInt(process.env.PORT || '3001'),
+        port: 3003, // Use fixed port 3003 since it's the Vite dev port with strictPort: false
       },
       headers: {
         'Cross-Origin-Embedder-Policy': 'require-corp',
