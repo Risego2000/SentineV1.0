@@ -9,7 +9,7 @@ const discoverBackendPort = async () => {
   try {
     // Try to fetch from /api/health on different ports
     // Check recently used ports first (from preview auto-assignment)
-    const commonPorts = [51355, 51470, 49182, 55606, 56162, 59601, 3002, 5173, 3001, 3003];
+    const commonPorts = [54603, 51355, 51470, 49182, 55606, 56162, 59601, 3002, 5173, 3001, 3003];
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 
