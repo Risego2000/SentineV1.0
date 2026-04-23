@@ -23,6 +23,15 @@ const getApiBaseUrl = (): string => {
     return '';
   }
 
+  // In development, detect backend port from sessionStorage (set by port auto-discovery)
+  // This is populated by the port discovery mechanism
+  if (typeof window !== 'undefined') {
+    const detectedPort = sessionStorage.getItem('sentinel_api_port');
+    if (detectedPort && hostname === 'localhost') {
+      return `${protocol}//${hostname}:${detectedPort}`;
+    }
+  }
+
   // In development, if running on any port except 3002,
   // assume backend is on 3002 (standard Sentinel port configuration)
   // This handles all dev server ports: 3001, 3003, 3004, etc.
