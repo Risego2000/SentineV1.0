@@ -35,6 +35,7 @@ export const useFrameProcessor = () => {
     isAuditEnabled,
     updateBufferStatus,
     viewerId,
+    addLog,
   } = useSentinel();
 
   const trackerRef = useRef<ByteTracker>(new ByteTracker());
@@ -121,9 +122,15 @@ export const useFrameProcessor = () => {
         track.audited = true;
         track.auditStatus = 'processing';
         updateBufferStatus({ state: 'recording', activeTracks: manager.getActiveCount() });
+
+        // Add infraction to panel immediately when detected
+        addLog(
+          'AI',
+          `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Vehículo ID: ${track.id}`
+        );
       }
     },
-    [findRulesForGeometry, updateBufferStatus]
+    [findRulesForGeometry, updateBufferStatus, addLog]
   );
 
   /**
