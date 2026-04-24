@@ -6,6 +6,7 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { initializeExpressServer } from '../server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,10 +48,48 @@ function createWindow() {
 }
 
 /**
+ * Configure paths for bundled resources (FFmpeg, Python)
+ */
+function configureResourcePaths() {
+  const appPath = app.getAppPath();
+  const resourcesPath = path.join(appPath, 'resources');
+
+  // Configure FFmpeg path
+  const ffmpegPath = path.join(
+    resourcesPath,
+    'ffmpeg',
+    process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  );
+  if (fs.existsSync(ffmpegPath)) {
+    process.env.FFMPEG_PATH = ffmpegPath;
+    console.log(`[Electron] FFmpeg path: ${ffmpegPath}`);
+  }
+
+  // Configure Python path
+  const pythonPath = path.join(
+    resourcesPath,
+    'python',
+    process.platform === 'win32' ? 'python.exe' : path.join('bin', 'python')
+  );
+  if (fs.existsSync(pythonPath)) {
+    process.env.PYTHON_PATH = pythonPath;
+    console.log(`[Electron] Python path: ${pythonPath}`);
+  }
+
+  // Configure PaddleOCR home directory
+  const paddleOcrModelsPath = path.join(resourcesPath, 'paddleocr-models');
+  process.env.PADDLEOCR_HOME = paddleOcrModelsPath;
+  console.log(`[Electron] PaddleOCR models path: ${paddleOcrModelsPath}`);
+}
+
+/**
  * Initialize Express server
  */
 async function initializeServer() {
   try {
+    // Configure resource paths before starting server
+    configureResourcePaths();
+
     const config = {
       port: 0, // Let OS assign a free port
       appPath: app.getAppPath(),
