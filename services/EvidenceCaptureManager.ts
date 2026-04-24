@@ -182,11 +182,11 @@ export class EvidenceCaptureManager {
       const snapshots = this.snapshotStorage.get(key) || [];
 
       // Run OCR on all detail frames to get plate candidates
-      // First try server-side Gemini OCR (more reliable for plates)
+      // Capture up to 10 frames for better accuracy (multiple angles)
       const detailFrames = snapshots
         .filter((s) => s.kind === 'detail')
         .map((s) => s.data)
-        .slice(0, 3);
+        .slice(0, 10);  // Multiple frames for robust license plate detection
 
       // Get general frames for timestamp extraction (better resolution for OSD reading)
       const generalFrames = snapshots
@@ -439,7 +439,7 @@ export class EvidenceCaptureManager {
       if (zY + zH > vH) zH = vH - zY;
 
       // Maintain aspect ratio while ensuring a decent resolution for OCR
-      const targetW = 800;
+      const targetW = 2688;  // 4K resolution for high-precision license plate OCR
       const targetH = Math.max(1, Math.floor(targetW * (zH / Math.max(1, zW))));
       canvas.width = targetW;
       canvas.height = targetH;
