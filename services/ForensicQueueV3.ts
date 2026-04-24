@@ -279,13 +279,23 @@ export class ForensicQueueV3 {
 
   /**
    * Selects frames for AI analysis (initial, mid, final).
+   * Ensures exactly 3 frames are returned for the 3 fotogramas display.
    */
   private selectTriplet(frames: string[] = [], fallback: string[] = []): string[] {
     const source = frames.length > 0 ? frames : fallback;
     if (source.length === 0) return [];
-    if (source.length === 1) return [source[0], source[0], source[0]];
-    if (source.length === 2) return [source[0], source[1], source[1]];
-    return [source[0], source[Math.floor(source.length / 2)], source[source.length - 1]];
+
+    // Always return exactly 3 frames for fotogramas display (ENTRADA, CRÍTICA, SALIDA)
+    if (source.length === 1) {
+      return [source[0], source[0], source[0]];
+    }
+    if (source.length === 2) {
+      return [source[0], source[1], source[1]];
+    }
+
+    // For 3+ frames, select: first (entrada), middle (crítica), last (salida)
+    const midIndex = Math.floor((source.length - 1) / 2);
+    return [source[0], source[midIndex], source[source.length - 1]];
   }
 
   /**
@@ -334,6 +344,11 @@ export class ForensicQueueV3 {
         zoomSnapshots = this.selectTriplet(
           evidence.zoomSnapshots,
           evidence.snapshots.filter((_, i) => i % 2 === 1)
+        );
+
+        logger.info(
+          'FORENSIC_QUEUE',
+          `Evidence loaded for ${current.job.id}: ${evidence.snapshots?.length || 0} total snapshots, ${contextSnapshots.length} context frames, ${zoomSnapshots.length} zoom frames`
         );
 
         // OCR processing

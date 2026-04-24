@@ -238,10 +238,17 @@ export class EvidenceCaptureManager {
 
       // Persist to EvidenceDB with semantic structure
       const evidenceId = key;
+      const contextSnapshots = snapshots.filter((s) => s.kind === 'general').map((s) => s.data);
+      const zoomSnapshots = snapshots.filter((s) => s.kind === 'detail').map((s) => s.data);
+
+      console.log(
+        `[CAPTURE] Finalized for Track #${track.id}: ${snapshots.length} total snapshots (${contextSnapshots.length} context, ${zoomSnapshots.length} zoom)`
+      );
+
       await evidenceDB.saveEvidence(evidenceId, {
         snapshots: snapshots.map((s) => s.data),
-        contextSnapshots: snapshots.filter((s) => s.kind === 'general').map((s) => s.data),
-        zoomSnapshots: snapshots.filter((s) => s.kind === 'detail').map((s) => s.data),
+        contextSnapshots,
+        zoomSnapshots,
         ocrResults,
         clip,
       });

@@ -3,7 +3,8 @@
  * Single source of truth for evidence and infractions.
  */
 
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
