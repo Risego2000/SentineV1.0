@@ -960,17 +960,10 @@ if (fs.existsSync(distPath)) {
 }
 
 // ─── Health endpoint ──────────────────────────────────────────────────────────
+// Fast health check for frontend discovery
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: Math.round(process.uptime()),
-    activeTranscodes,
-    pendingAudits: 0,
-    ffmpegAvailable: ffmpegPath !== 'ffmpeg',
-    hardwareAcceleration: hardwareAccel,
-    reportsDir: REPORTS_DIR,
-    timestamp: new Date().toISOString(),
-  });
+  res.set('Content-Type', 'application/json');
+  res.send('{"status":"ok"}');
 });
 
 app.post('/api/save-config', (req, res) => {
