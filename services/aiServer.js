@@ -494,14 +494,34 @@ export const extractTimestampFromOSD = async (base64Image) => {
         },
       },
       {
-        text: `Extract the date and time from the video's on-screen display (OSD), typically in the top-left corner.
-        Look for patterns like: DD-MM-YYYY HH:MM:SS or similar date/time formats.
-        Extract ONLY the date and time information in the format: DD-MM-YYYY HH:MM:SS
+        text: `TASK: Extract the date and time from the video's on-screen display (OSD).
 
-        Return ONLY valid JSON: {"timestamp": "DD-MM-YYYY HH:MM:SS", "confidence": 0-1}
-        If no timestamp found: {"timestamp": null, "confidence": 0}
+LOCATION: Look in the top-left, top-right, bottom-left, or bottom-right corner for date/time text.
 
-        Be extremely precise with numbers and separators.`,
+FORMATS: Look for patterns like:
+  - DD-MM-YYYY HH:MM:SS
+  - DD/MM/YYYY HH:MM:SS
+  - DD-MM-YY HH:MM:SS
+  - YYYY-MM-DD HH:MM:SS
+  - Any visible numeric date and time pattern
+
+EXTRACTION:
+1. First, identify the EXACT text you see in the OSD (numbers, separators, everything)
+2. Then format it as DD-MM-YYYY HH:MM:SS if possible
+
+RESPONSE: Return ONLY valid JSON:
+{
+  "timestamp": "DD-MM-YYYY HH:MM:SS",
+  "confidence": 0.8
+}
+
+If no timestamp found:
+{
+  "timestamp": null,
+  "confidence": 0
+}
+
+CRITICAL: Be extremely precise - extract EXACTLY what you see.`,
       },
     ]);
 
@@ -513,7 +533,8 @@ export const extractTimestampFromOSD = async (base64Image) => {
     }
 
     const result = JSON.parse(jsonMatch[0]);
-    const osdText = String(result.osdText || '').trim();
+    // Gemini returns 'timestamp' field with the extracted date/time
+    const osdText = String(result.timestamp || '').trim();
     const confidence = Number(result.confidence) || 0;
 
     if (!osdText || osdText === 'null') {
@@ -521,10 +542,10 @@ export const extractTimestampFromOSD = async (base64Image) => {
     }
 
     // Parse various timestamp formats
-    const timestamp = parseOSDTimestamp(osdText);
+    const parsedTimestamp = parseOSDTimestamp(osdText);
 
     return {
-      timestamp,
+      timestamp: parsedTimestamp,
       osdText,
       confidence,
     };
