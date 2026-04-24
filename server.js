@@ -463,22 +463,8 @@ app.post('/api/transcode', upload.single('video'), async (req, res) => {
     console.log(`[TRANSCODE] [${jobId}] Iniciando transcodificación (aceleración: ${hardwareAccel})...`);
     progressMap.set(jobId, 0);
 
-    // Map hardware accel to ffmpeg -hwaccel parameter
-    let hwaccelParam = null;
-    if (hardwareAccel === 'amd') hwaccelParam = 'amf';
-    else if (hardwareAccel === 'nvidia') hwaccelParam = 'cuda';
-    else if (hardwareAccel === 'intel') hwaccelParam = 'qsv';
-    else if (hardwareAccel === 'apple') hwaccelParam = 'videotoolbox';
-
-    // Build FFmpeg args with hardware acceleration for BOTH decode and encode
-    const decoderArgs = [];
-    if (hwaccelParam) {
-      decoderArgs.push('-hwaccel', hwaccelParam);
-    }
-
     const encoderArgs = getEncoderArgs('h264');
     const ffmpegArgs = [
-      ...decoderArgs,
       '-i',
       inputPath,
       ...encoderArgs,
