@@ -223,7 +223,10 @@ export class EvidenceCaptureManager {
             body: JSON.stringify({ image: detailFrames[0] }),
           });
           const result = await response.json();
-          if (result && result.osdText) videoTimeCode = result.osdText;
+          // Use timestamp field (Gemini returns this), fallback to osdText
+          if (result && (result.timestamp || result.osdText)) {
+            videoTimeCode = result.timestamp || result.osdText;
+          }
         } catch (err) {
           console.warn('[Timestamp] Server-side extraction failed:', err);
         }
