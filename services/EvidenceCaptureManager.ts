@@ -198,25 +198,14 @@ export class EvidenceCaptureManager {
 
       if (detailFrames.length > 0) {
         try {
-          // Use server-side Gemini OCR for better accuracy
-          const response = await fetch('/api/ai/ocr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ images: detailFrames }),
-          });
-          const result = await response.json();
-          if (result && result.plate && result.plate !== 'NO_PLATE') {
-            ocrResults = [result.plate];
+          // Use OCRSynchronizer which calls backend PaddleOCR service
+          const localResult = await OCRSynchronizer.extractLicensePlate(detailFrames);
+          if (localResult && localResult.plate) {
+            ocrResults = [localResult.plate];
           }
         } catch (err) {
-          console.warn('[OCR] Server-side Gemini OCR failed:', err);
-          // Fallback to local Tesseract
-          try {
-            const localResult = await OCRSynchronizer.extractLicensePlate(detailFrames);
-            if (localResult && localResult.plate) ocrResults = [localResult.plate];
-          } catch {
-            // OCR is best-effort
-          }
+          console.warn('[OCR] License plate extraction failed:', err);
+          // OCR is best-effort
         }
       }
 

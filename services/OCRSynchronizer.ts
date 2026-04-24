@@ -34,7 +34,7 @@ export const OCRSynchronizer = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          images: zoomFrames.slice(0, 3),
+          images: zoomFrames.slice(0, 10),
         }),
       });
 
