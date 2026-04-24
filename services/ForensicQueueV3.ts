@@ -364,8 +364,17 @@ export class ForensicQueueV3 {
 
         // Create compatible track object for the service
         const compatibleTrack = {
-          id: current.job.trackState.id,
+          // Use string ID for validator compliance
+          id: String(current.job.trackState.id),
           label: current.job.trackState.label,
+          // Use 'box' array format [x, y, w, h] as expected by validator
+          box: [
+            current.job.trackState.bboxX,
+            current.job.trackState.bboxY,
+            current.job.trackState.bboxW,
+            current.job.trackState.bboxH,
+          ],
+          // Keep bbox for compatibility with Track type
           bbox: {
             x: current.job.trackState.bboxX,
             y: current.job.trackState.bboxY,
