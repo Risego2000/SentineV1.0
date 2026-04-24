@@ -17,13 +17,24 @@ const PADDLE_OCR_SCRIPT = path.join(__dirname, 'paddle_ocr_extractor.py');
  */
 async function runPaddleOcr(request) {
   return new Promise((resolve, reject) => {
+    let timeoutHandle = null;
+
     const process = spawn('python', [PADDLE_OCR_SCRIPT], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 120000, // 2 minutes timeout
     });
 
     let stdout = '';
     let stderr = '';
+    let isResolved = false;
+
+    // Set timeout
+    timeoutHandle = setTimeout(() => {
+      if (!isResolved) {
+        isResolved = true;
+        process.kill('SIGTERM');
+        reject(new Error('PaddleOCR process timeout (2 minutes)'));
+      }
+    }, 120000);
 
     process.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -34,23 +45,33 @@ async function runPaddleOcr(request) {
     });
 
     process.on('error', (error) => {
-      console.error('[PaddleOCR] Process error:', error);
-      reject(error);
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeoutHandle);
+        console.error('[PaddleOCR] Process error:', error);
+        reject(error);
+      }
     });
 
     process.on('close', (code) => {
-      if (code !== 0) {
-        console.error('[PaddleOCR] Python script failed:', stderr);
-        reject(new Error(`PaddleOCR process exited with code ${code}: ${stderr}`));
-        return;
-      }
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeoutHandle);
 
-      try {
-        const result = JSON.parse(stdout);
-        resolve(result);
-      } catch (err) {
-        console.error('[PaddleOCR] Failed to parse output:', stdout);
-        reject(new Error(`Invalid JSON output from PaddleOCR: ${err.message}`));
+        if (code !== 0 && code !== null) {
+          // code can be null if process was killed
+          console.error('[PaddleOCR] Python script failed:', stderr);
+          reject(new Error(`PaddleOCR process exited with code ${code}: ${stderr}`));
+          return;
+        }
+
+        try {
+          const result = JSON.parse(stdout);
+          resolve(result);
+        } catch (err) {
+          console.error('[PaddleOCR] Failed to parse output:', stdout);
+          reject(new Error(`Invalid JSON output from PaddleOCR: ${err.message}`));
+        }
       }
     });
 
