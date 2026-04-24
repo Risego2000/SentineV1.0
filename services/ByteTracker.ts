@@ -312,9 +312,11 @@ export class ByteTracker {
       t.bbox.x = t.kf.x - t.bbox.w / 2;
       t.bbox.y = t.kf.y - t.bbox.h / 2;
 
-      // Exit conditions
-      const isOutOfView = t.bbox.x < -0.2 || t.bbox.x > 1.2 || t.bbox.y < -0.2 || t.bbox.y > 1.2;
-      return t.missedFrames < persistence && !isOutOfView;
+      // Exit conditions - desaparecer INMEDIATAMENTE cuando sale del viewport
+      const isOutOfView = t.bbox.x < -0.1 || t.bbox.x > 1.1 || t.bbox.y < -0.1 || t.bbox.y > 1.1;
+      if (isOutOfView) return false; // Eliminar inmediatamente
+
+      return t.missedFrames < persistence;
     });
 
     return this.tracks;
