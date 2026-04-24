@@ -190,8 +190,8 @@ const getEncoderArgs = (outputCodec = 'h264') => {
     if (hardwareAccel === 'apple') {
       return ['-c:v', 'h264_videotoolbox'];
     }
-    // CPU encoding: ultrafast for speed, faster than 'fast' on CPU
-    return ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-profile:v', 'baseline'];
+    // CPU encoding: optimized for speed/quality tradeoff
+    return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '26', '-profile:v', 'baseline'];
   }
 };
 
@@ -463,8 +463,16 @@ app.post('/api/transcode', upload.single('video'), async (req, res) => {
     console.log(`[TRANSCODE] [${jobId}] Iniciando transcodificación (aceleración: ${hardwareAccel})...`);
     progressMap.set(jobId, 0);
 
+    // Build FFmpeg args with hardware acceleration for BOTH decode and encode
+    const decoderArgs = [];
+    if (hardwareAccel !== 'none') {
+      decoderArgs.push('-hwaccel', hardwareAccel);
+      decoderArgs.push('-hwaccel_output_format', 'auto');
+    }
+
     const encoderArgs = getEncoderArgs('h264');
     const ffmpegArgs = [
+      ...decoderArgs,
       '-i',
       inputPath,
       ...encoderArgs,
