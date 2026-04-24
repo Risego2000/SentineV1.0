@@ -494,14 +494,14 @@ export const extractTimestampFromOSD = async (base64Image) => {
         },
       },
       {
-        text: `Read the timestamp/date-time from the top-left corner of this video frame (OSD - On-Screen Display).
-        Return ONLY a JSON object with:
-        {
-          "osdText": "exact text you read from OSD (e.g. '12-04-2026 14:30:45')",
-          "confidence": 0.95
-        }
-        If you cannot read a timestamp, return {"osdText": null, "confidence": 0}.
-        Be very precise with numbers.`,
+        text: `Extract the date and time from the video's on-screen display (OSD), typically in the top-left corner.
+        Look for patterns like: DD-MM-YYYY HH:MM:SS or similar date/time formats.
+        Extract ONLY the date and time information in the format: DD-MM-YYYY HH:MM:SS
+
+        Return ONLY valid JSON: {"timestamp": "DD-MM-YYYY HH:MM:SS", "confidence": 0-1}
+        If no timestamp found: {"timestamp": null, "confidence": 0}
+
+        Be extremely precise with numbers and separators.`,
       },
     ]);
 
