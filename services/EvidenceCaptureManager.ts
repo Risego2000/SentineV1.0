@@ -187,6 +187,13 @@ export class EvidenceCaptureManager {
         .filter((s) => s.kind === 'detail')
         .map((s) => s.data)
         .slice(0, 3);
+
+      // Get general frames for timestamp extraction (better resolution for OSD reading)
+      const generalFrames = snapshots
+        .filter((s) => s.kind === 'general')
+        .map((s) => s.data)
+        .slice(0, 3);
+
       let ocrResults: string[] = [];
 
       if (detailFrames.length > 0) {
@@ -215,12 +222,13 @@ export class EvidenceCaptureManager {
 
       let videoTimeCode = null;
       // Try server-side timestamp extraction first
-      if (detailFrames.length > 0) {
+      // Use GENERAL frame (1920x1080) instead of detail frame for better OSD visibility
+      if (generalFrames.length > 0) {
         try {
           const response = await fetch('/api/ocr/timestamp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: detailFrames[0] }),
+            body: JSON.stringify({ image: generalFrames[0] }),
           });
           const result = await response.json();
           // Use timestamp field (Gemini returns this), fallback to osdText

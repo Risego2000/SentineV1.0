@@ -84,9 +84,10 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
             {/* Tab Content */}
             {activeTab === 'evidence' && (
               <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+                {/* ESCENAS GENERALES */}
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    Evidencia Fotográfica Certificada
+                    🎬 Escenas Generales (Contexto)
                   </h3>
                   {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
                     <div className="grid grid-cols-1 gap-4">
@@ -128,6 +129,46 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                     </div>
                   )}
                 </div>
+
+                {/* DETALLES DE MATRÍCULA */}
+                {log.zoomSnapshots && log.zoomSnapshots.length >= 3 && (
+                  <div className="space-y-4 border-t border-white/10 pt-6">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      🔍 Detalle de Matrícula (OCR)
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        { img: log.zoomSnapshots[0], label: 'DETALLE 01 - ENTRADA' },
+                        { img: log.zoomSnapshots[1], label: 'DETALLE 02 - CRÍTICA' },
+                        { img: log.zoomSnapshots[2], label: 'DETALLE 03 - SALIDA' },
+                      ].map((frame, idx) => (
+                        <div
+                          key={`zoom-${idx}`}
+                          className="relative rounded-md overflow-hidden border border-amber-500/30 bg-slate-900/40"
+                        >
+                          <img
+                            src={`data:image/jpeg;base64,${frame.img}`}
+                            className="w-full h-auto object-contain"
+                            alt={frame.label}
+                          />
+                          <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md px-2 py-1 border border-amber-500/40 rounded">
+                            <span className="text-[7px] font-bold text-amber-400 uppercase tracking-wider">
+                              {frame.label}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {log.plate && log.plate !== 'DESCONOCIDO' && (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded p-3 mt-2">
+                        <span className="text-[9px] text-slate-400 uppercase">Matrícula Detectada:</span>
+                        <div className="text-lg font-black text-amber-400 font-mono mt-1">
+                          {log.plate}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
