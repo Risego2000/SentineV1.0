@@ -15,14 +15,11 @@ module.exports = {
   // Files to include in final package
   files: [
     'dist/**/*',
-    'electron/**/*',
-    'services/**/*',
     'node_modules/**/*',
     'package.json',
-    'package-lock.json',
   ],
 
-  // Exclude unnecessary files
+  // Additional files/resources to bundle
   extraFiles: [
     {
       from: 'resources',
@@ -43,10 +40,10 @@ module.exports = {
         arch: ['x64'],
       },
     ],
-    certificateFile: process.env.WIN_SIGNING_CERT,
-    certificatePassword: process.env.WIN_SIGNING_PASSWORD,
+    // Signing configuration (optional, only used if environment variables are set)
+    certificateFile: process.env.WIN_SIGNING_CERT || undefined,
+    certificatePassword: process.env.WIN_SIGNING_PASSWORD || undefined,
     signingHashAlgorithms: ['sha256'],
-    sign: './customSign.js',
   },
 
   // NSIS Installer (Windows)
@@ -105,12 +102,5 @@ module.exports = {
         path: '/Applications',
       },
     ],
-  },
-
-  // Auto-updater configuration
-  publish: {
-    provider: 'github',
-    owner: 'sentinelv16',
-    repo: 'sentinelv16',
   },
 };
