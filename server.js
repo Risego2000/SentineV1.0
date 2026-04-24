@@ -13,9 +13,14 @@ import {
   generateGeometryWithGemini,
   loadLocalEnvFile,
   extractLicensePlateWithGemini,
-  extractTimestampFromOSD,
+  extractTimestampFromOSD as extractTimestampFromOSDGemini,
 } from './services/aiServer.js';
 import { generateBoletin } from './services/boletin-generator.js';
+import {
+  extractLicensePlateFromImages as extractLicensePlateFromPaddle,
+  extractTimestampFromOSD as extractTimestampFromPaddle,
+  shutdownOcrWorker,
+} from './services/paddleOcrService.js';
 import {
   isPrivateAddress,
   sanitizeFilename,
@@ -614,7 +619,7 @@ app.post('/api/ai/audit', async (req, res) => {
   }
 });
 
-// OCR endpoint using Gemini Vision API (best accuracy for license plates)
+// OCR endpoint using PaddleOCR (best accuracy for license plates)
 // Supports both single image and multiple images for higher accuracy
 app.post('/api/ocr/plate', async (req, res) => {
   try {
@@ -632,8 +637,7 @@ app.post('/api/ocr/plate', async (req, res) => {
       return res.status(400).json({ error: 'At least one base64 image required' });
     }
 
-    const { extractLicensePlateFromMultiple } = await import('./services/aiServer.js');
-    const result = await extractLicensePlateFromMultiple(imagesToProcess);
+    const result = await extractLicensePlateFromPaddle(imagesToProcess);
     res.json(result);
   } catch (error) {
     logger.errorWithContext('API_OCR_PLATE', error);
@@ -644,7 +648,7 @@ app.post('/api/ocr/plate', async (req, res) => {
 });
 
 // OSD Timestamp extraction endpoint
-// Extracts date/time from top-left corner of video frame
+// Extracts date/time from top-left corner of video frame using PaddleOCR
 app.post('/api/ocr/timestamp', async (req, res) => {
   try {
     const { image } = req.body;
@@ -653,7 +657,7 @@ app.post('/api/ocr/timestamp', async (req, res) => {
       return res.status(400).json({ error: 'Base64 image required' });
     }
 
-    const result = await extractTimestampFromOSD(image);
+    const result = await extractTimestampFromPaddle(image);
     res.json(result);
   } catch (error) {
     logger.errorWithContext('API_OCR_TIMESTAMP', error);
@@ -1044,7 +1048,7 @@ app.get('/api/presets/:filename', (req, res) => {
   }
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`[SENTINEL_SYSTEM] Activo en: http://localhost:${port}`);
   console.log(`[SENTINEL_SYSTEM] Modo: ${fs.existsSync(distPath) ? 'FULL_STACK' : 'API_ONLY'}`);
   console.log(`[SENTINEL_SYSTEM] FFmpeg: ${ffmpegPath}`);
@@ -1057,4 +1061,23 @@ app.listen(port, () => {
   } catch (err) {
     console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
   }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('[SENTINEL_SYSTEM] SIGTERM recibido, cerrando gracefully...');
+  await shutdownOcrWorker();
+  server.close(() => {
+    console.log('[SENTINEL_SYSTEM] Server cerrado');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('[SENTINEL_SYSTEM] SIGINT recibido, cerrando gracefully...');
+  await shutdownOcrWorker();
+  server.close(() => {
+    console.log('[SENTINEL_SYSTEM] Server cerrado');
+    process.exit(0);
+  });
 });
