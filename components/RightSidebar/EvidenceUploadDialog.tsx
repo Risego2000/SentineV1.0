@@ -151,11 +151,15 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
             <div className="flex-1">
               <h2 className="text-lg font-bold text-white mb-2">Vídeo H.265 Detectado</h2>
               <p className="text-slate-400 text-sm">
-                Este vídeo usa codec H.265 (HEVC). La mayoría de navegadores no lo soportan nativamente.
+                Este vídeo usa codec H.265 (HEVC). Muchos navegadores no lo soportan nativamente. Necesitará conversión a H.264.
               </p>
-              <p className="text-slate-500 text-xs mt-3">
-                <strong>Opción 1:</strong> Subir tal cual (se convertirá en el servidor, ~2-5 minutos)<br/>
-                <strong>Opción 2:</strong> Cancelar y convertir el vídeo antes de subir
+              <p className="text-slate-500 text-xs mt-4 space-y-2">
+                <div><strong>📤 Opción 1: Subir ahora</strong> (conversión en servidor)</div>
+                <div className="ml-4 text-slate-600">Se convierte automáticamente a H.264 con aceleración GPU</div>
+                <div className="ml-4 text-slate-600">Tiempo estimado: 2-5 minutos según duración del vídeo</div>
+
+                <div className="mt-2"><strong>❌ Opción 2: Cancelar</strong> (convertir localmente)</div>
+                <div className="ml-4 text-slate-600">Si tienes una herramienta de conversión disponible, puede ser más rápido</div>
               </p>
             </div>
           </div>
@@ -166,15 +170,15 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
                 setShowH265Warning(false);
                 setPendingFile(null);
               }}
-              className="flex-1 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors"
+              className="flex-1 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleUploadAsIs}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
             >
-              Subir de Todas Formas
+              Subir y Convertir
             </button>
           </div>
         </div>
