@@ -1053,13 +1053,15 @@ const server = app.listen(port, () => {
   console.log(`[SENTINEL_SYSTEM] Modo: ${fs.existsSync(distPath) ? 'FULL_STACK' : 'API_ONLY'}`);
   console.log(`[SENTINEL_SYSTEM] FFmpeg: ${ffmpegPath}`);
 
-  // Write port to file for frontend auto-discovery
-  try {
-    const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
-    fs.writeFileSync(portFile, String(port), 'utf8');
-    console.log(`[SENTINEL_SYSTEM] Puerto guardado en: ${portFile}`);
-  } catch (err) {
-    console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
+  // Write port to file for frontend auto-discovery (disabled in Electron mode)
+  if (!process.env.ELECTRON_MAIN_PROCESS) {
+    try {
+      const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
+      fs.writeFileSync(portFile, String(port), 'utf8');
+      console.log(`[SENTINEL_SYSTEM] Puerto guardado en: ${portFile}`);
+    } catch (err) {
+      console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
+    }
   }
 });
 
@@ -1081,3 +1083,19 @@ process.on('SIGINT', async () => {
     process.exit(0);
   });
 });
+
+// Export function for Electron initialization
+export async function initializeExpressServer(config) {
+  // Set environment variable to signal we're in Electron mode
+  if (config.isElectron) {
+    process.env.ELECTRON_MAIN_PROCESS = 'true';
+  }
+
+  // Set app path for resource discovery
+  if (config.appPath) {
+    process.env.APP_PATH = config.appPath;
+  }
+
+  // Return the server instance (already listening)
+  return server;
+}

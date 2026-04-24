@@ -1,4 +1,5 @@
 import { getApiUrl } from './apiConfig';
+import { isElectron, getElectronAPI } from '../utils/electronDetect';
 
 interface PlateOCRResult {
   plate: string;
@@ -7,7 +8,7 @@ interface PlateOCRResult {
 
 /**
  * Service for OCR processing using PaddleOCR backend.
- * All OCR operations now use the backend service for better accuracy and performance.
+ * Supports both Electron IPC and HTTP backends.
  */
 export const OCRSynchronizer = {
   normalizePlate(text: string): string {
@@ -27,29 +28,41 @@ export const OCRSynchronizer = {
     if (!zoomFrames.length) return { plate: '', candidates: [] };
 
     try {
-      // Send to PaddleOCR backend for processing
-      const response = await fetch(getApiUrl('/api/ocr/plate'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use IPC if running in Electron, otherwise use HTTP
+      if (isElectron()) {
+        const api = getElectronAPI();
+        const result = await api.ipc.invoke('ocr:extractPlate', {
           images: zoomFrames.slice(0, 10),
-        }),
-      });
+        });
+        return {
+          plate: result.plate || '',
+          candidates: result.candidates || [],
+        };
+      } else {
+        // Send to PaddleOCR backend for processing via HTTP
+        const response = await fetch(getApiUrl('/api/ocr/plate'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            images: zoomFrames.slice(0, 10),
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`OCR API error: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`OCR API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const plate = result.plate || '';
+        const candidates = result.candidates || [];
+
+        return {
+          plate,
+          candidates,
+        };
       }
-
-      const result = await response.json();
-      const plate = result.plate || '';
-      const candidates = result.candidates || [];
-
-      return {
-        plate,
-        candidates,
-      };
     } catch (e) {
       console.error('[OCR] Error extracting license plate:', e);
       return { plate: '', candidates: [] };
@@ -79,30 +92,46 @@ export const OCRSynchronizer = {
     const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
 
     try {
-      // Send to PaddleOCR backend for timestamp extraction
-      const response = await fetch(getApiUrl('/api/ocr/timestamp'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use IPC if running in Electron, otherwise use HTTP
+      if (isElectron()) {
+        const api = getElectronAPI();
+        const result = await api.ipc.invoke('ocr:extractTimestamp', {
           image: base64Image,
-        }),
-      });
+        });
+        const timestamp = result.timestamp || '';
 
-      if (!response.ok) {
-        throw new Error(`OCR API error: ${response.status}`);
+        if (!timestamp) {
+          console.warn('[OCR] Timecode incomplete - date not detected in OSD');
+          return '';
+        }
+
+        return timestamp;
+      } else {
+        // Send to PaddleOCR backend for timestamp extraction via HTTP
+        const response = await fetch(getApiUrl('/api/ocr/timestamp'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: base64Image,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`OCR API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const timestamp = result.timestamp || '';
+
+        if (!timestamp) {
+          console.warn('[OCR] Timecode incomplete - date not detected in OSD');
+          return '';
+        }
+
+        return timestamp;
       }
-
-      const result = await response.json();
-      const timestamp = result.timestamp || '';
-
-      if (!timestamp) {
-        console.warn('[OCR] Timecode incomplete - date not detected in OSD');
-        return '';
-      }
-
-      return timestamp;
     } catch (e) {
       console.error('[OCR] Error extracting timecode:', e);
       return '';

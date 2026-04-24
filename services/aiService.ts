@@ -1,5 +1,6 @@
 import { GeometryLine, Track, AuditResponse, AuditPresetType } from '../types';
 import { getApiUrl } from './apiConfig';
+import { isElectron, getElectronAPI } from '../utils/electronDetect';
 
 /**
  * Sanitizes text to prevent basic XSS and injection.
@@ -18,8 +19,21 @@ export interface GeometryResponse {
   suggestedDirectives: string;
 }
 
-const postJson = async <T>(url: string, payload: unknown): Promise<T> => {
-  const fullUrl = getApiUrl(url);
+const postJson = async <T>(endpoint: string, payload: unknown): Promise<T> => {
+  // Use IPC if running in Electron
+  if (isElectron()) {
+    const api = getElectronAPI();
+    const channelName = endpoint.replace(/\//g, ':').substring(1); // /api/ai/geometry -> api:ai:geometry
+    try {
+      const result = await api.ipc.invoke(channelName, payload);
+      return result as T;
+    } catch (error) {
+      throw new Error(`IPC error on ${channelName}: ${error}`);
+    }
+  }
+
+  // Use HTTP for web mode
+  const fullUrl = getApiUrl(endpoint);
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers: {

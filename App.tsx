@@ -2,10 +2,22 @@ import React, { useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
 import { SharedBottomBar } from './components/SharedBar/SharedBottomBar';
+import { isElectron, getServerPortFromElectron } from './utils/electronDetect';
 import './index.css';
 
 // Auto-discover backend API port on startup
 const discoverBackendPort = async () => {
+  // If running in Electron, use IPC to get the port
+  if (isElectron()) {
+    try {
+      const port = await getServerPortFromElectron();
+      console.log(`[API_DISCOVERY] Backend port from Electron: ${port}`);
+      sessionStorage.setItem('sentinel_api_port', String(port));
+      return port;
+    } catch (error) {
+      console.error('[API_DISCOVERY] Failed to get port from Electron:', error);
+    }
+  }
   try {
     // Try to fetch from /api/health on different ports
     // Start with the standard Sentinel port, then try common dev ports
