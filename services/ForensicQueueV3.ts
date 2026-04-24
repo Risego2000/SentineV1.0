@@ -351,9 +351,6 @@ export class ForensicQueueV3 {
           `Evidence loaded for ${current.job.id}: ${evidence.snapshots?.length || 0} total snapshots, ${contextSnapshots.length} context frames, ${zoomSnapshots.length} zoom frames`
         );
 
-        // OCR processing
-        plateOCR = await OCRSynchronizer.extractLicensePlate(zoomSnapshots);
-
         logger.info(
           'FORENSIC_QUEUE',
           `Processing job ${current.job.id} [Preset: ${current.job.auditPreset}]...`
@@ -417,14 +414,57 @@ export class ForensicQueueV3 {
           analysisContext: current.job.geometryState.analysisContext,
         };
 
-        const auditResult = await AIService.analyzeTrajectory(
-          compatibleTrack,
-          compatibleGeometry,
-          current.job.directives,
-          current.job.auditPreset
+        // Run OCR and AI analysis in parallel for faster processing
+        const [ocrResult, auditResult] = await Promise.all([
+          OCRSynchronizer.extractLicensePlate(zoomSnapshots),
+          AIService.analyzeTrajectory(
+            compatibleTrack,
+            compatibleGeometry,
+            current.job.directives,
+            current.job.auditPreset
+          ),
+        ]);
+
+        plateOCR = ocrResult;
+
+        // IMMEDIATE INFRACTION DETERMINATION: Geometric analysis (no AI needed)
+        const geometricAnalysis = this.determineInfractionGeometric(
+          current.job.trackState,
+          current.job.geometryState,
+          current.job.trackState.roiHistory
         );
 
-        // Check for forbidden turn sequence validation
+        // Use geometric analysis if confidence is high, otherwise fallback to AI
+        let finalAuditResult = auditResult;
+        if (geometricAnalysis.confidence > 0.95 && geometricAnalysis.infraction) {
+          logger.info(
+            'FORENSIC_QUEUE',
+            `[INSTANT] Infracción determinada por geometría con confianza ${geometricAnalysis.confidence}: ${geometricAnalysis.ruleCategory}`
+          );
+          finalAuditResult = {
+            ...auditResult,
+            infraction: true,
+            ruleCategory: geometricAnalysis.ruleCategory || auditResult.ruleCategory,
+            severity: geometricAnalysis.severity || auditResult.severity,
+            description: geometricAnalysis.description || auditResult.description,
+          };
+        } else if (geometricAnalysis.confidence > 0.8 && geometricAnalysis.infraction) {
+          // Medium confidence: supplement AI result with geometric analysis
+          logger.info(
+            'FORENSIC_QUEUE',
+            `[GEOMETRIC] Confirmando con geometría (conf ${geometricAnalysis.confidence}): ${geometricAnalysis.ruleCategory}`
+          );
+          if (!auditResult.infraction) {
+            finalAuditResult = {
+              ...auditResult,
+              infraction: true,
+              ruleCategory: geometricAnalysis.ruleCategory,
+              severity: geometricAnalysis.severity,
+            };
+          }
+        }
+
+        // Legacy validation check para backward compatibility
         const isForbiddenTurnSequence =
           current.job.geometryState.violationKind === 'forbidden_turn_sequence' &&
           current.job.geometryState.roiSequenceIds &&
@@ -438,40 +478,40 @@ export class ForensicQueueV3 {
           `Validation check para job ${current.job.id}: violationKind=${current.job.geometryState.violationKind}, isForbiddenTurnSequence=${isForbiddenTurnSequence}`
         );
 
-        // Apply forbidden turn override if needed
-        if (isForbiddenTurnSequence) {
+        // Apply forbidden turn override if needed (legacy, now covered by geometric analysis)
+        if (isForbiddenTurnSequence && !finalAuditResult.ruleCategory?.includes('GIRO')) {
           logger.info(
             'FORENSIC_QUEUE',
             `Aplicando override de giro prohibido estricto para job ${current.job.id}`
           );
           const sequenceLabels = current.job.geometryState.roiSequenceLabels || ['ROI A', 'ROI B'];
-          auditResult.infraction = true;
-          auditResult.ruleCategory = 'GIRO_PROHIBIDO';
-          auditResult.description = `Giro prohibido confirmado por secuencia ordenada de zonas ${sequenceLabels.join(' -> ')}.`;
-          auditResult.reasoning = [
+          finalAuditResult.infraction = true;
+          finalAuditResult.ruleCategory = 'GIRO_PROHIBIDO';
+          finalAuditResult.description = `Giro prohibido confirmado por secuencia ordenada de zonas ${sequenceLabels.join(' -> ')}.`;
+          finalAuditResult.reasoning = [
             `Secuencia ROI validada: ${sequenceLabels.join(' -> ')}.`,
             `Track #${current.job.trackState.id} mantuvo identidad persistente durante la maniobra.`,
             'La regla configurada establece que esta secuencia equivale a giro prohibido.',
           ];
-          if (!auditResult.severity || auditResult.severity === 'LOW') {
-            auditResult.severity = 'HIGH';
+          if (!finalAuditResult.severity || finalAuditResult.severity === 'LOW') {
+            finalAuditResult.severity = 'HIGH';
           }
         }
 
-        if (auditResult.infraction) {
+        if (finalAuditResult.infraction) {
           current.currentStatus = 'completed';
 
           logger.success(
             'FORENSIC_QUEUE',
-            `INFRACCIÓN CONFIRMADA - Job ${current.job.id} (${auditResult.plate})`
+            `INFRACCIÓN CONFIRMADA - Job ${current.job.id} (${finalAuditResult.plate})`
           );
 
           const infractionLog: InfractionLog = {
-            ...auditResult,
+            ...finalAuditResult,
             id: Date.now(),
             plate:
-              auditResult.plate && auditResult.plate !== 'DESCONOCIDO'
-                ? auditResult.plate
+              finalAuditResult.plate && finalAuditResult.plate !== 'DESCONOCIDO'
+                ? finalAuditResult.plate
                 : plateOCR.plate || 'DESCONOCIDO',
             image: zoomSnapshots[zoomSnapshots.length - 1] || evidence.snapshots[0],
             extraSnapshots: contextSnapshots,
@@ -483,8 +523,8 @@ export class ForensicQueueV3 {
             time: new Date().toLocaleTimeString(),
             localTime: current.job.snapshot.localTime,
             videoTimeCode:
-              auditResult.videoTimeCode && !auditResult.videoTimeCode.includes('??')
-                ? auditResult.videoTimeCode
+              finalAuditResult.videoTimeCode && !finalAuditResult.videoTimeCode.includes('??')
+                ? finalAuditResult.videoTimeCode
                 : current.job.snapshot.videoTimeCode,
             playbackTime: current.job.snapshot.playbackTime,
             viewerId: current.job.viewerId,
@@ -785,6 +825,78 @@ export class ForensicQueueV3 {
       avgRetries,
       listeners: this.listeners.size,
       isProcessing: this.isProcessing,
+    };
+  }
+
+  /**
+   * Determine infraction type and severity based on GEOMETRY ONLY (no AI needed).
+   * Returns immediately (<50ms) with high confidence for geometric violations.
+   * This enables immediate infraction determination without waiting for Gemini AI.
+   */
+  private determineInfractionGeometric(
+    trackState: any,
+    geometryState: any,
+    roiHistory: any[]
+  ): {
+    infraction: boolean;
+    ruleCategory?: string;
+    severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    confidence: number;
+    description?: string;
+  } {
+    // Check for forbidden turn sequence (highest confidence)
+    if (
+      geometryState.violationKind === 'forbidden_turn_sequence' &&
+      geometryState.roiSequenceIds &&
+      matchesOrderedRoiSequence([...roiHistory], [...geometryState.roiSequenceIds])
+    ) {
+      return {
+        infraction: true,
+        ruleCategory: 'GIRO_PROHIBIDO',
+        severity: 'HIGH',
+        confidence: 1.0,
+        description: `Giro prohibido confirmado por secuencia ordenada de zonas ${geometryState.roiSequenceLabels?.join(' -> ') || 'ROI A -> ROI B'}.`,
+      };
+    }
+
+    // Check for line crossing
+    if (geometryState.violationKind === 'line_crossing') {
+      return {
+        infraction: true,
+        ruleCategory: 'CAMBIO_DE_CARRIL',
+        severity: 'MEDIUM',
+        confidence: 0.9,
+        description: 'Cambio de carril detectado por cruce de línea geométrica.',
+      };
+    }
+
+    // Check for stop violation (vehicle stopped in restricted zone)
+    if (geometryState.violationKind === 'stop_violation') {
+      return {
+        infraction: true,
+        ruleCategory: 'INCUMPLIMIENTO_PARADA',
+        severity: 'MEDIUM',
+        confidence: 0.85,
+        description: 'Incumplimiento de señal de parada detectado.',
+      };
+    }
+
+    // Check for zone dwell (extended time in restricted zone)
+    if (geometryState.violationKind === 'zone_dwell' && trackState.dwellTime > 30000) {
+      // 30+ seconds in zone
+      return {
+        infraction: true,
+        ruleCategory: 'ESTACIONAMIENTO_PROHIBIDO',
+        severity: 'MEDIUM',
+        confidence: 0.8,
+        description: `Vehículo detenido en zona prohibida durante ${Math.round(trackState.dwellTime / 1000)}s.`,
+      };
+    }
+
+    // No geometric infraction detected
+    return {
+      infraction: false,
+      confidence: 0.0,
     };
   }
 }
