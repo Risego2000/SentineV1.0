@@ -124,7 +124,7 @@ export class ByteTracker {
    */
   update(
     detections: StandardDetection[],
-    persistence: number = 30,
+    persistence: number = 5,
     minScore: number = 0.25
   ): Track[] {
     const iouMatrix = this.tracks.map((t) => detections.map((d) => this.iou(t.bbox, d.box)));
