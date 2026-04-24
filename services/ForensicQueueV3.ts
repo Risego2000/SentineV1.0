@@ -51,7 +51,7 @@ export class ForensicQueueV3 {
 
   // Dynamic context at job creation time (frozen in each job)
   private directives: string = '';
-  private auditPreset: AuditPresetType = 'senior';
+  private auditPreset: AuditPresetType = 'standard';
   private rules: ForensicRule[] = [...FORENSIC_RULES];
 
   constructor(callback?: (log: InfractionLog) => void) {
