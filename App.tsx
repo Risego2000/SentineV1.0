@@ -9,19 +9,22 @@ const discoverBackendPort = async () => {
   try {
     // Try to fetch from /api/health on different ports
     // Start with the standard Sentinel port, then try common dev ports
-    const commonPorts = [3002, 3001, 3003, 5173];
+    const commonPorts = [3002, 3001];
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 
     for (const port of commonPorts) {
       try {
         const url = `${protocol}//${hostname}:${port}/api/health`;
-        const response = await Promise.race([
-          fetch(url, { method: 'GET' }),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 1000)
-          )
-        ]);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 800);
+
+        const response = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           console.log(`[API_DISCOVERY] Backend found on port ${port}`);
@@ -29,12 +32,13 @@ const discoverBackendPort = async () => {
           return port;
         }
       } catch (e) {
-        // Port not responding, try next one
-        // Suppress logging for expected failures during discovery
+        // Port not responding or timeout, try next one
+        // Silently continue to next port
       }
     }
+    console.log('[API_DISCOVERY] Using default API configuration');
   } catch (error) {
-    console.warn('[API_DISCOVERY] Could not auto-discover backend port:', error);
+    // Suppress error logging during discovery
   }
 };
 
