@@ -182,22 +182,59 @@ export class EvidenceCaptureManager {
       const snapshots = this.snapshotStorage.get(key) || [];
 
       // Run OCR on all detail frames to get plate candidates
+      // First try server-side Gemini OCR (more reliable for plates)
       const detailFrames = snapshots
         .filter((s) => s.kind === 'detail')
         .map((s) => s.data)
         .slice(0, 3);
       let ocrResults: string[] = [];
+
       if (detailFrames.length > 0) {
         try {
-          const result = await OCRSynchronizer.extractLicensePlate(detailFrames);
-          if (result && result.plate) ocrResults = [result.plate];
-        } catch {
-          // OCR is best-effort
+          // Use server-side Gemini OCR for better accuracy
+          const response = await fetch('/api/ai/ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: detailFrames }),
+          });
+          const result = await response.json();
+          if (result && result.plate && result.plate !== 'NO_PLATE') {
+            ocrResults = [result.plate];
+          }
+        } catch (err) {
+          console.warn('[OCR] Server-side Gemini OCR failed:', err);
+          // Fallback to local Tesseract
+          try {
+            const localResult = await OCRSynchronizer.extractLicensePlate(detailFrames);
+            if (localResult && localResult.plate) ocrResults = [localResult.plate];
+          } catch {
+            // OCR is best-effort
+          }
         }
       }
 
+      let videoTimeCode = null;
+      // Try server-side timestamp extraction first
+      if (detailFrames.length > 0) {
+        try {
+          const response = await fetch('/api/ocr/timestamp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: detailFrames[0] }),
+          });
+          const result = await response.json();
+          if (result && result.osdText) videoTimeCode = result.osdText;
+        } catch (err) {
+          console.warn('[Timestamp] Server-side extraction failed:', err);
+        }
+      }
+
+      // Fallback to local extraction if server failed
+      if (!videoTimeCode) {
+        videoTimeCode = await OCRSynchronizer.extractTimecode(video);
+      }
+
       const localTime = new Date().toLocaleString();
-      const videoTimeCode = await OCRSynchronizer.extractTimecode(video);
 
       // Persist to EvidenceDB with semantic structure
       const evidenceId = key;
