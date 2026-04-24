@@ -29,7 +29,6 @@
     "pdf-lib": "^1.17.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "tesseract.js": "^7.0.0",
     "worker-loader": "^3.0.8",
     "zustand": "^5.0.10"
   },
