@@ -70,9 +70,9 @@ export const NeuralStatusHUD = () => {
   const phase = bufferStatus.phase ?? 'standby';
   const cfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.standby;
 
-  const totalSeg = 30;
+  const totalSeg = 40;
   const activeSeg = Math.min(totalSeg, Math.floor(bufferStatus.seconds));
-  const pct = Math.round((bufferStatus.seconds / 30) * 100);
+  const pct = Math.round((bufferStatus.seconds / 40) * 100);
 
   const roiA = bufferStatus.roiALabel ?? 'ROI A';
   const roiB = bufferStatus.roiBLabel ?? 'ROI B';
@@ -144,7 +144,7 @@ export const NeuralStatusHUD = () => {
         <div className={'flex flex-col justify-center flex-1 border-r border-white/5 ' + pad}>
           <div className="flex items-center justify-between mb-1">
             <span className={'font-mono font-bold text-slate-500 ' + txtLabel}>
-              {bufferStatus.seconds.toFixed(1)}s / 30.0s
+              {bufferStatus.seconds.toFixed(1)}s / 40.0s
             </span>
             <span className={'font-black text-white font-mono leading-none ' + txtPct}>
               {pct}

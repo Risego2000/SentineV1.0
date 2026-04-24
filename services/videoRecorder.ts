@@ -10,7 +10,7 @@ export class VideoBufferService {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private readonly maxSeconds = 31;
+  private readonly maxSeconds = 41;
   private bufferCallback?: (seconds: number) => void;
   private mode: 'circular' | 'roi_based' = 'circular';
   private recordingStartTime: number = 0;
