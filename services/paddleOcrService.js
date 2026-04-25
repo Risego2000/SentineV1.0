@@ -1,11 +1,13 @@
 /**
  * PaddleOCR Service - License plate and timestamp extraction
  * Uses Python PaddleOCR via subprocess for reliable execution
+ * WITH ERROR RECOVERY AND AUTO-RETRY
  */
 
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { retryWithBackoff, fallbacks } from './errorRecoveryService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PADDLE_OCR_SCRIPT = path.join(__dirname, 'paddle_ocr_extractor.py');
@@ -83,6 +85,7 @@ async function runPaddleOcr(request) {
 
 /**
  * Extract license plate from multiple base64 images using PaddleOCR
+ * WITH AUTO-RETRY AND FALLBACK
  */
 export async function extractLicensePlateFromImages(base64Images = []) {
   try {
@@ -92,25 +95,30 @@ export async function extractLicensePlateFromImages(base64Images = []) {
 
     console.log(`[PaddleOCR] Processing ${base64Images.length} image(s) for license plate extraction...`);
 
-    const result = await runPaddleOcr({
-      operation: 'extract_plate',
-      images: base64Images,
-    });
+    // 🔴 USE AUTO-RETRY WITH EXPONENTIAL BACKOFF
+    const result = await retryWithBackoff(
+      async (signal) => {
+        return await runPaddleOcr({
+          operation: 'extract_plate',
+          images: base64Images,
+        });
+      },
+      'ocr',
+      { maxRetries: 3 }
+    );
 
     console.log(`[PaddleOCR] Result: plate="${result.plate}", candidates=${JSON.stringify(result.candidates)}`);
     return result;
   } catch (error) {
-    console.error('[PaddleOCR] Error extracting license plate:', error);
-    return {
-      plate: 'ERROR',
-      candidates: [],
-      confidence: 0,
-    };
+    console.error('[PaddleOCR] Error extracting license plate (all retries failed):', error);
+    // 🔴 USE FALLBACK ON FINAL FAILURE
+    return fallbacks.ocr(error);
   }
 }
 
 /**
  * Extract timestamp from OSD (On-Screen Display) using PaddleOCR
+ * WITH AUTO-RETRY AND FALLBACK
  */
 export async function extractTimestampFromOSD(base64Image) {
   try {
@@ -120,19 +128,29 @@ export async function extractTimestampFromOSD(base64Image) {
 
     console.log('[PaddleOCR] Extracting timestamp from OSD...');
 
-    const result = await runPaddleOcr({
-      operation: 'extract_timestamp',
-      image: base64Image,
-    });
+    // 🔴 USE AUTO-RETRY WITH EXPONENTIAL BACKOFF
+    const result = await retryWithBackoff(
+      async (signal) => {
+        return await runPaddleOcr({
+          operation: 'extract_timestamp',
+          image: base64Image,
+        });
+      },
+      'ocr',
+      { maxRetries: 2 } // Fewer retries for timestamp (simpler task)
+    );
 
     console.log(`[PaddleOCR] OSD text: "${result.osdText}", extracted timestamp: "${result.timestamp}"`);
     return result;
   } catch (error) {
-    console.error('[PaddleOCR] Error extracting timestamp:', error);
+    console.error('[PaddleOCR] Error extracting timestamp (all retries failed):', error);
+    // Return fallback with timestamp null (will use system time)
     return {
       timestamp: null,
       osdText: null,
       confidence: 0,
+      error: error.message,
+      fallback: true,
     };
   }
 }
