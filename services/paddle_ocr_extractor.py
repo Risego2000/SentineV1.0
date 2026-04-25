@@ -1,208 +1,135 @@
 #!/usr/bin/env python3
 """
-PaddleOCR License Plate Extractor
-Extracts license plates from base64-encoded images using PaddleOCR
+PaddleOCR Extractor - License plate and timestamp extraction
+Optimized for speed and accuracy with Spanish license plates
 """
 
-import sys
 import json
+import sys
 import base64
-import os
-from io import BytesIO
+import io
 from PIL import Image
-import re
 
 try:
     from paddleocr import PaddleOCR
 except ImportError:
-    print(json.dumps({"error": "PaddleOCR not installed"}), file=sys.stderr)
+    print(json.dumps({
+        "error": "PaddleOCR not installed. Run: pip install paddleocr paddlepaddle"
+    }))
     sys.exit(1)
 
+# Initialize PaddleOCR once (expensive operation)
+ocr = PaddleOCR(
+    use_angle_cls=False,  # Disable angle classification (faster)
+    lang=['en', 'es'],    # English + Spanish
+    show_log=False,       # Reduce logging
+)
 
 def normalize_plate(text):
-    """Normalize and validate license plate text"""
-    compact = text.upper().replace(' ', '').replace('-', '').replace('_', '').replace('.', '')
-    compact = re.sub(r'[^A-Z0-9]', '', compact)
+    """Normalize OCR text to Spanish license plate format (4 digits + 3 letters)"""
+    import re
+    text = text.upper().replace(' ', '').replace('-', '')
+    text = ''.join(c for c in text if c.isalnum())
+    
+    # Look for pattern: 4 digits + 3 letters
+    matches = re.findall(r'\d{4}[A-Z]{3}', text)
+    if matches:
+        return matches[0]
+    
+    matches = re.findall(r'[A-Z0-9]{6,8}', text)
+    if matches:
+        return matches[0]
+    
+    return text if len(text) >= 6 else ''
 
-    # Spanish plate format: 4 digits + 3 letters
-    spain_matches = re.findall(r'\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3}', compact)
-    if spain_matches:
-        return spain_matches[0]
+def normalize_timestamp(text):
+    """Extract timestamp from OSD text"""
+    import re
+    text = text.strip()
+    
+    time_match = re.search(r'(\d{1,2}):(\d{2}):(\d{2})', text)
+    date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', text)
+    
+    result = []
+    if date_match:
+        result.append(f"{date_match.group(1)}/{date_match.group(2)}/{date_match.group(3)}")
+    if time_match:
+        result.append(f"{time_match.group(1)}:{time_match.group(2)}:{time_match.group(3)}")
+    
+    return ' '.join(result) if result else text
 
-    # Generic format: 6-8 alphanumeric characters
-    generic_matches = re.findall(r'[A-Z0-9]{6,8}', compact)
-    if generic_matches:
-        return generic_matches[0]
-
-    return ''
-
-
-def extract_plate_from_image(ocr, base64_image):
-    """Extract license plate from single base64 image"""
-    try:
-        # Remove data URL prefix if present
-        if ',' in base64_image:
-            base64_image = base64_image.split(',')[1]
-
-        # Decode base64 to image
-        image_data = base64.b64decode(base64_image)
-        image = Image.open(BytesIO(image_data))
-
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-
-        # Run OCR
-        result = ocr.ocr(image, cls=True)
-
-        # Extract text from results
-        plate_candidates = []
-        if result and result[0]:
-            for line in result[0]:
-                text = line[1][0] if line[1] else ""
-                confidence = float(line[1][1]) if len(line[1]) > 1 else 0.0
-
-                normalized = normalize_plate(text)
-                if normalized:
-                    plate_candidates.append({
-                        'text': normalized,
-                        'confidence': confidence
-                    })
-
-        return plate_candidates
-    except Exception as e:
-        print(f"Error processing image: {str(e)}", file=sys.stderr)
-        return []
-
-
-def extract_timestamp_from_osd(ocr, base64_image):
-    """Extract timestamp from OSD (On-Screen Display) text"""
-    try:
-        # Remove data URL prefix if present
-        if ',' in base64_image:
-            base64_image = base64_image.split(',')[1]
-
-        # Decode base64 to image
-        image_data = base64.b64decode(base64_image)
-        image = Image.open(BytesIO(image_data))
-
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-
-        # Run OCR
-        result = ocr.ocr(image, cls=True)
-
-        # Extract all text
-        full_text = ""
-        if result and result[0]:
-            for line in result[0]:
-                text = line[1][0] if line[1] else ""
-                full_text += text + " "
-
-        full_text = full_text.strip()
-
-        # Look for timestamp patterns
-        time_pattern = r'\d{1,2}:\d{2}:\d{2}'
-        date_pattern = r'\d{1,4}[-/]\d{1,2}[-/]\d{1,4}'
-
-        time_match = re.search(time_pattern, full_text)
-        date_match = re.search(date_pattern, full_text)
-
-        timestamp = None
-        if time_match and date_match:
-            timestamp = f"{date_match.group()} {time_match.group()}"
-        elif time_match:
-            timestamp = time_match.group()
-        elif date_match:
-            timestamp = date_match.group()
-
+def extract_plate(images_b64):
+    """Extract license plate from multiple images"""
+    candidates = {}
+    
+    for img_b64 in images_b64[:10]:
+        try:
+            img_data = base64.b64decode(img_b64)
+            img = Image.open(io.BytesIO(img_data))
+            result = ocr.ocr(img, cls=False)
+            
+            for line in result:
+                for word_info in line:
+                    text = word_info[1]
+                    normalized = normalize_plate(text)
+                    if normalized:
+                        candidates[normalized] = candidates.get(normalized, 0) + 1
+        except Exception as e:
+            print(f"[OCR_ERROR] {str(e)}", file=sys.stderr)
+            continue
+    
+    if candidates:
+        best_plate = max(candidates, key=candidates.get)
         return {
-            'timestamp': timestamp,
-            'osdText': full_text,
-            'confidence': 0.7 if full_text else 0
+            "plate": best_plate,
+            "candidates": list(candidates.keys()),
+            "confidence": candidates[best_plate] / max(1, len(images_b64))
+        }
+    
+    return {"plate": "", "candidates": [], "confidence": 0}
+
+def extract_timestamp(image_b64):
+    """Extract timestamp from OSD region"""
+    try:
+        img_data = base64.b64decode(image_b64)
+        img = Image.open(io.BytesIO(img_data))
+        result = ocr.ocr(img, cls=False)
+        
+        texts = []
+        for line in result:
+            for word_info in line:
+                texts.append(word_info[1])
+        
+        combined_text = ' '.join(texts)
+        normalized = normalize_timestamp(combined_text)
+        
+        return {
+            "timestamp": normalized,
+            "raw_text": combined_text,
+            "confidence": len(texts) > 0
         }
     except Exception as e:
-        print(f"Error extracting timestamp: {str(e)}", file=sys.stderr)
-        return {
-            'timestamp': None,
-            'osdText': None,
-            'confidence': 0
-        }
-
+        print(f"[OCR_ERROR] {str(e)}", file=sys.stderr)
+        return {"timestamp": "", "raw_text": "", "confidence": False}
 
 def main():
-    """Main entry point"""
     try:
-        # Read input from stdin
-        input_data = sys.stdin.read()
-        request = json.loads(input_data)
-
-        # Initialize PaddleOCR
-        ocr = PaddleOCR(use_angle_cls=True, lang='es')
-
-        # Determine operation type
-        operation = request.get('operation', 'extract_plate')
-
-        if operation == 'extract_plate':
-            images = request.get('images', [])
-            if not images:
-                print(json.dumps({
-                    'plate': 'NO_IMAGES',
-                    'candidates': [],
-                    'confidence': 0
-                }))
-                return
-
-            all_candidates = []
-            for idx, image in enumerate(images):
-                if not image:
-                    continue
-
-                candidates = extract_plate_from_image(ocr, image)
-                all_candidates.extend(candidates)
-
-            # Find best result
-            if all_candidates:
-                best = max(all_candidates, key=lambda x: x['confidence'])
-                candidates_text = [c['text'] for c in all_candidates]
-                print(json.dumps({
-                    'plate': best['text'],
-                    'candidates': list(set(candidates_text)),
-                    'confidence': best['confidence']
-                }))
-            else:
-                print(json.dumps({
-                    'plate': 'NO_PLATE',
-                    'candidates': [],
-                    'confidence': 0
-                }))
-
-        elif operation == 'extract_timestamp':
-            image = request.get('image')
-            if not image:
-                print(json.dumps({
-                    'timestamp': None,
-                    'osdText': None,
-                    'confidence': 0
-                }))
-                return
-
-            result = extract_timestamp_from_osd(ocr, image)
+        request_json = sys.stdin.read()
+        request = json.loads(request_json)
+        operation = request.get("operation")
+        
+        if operation == "extract_plate":
+            result = extract_plate(request.get("images", []))
             print(json.dumps(result))
-
+        elif operation == "extract_timestamp":
+            result = extract_timestamp(request.get("image", ""))
+            print(json.dumps(result))
         else:
-            print(json.dumps({
-                'error': f'Unknown operation: {operation}'
-            }), file=sys.stderr)
+            print(json.dumps({"error": f"Unknown operation: {operation}"}))
             sys.exit(1)
-
     except Exception as e:
-        print(json.dumps({
-            'error': str(e)
-        }), file=sys.stderr)
+        print(json.dumps({"error": f"Error: {str(e)}"}))
         sys.exit(1)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

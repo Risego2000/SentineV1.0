@@ -196,7 +196,15 @@ const getEncoderArgs = (outputCodec = 'h264') => {
       return ['-c:v', 'h264_videotoolbox'];
     }
     // CPU encoding: optimized for speed/quality tradeoff
-    return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '26', '-profile:v', 'baseline'];
+    // CRF 23 = visually lossless, 26 = good quality, 28 = acceptable
+    // -preset medium = balance speed/quality, fast = faster encoding
+    return [
+      '-c:v', 'libx264',
+      '-preset', 'medium',  // Balance: faster than 'slow', better quality than 'fast'
+      '-crf', '23',         // Quality: 23 = nearly lossless (0-51, lower = better)
+      '-pix_fmt', 'yuv420p', // Pixel format: required for H.264 compatibility
+      '-profile:v', 'high', // Profile: high = better compression than baseline
+    ];
   }
 };
 
@@ -472,12 +480,19 @@ app.post('/api/transcode', upload.single('video'), async (req, res) => {
     const ffmpegArgs = [
       '-i',
       inputPath,
+      // Preserve resolution: copy scale filter (no scaling)
+      '-vf',
+      'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even resolution (required for H.264)
       ...encoderArgs,
+      // Audio: AAC for compatibility
       '-c:a',
       'aac',
+      '-b:a',
+      '128k', // Audio bitrate
+      // MP4 format flags
       '-movflags',
-      '+faststart',
-      '-y',
+      '+faststart', // Enable streaming/progressive download
+      '-y', // Overwrite output
       outputPath,
     ];
 

@@ -272,6 +272,11 @@ function getServerPort(): number {
 
 /**
  * Helper: Fetch with timeout
+ * Timeouts are configured based on operation type:
+ * - Transcode: 10 minutes (long operations)
+ * - OCR: 30 seconds (moderately fast)
+ * - AI: 20 seconds (complex but faster)
+ * - Health: 5 seconds (simple check)
  */
 async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
   const { timeout = 10000, ...fetchOptions } = options;
