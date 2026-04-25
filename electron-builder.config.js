@@ -17,6 +17,7 @@ module.exports = {
     'dist/**/*',
     'node_modules/**/*',
     'package.json',
+    'package-lock.json',
   ],
 
   // Additional files/resources to bundle
@@ -27,6 +28,10 @@ module.exports = {
       filter: ['**/*'],
     },
   ],
+
+  // Asar archive (package.asar) for improved security and size
+  asar: true,
+  asarUnpack: ['resources/**/*'], // Unpack resources so they can be accessed
 
   // Windows configuration
   win: {

@@ -3,7 +3,7 @@
  * Manages application window, backend server lifecycle, and IPC communication
  */
 
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -17,7 +17,7 @@ let expressServer: any = null;
 /**
  * Create the main application window
  */
-function createWindow() {
+function createWindow(serverPort?: number) {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -42,6 +42,14 @@ function createWindow() {
     mainWindow.loadFile(path.join(app.getAppPath(), 'dist/renderer/index.html'));
   }
 
+  // Send port after renderer is ready (not after loadURL)
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (serverPort) {
+      mainWindow!.webContents.send('server-port', serverPort);
+      console.log(`[Electron] Sent server-port ${serverPort} to renderer`);
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -62,7 +70,9 @@ function configureResourcePaths() {
   );
   if (fs.existsSync(ffmpegPath)) {
     process.env.FFMPEG_PATH = ffmpegPath;
-    console.log(`[Electron] FFmpeg path: ${ffmpegPath}`);
+    console.log(`[Electron] ✓ FFmpeg found: ${ffmpegPath}`);
+  } else {
+    console.warn(`[Electron] ✗ FFmpeg not found at: ${ffmpegPath}`);
   }
 
   // Configure Python path
@@ -73,13 +83,31 @@ function configureResourcePaths() {
   );
   if (fs.existsSync(pythonPath)) {
     process.env.PYTHON_PATH = pythonPath;
-    console.log(`[Electron] Python path: ${pythonPath}`);
+    console.log(`[Electron] ✓ Python found: ${pythonPath}`);
+  } else {
+    console.warn(`[Electron] ✗ Python not found at: ${pythonPath}`);
   }
 
-  // Configure PaddleOCR home directory
-  const paddleOcrModelsPath = path.join(resourcesPath, 'paddleocr-models');
-  process.env.PADDLEOCR_HOME = paddleOcrModelsPath;
-  console.log(`[Electron] PaddleOCR models path: ${paddleOcrModelsPath}`);
+  // Configure PaddleOCR models path (inside Python site-packages)
+  const paddleOcrPath = path.join(
+    resourcesPath,
+    'python',
+    process.platform === 'win32' ? 'Lib\\site-packages' : 'lib/python3.11/site-packages'
+  );
+
+  // PaddleOCR will create .paddleocr directory in HOME, but we can guide it
+  const userDataPath = app.getPath('userData');
+  const paddleOcrHome = path.join(userDataPath, '.paddleocr');
+
+  process.env.PADDLEOCR_HOME = paddleOcrHome;
+  console.log(`[Electron] PaddleOCR models will be cached at: ${paddleOcrHome}`);
+
+  // Verify Python site-packages exists
+  if (fs.existsSync(paddleOcrPath)) {
+    console.log(`[Electron] ✓ Python site-packages found: ${paddleOcrPath}`);
+  } else {
+    console.warn(`[Electron] ✗ Python site-packages not found at: ${paddleOcrPath}`);
+  }
 }
 
 /**
@@ -125,14 +153,10 @@ app.on('ready', async () => {
   try {
     // Initialize server first
     const serverPort = await initializeServer();
+    console.log(`[Electron] Server initialized on port ${serverPort}`);
 
-    // Then create window
-    createWindow();
-
-    // Send port to renderer once window is ready
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('server-port', serverPort);
-    }
+    // Then create window with server port
+    createWindow(serverPort);
   } catch (error) {
     console.error('[Electron] Fatal error during app startup:', error);
     app.quit();
@@ -239,26 +263,57 @@ ipcMain.handle('window:close', () => {
 // ============= API HANDLERS (Forward to Express Backend) =============
 
 /**
+ * Helper: Get actual server port
+ */
+function getServerPort(): number {
+  const port = parseInt(process.env.SENTINEL_SERVER_PORT || '3002');
+  return isNaN(port) ? 3002 : port;
+}
+
+/**
+ * Helper: Fetch with timeout
+ */
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = 10000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+/**
  * IPC: Extract license plate via OCR
  */
 ipcMain.handle('ocr:extractPlate', async (event, { images }) => {
   try {
-    const serverAddress = expressServer.address();
-    const serverPort = typeof serverAddress === 'string'
-      ? 3002
-      : (serverAddress?.port || 3002);
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/ocr/plate`;
 
-    const response = await fetch(`http://localhost:${serverPort}/api/ocr/plate`, {
+    console.log(`[IPC] ocr:extractPlate → ${url}`);
+
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ images }),
+      timeout: 30000, // OCR can be slow
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const error = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(`API error: ${error}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`[IPC] ocr:extractPlate ✓`);
+    return result;
   } catch (error) {
     console.error('[IPC] Error in ocr:extractPlate:', error);
     throw error;
@@ -270,22 +325,26 @@ ipcMain.handle('ocr:extractPlate', async (event, { images }) => {
  */
 ipcMain.handle('ocr:extractTimestamp', async (event, { image }) => {
   try {
-    const serverAddress = expressServer.address();
-    const serverPort = typeof serverAddress === 'string'
-      ? 3002
-      : (serverAddress?.port || 3002);
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/ocr/timestamp`;
 
-    const response = await fetch(`http://localhost:${serverPort}/api/ocr/timestamp`, {
+    console.log(`[IPC] ocr:extractTimestamp → ${url}`);
+
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image }),
+      timeout: 15000,
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const error = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(`API error: ${error}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`[IPC] ocr:extractTimestamp ✓`);
+    return result;
   } catch (error) {
     console.error('[IPC] Error in ocr:extractTimestamp:', error);
     throw error;
@@ -297,22 +356,26 @@ ipcMain.handle('ocr:extractTimestamp', async (event, { image }) => {
  */
 ipcMain.handle('api:ai:geometry', async (event, payload) => {
   try {
-    const serverAddress = expressServer.address();
-    const serverPort = typeof serverAddress === 'string'
-      ? 3002
-      : (serverAddress?.port || 3002);
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/ai/geometry`;
 
-    const response = await fetch(`http://localhost:${serverPort}/api/ai/geometry`, {
+    console.log(`[IPC] api:ai:geometry → ${url}`);
+
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      timeout: 20000, // AI can take time
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const error = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(`API error: ${error}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`[IPC] api:ai:geometry ✓`);
+    return result;
   } catch (error) {
     console.error('[IPC] Error in api:ai:geometry:', error);
     throw error;
@@ -324,24 +387,176 @@ ipcMain.handle('api:ai:geometry', async (event, payload) => {
  */
 ipcMain.handle('api:ai:audit', async (event, payload) => {
   try {
-    const serverAddress = expressServer.address();
-    const serverPort = typeof serverAddress === 'string'
-      ? 3002
-      : (serverAddress?.port || 3002);
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/ai/audit`;
 
-    const response = await fetch(`http://localhost:${serverPort}/api/ai/audit`, {
+    console.log(`[IPC] api:ai:audit → ${url}`);
+
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      timeout: 20000, // AI can take time
+    });
+
+    if (!response.ok) {
+      const error = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(`API error: ${error}`);
+    }
+
+    const result = await response.json();
+    console.log(`[IPC] api:ai:audit ✓`);
+    return result;
+  } catch (error) {
+    console.error('[IPC] Error in api:ai:audit:', error);
+    throw error;
+  }
+});
+
+/**
+ * IPC: Health check
+ */
+ipcMain.handle('api:health', async () => {
+  try {
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/health`;
+
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      timeout: 5000,
+    });
+
+    const isHealthy = response.ok;
+    console.log(`[IPC] api:health: ${isHealthy ? '✓' : '✗'}`);
+    return isHealthy;
+  } catch (error) {
+    console.error('[IPC] Health check failed:', error);
+    return false;
+  }
+});
+
+/**
+ * IPC: Ready check (includes service status)
+ */
+ipcMain.handle('api:ready', async () => {
+  try {
+    const serverPort = getServerPort();
+    const url = `http://127.0.0.1:${serverPort}/api/ready`;
+
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      timeout: 5000,
     });
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log(`[IPC] api:ready: ${result.status}`);
+    return result;
   } catch (error) {
-    console.error('[IPC] Error in api:ai:audit:', error);
+    console.error('[IPC] Ready check failed:', error);
+    return {
+      status: 'not_ready',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      services: {
+        ffmpeg: false,
+        python: false,
+        paddleOcr: false,
+      },
+    };
+  }
+});
+
+/**
+ * IPC: Read file
+ */
+ipcMain.handle('file:read', async (event, filePath) => {
+  try {
+    // Security: only allow reading files within app directory
+    const appPath = app.getAppPath();
+    const resolvedPath = path.resolve(filePath);
+
+    if (!resolvedPath.startsWith(appPath)) {
+      throw new Error('Access denied: file is outside app directory');
+    }
+
+    return fs.readFileSync(resolvedPath, 'utf-8');
+  } catch (error) {
+    console.error('[IPC] Error reading file:', error);
+    throw error;
+  }
+});
+
+/**
+ * IPC: Write file
+ */
+ipcMain.handle('file:write', async (event, filePath, content) => {
+  try {
+    // Security: only allow writing to userData directory
+    const userDataPath = app.getPath('userData');
+    const resolvedPath = path.resolve(filePath);
+
+    if (!resolvedPath.startsWith(userDataPath)) {
+      throw new Error('Access denied: can only write to userData directory');
+    }
+
+    // Create directory if it doesn't exist
+    const dir = path.dirname(resolvedPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(resolvedPath, content, 'utf-8');
+    return true;
+  } catch (error) {
+    console.error('[IPC] Error writing file:', error);
+    throw error;
+  }
+});
+
+/**
+ * IPC: Select file dialog
+ */
+ipcMain.handle('file:select', async (event, options = {}) => {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      throw new Error('Main window not available');
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      ...options,
+    });
+
+    return result.filePaths;
+  } catch (error) {
+    console.error('[IPC] Error selecting file:', error);
+    throw error;
+  }
+});
+
+/**
+ * IPC: Download file
+ */
+ipcMain.handle('file:download', async (event, url, filename) => {
+  try {
+    const downloadsPath = app.getPath('downloads');
+    const filePath = path.join(downloadsPath, filename);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(filePath, Buffer.from(buffer));
+
+    console.log(`[IPC] File downloaded: ${filePath}`);
+    return filePath;
+  } catch (error) {
+    console.error('[IPC] Error downloading file:', error);
     throw error;
   }
 });

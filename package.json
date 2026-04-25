@@ -21,7 +21,7 @@
     "install:paddleocr": "node -e \"const {execSync} = require('child_process'); const pythonPath = './resources/python/python.exe'; execSync(`${pythonPath} -m pip install paddleocr paddlepaddle pillow`, {stdio: 'inherit'})\"",
     "test:electron": "node test-electron.js",
     "preview": "vite preview",
-    "electron": "npm-run-all --parallel dev:vite dev:electron",
+    "electron": "npm-run-all --parallel dev dev:electron",
     "test": "vitest",
     "lint": "eslint .",
     "format": "prettier --write ."

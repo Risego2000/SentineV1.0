@@ -970,6 +970,40 @@ app.get('/api/health', (req, res) => {
   res.send('{"status":"ok"}');
 });
 
+app.get('/api/ready', (req, res) => {
+  try {
+    // Check available services
+    const pythonPath = process.env.PYTHON_PATH || '';
+    const paddleOcrHome = process.env.PADDLEOCR_HOME || '';
+
+    const ready = {
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      services: {
+        ffmpeg: !!ffmpegPath && ffmpegPath !== 'ffmpeg', // True if not using fallback
+        python: !!pythonPath && fs.existsSync(pythonPath),
+        paddleOcr: !!paddleOcrHome, // Will be set by main.ts in Electron
+      },
+      port: port,
+      mode: process.env.ELECTRON_MAIN_PROCESS ? 'electron' : 'web',
+    };
+
+    // Check if all critical services are available
+    const allReady = ready.services.ffmpeg && ready.services.python;
+    // paddleOcr is optional for initial startup
+
+    logger.auditLog('GET', '/api/ready', allReady ? 200 : 503, { allReady });
+    res.status(allReady ? 200 : 503).json(ready);
+  } catch (error) {
+    logger.errorWithContext('API_READY', error);
+    res.status(503).json({
+      status: 'not_ready',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 app.post('/api/save-config', (req, res) => {
   try {
     const { fileName, config } = req.body;
@@ -1048,54 +1082,71 @@ app.get('/api/presets/:filename', (req, res) => {
   }
 });
 
-const server = app.listen(port, () => {
-  console.log(`[SENTINEL_SYSTEM] Activo en: http://localhost:${port}`);
-  console.log(`[SENTINEL_SYSTEM] Modo: ${fs.existsSync(distPath) ? 'FULL_STACK' : 'API_ONLY'}`);
-  console.log(`[SENTINEL_SYSTEM] FFmpeg: ${ffmpegPath}`);
-
-  // Write port to file for frontend auto-discovery (disabled in Electron mode)
-  if (!process.env.ELECTRON_MAIN_PROCESS) {
-    try {
-      const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
-      fs.writeFileSync(portFile, String(port), 'utf8');
-      console.log(`[SENTINEL_SYSTEM] Puerto guardado en: ${portFile}`);
-    } catch (err) {
-      console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
-    }
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('[SENTINEL_SYSTEM] SIGTERM recibido, cerrando gracefully...');
-  await shutdownOcrWorker();
-  server.close(() => {
-    console.log('[SENTINEL_SYSTEM] Server cerrado');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', async () => {
-  console.log('[SENTINEL_SYSTEM] SIGINT recibido, cerrando gracefully...');
-  await shutdownOcrWorker();
-  server.close(() => {
-    console.log('[SENTINEL_SYSTEM] Server cerrado');
-    process.exit(0);
-  });
-});
-
 // Export function for Electron initialization
-export async function initializeExpressServer(config) {
-  // Set environment variable to signal we're in Electron mode
-  if (config.isElectron) {
-    process.env.ELECTRON_MAIN_PROCESS = 'true';
-  }
+export async function initializeExpressServer(config = {}) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Set environment variables from config
+      if (config.isElectron) {
+        process.env.ELECTRON_MAIN_PROCESS = 'true';
+      }
 
-  // Set app path for resource discovery
-  if (config.appPath) {
-    process.env.APP_PATH = config.appPath;
-  }
+      if (config.appPath) {
+        process.env.APP_PATH = config.appPath;
+      }
 
-  // Return the server instance (already listening)
-  return server;
+      // Use provided port or dynamic port (0) for Electron
+      const serverPort = config.port !== undefined ? config.port : port;
+
+      // Create server
+      const server = app.listen(serverPort, '127.0.0.1', () => {
+        const actualAddress = server.address();
+        const actualPort = typeof actualAddress === 'string' ? serverPort : (actualAddress?.port || serverPort);
+
+        console.log(`[SENTINEL_SYSTEM] Activo en: http://localhost:${actualPort}`);
+        console.log(`[SENTINEL_SYSTEM] Modo: ${fs.existsSync(distPath) ? 'FULL_STACK' : 'API_ONLY'}`);
+        console.log(`[SENTINEL_SYSTEM] FFmpeg: ${ffmpegPath}`);
+        console.log(`[SENTINEL_SYSTEM] Puerto real asignado: ${actualPort}`);
+
+        // Write port to file for frontend auto-discovery (disabled in Electron mode)
+        if (!process.env.ELECTRON_MAIN_PROCESS) {
+          try {
+            const portFile = path.join(os.tmpdir(), 'sentinel-api-port.txt');
+            fs.writeFileSync(portFile, String(actualPort), 'utf8');
+            console.log(`[SENTINEL_SYSTEM] Puerto guardado en: ${portFile}`);
+          } catch (err) {
+            console.warn(`[SENTINEL_SYSTEM] No se pudo guardar puerto: ${err.message}`);
+          }
+        }
+
+        // Store server port globally for IPC handlers
+        process.env.SENTINEL_SERVER_PORT = String(actualPort);
+
+        // Setup graceful shutdown
+        const gracefulShutdown = async () => {
+          console.log('[SENTINEL_SYSTEM] Cerrando gracefully...');
+          await shutdownOcrWorker();
+          server.close(() => {
+            console.log('[SENTINEL_SYSTEM] Server cerrado');
+            process.exit(0);
+          });
+        };
+
+        process.on('SIGTERM', gracefulShutdown);
+        process.on('SIGINT', gracefulShutdown);
+
+        // Resolve with server instance
+        resolve(server);
+      });
+
+      // Handle server errors
+      server.on('error', (err) => {
+        console.error('[SENTINEL_SYSTEM] Server error:', err);
+        reject(err);
+      });
+    } catch (error) {
+      console.error('[SENTINEL_SYSTEM] Failed to initialize server:', error);
+      reject(error);
+    }
+  });
 }

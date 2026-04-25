@@ -24,9 +24,13 @@ try {
   esbuild.buildSync({
     entryPoints: ['electron/main.ts'],
     outfile: 'dist/electron/main.js',
+    bundle: true,
     platform: 'node',
     target: 'node18',
-    format: 'esm',
+    format: 'esm', // Use ESM to match package.json "type": "module"
+    external: ['electron'],
+    // ESM-specific options
+    mainFields: ['module', 'main'],
   });
 
   // Build preload.ts
@@ -34,9 +38,13 @@ try {
   esbuild.buildSync({
     entryPoints: ['electron/preload.ts'],
     outfile: 'dist/electron/preload.js',
+    bundle: true,
     platform: 'node',
     target: 'node18',
-    format: 'esm',
+    format: 'esm', // Use ESM to match package.json "type": "module"
+    external: ['electron'],
+    // ESM-specific options
+    mainFields: ['module', 'main'],
   });
 
   console.log('[Build] ✓ Electron compilation complete');

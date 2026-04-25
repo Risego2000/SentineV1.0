@@ -42,6 +42,26 @@ contextBridge.exposeInMainWorld('electron', {
     close: () =>
       ipcRenderer.invoke('window:close'),
   },
+
+  // File APIs
+  file: {
+    read: (filePath: string) =>
+      ipcRenderer.invoke('file:read', filePath),
+    write: (filePath: string, content: string) =>
+      ipcRenderer.invoke('file:write', filePath, content),
+    select: (options?: any) =>
+      ipcRenderer.invoke('file:select', options),
+    download: (url: string, filename: string) =>
+      ipcRenderer.invoke('file:download', url, filename),
+  },
+
+  // API health and ready checks
+  api: {
+    health: () =>
+      ipcRenderer.invoke('api:health'),
+    ready: () =>
+      ipcRenderer.invoke('api:ready'),
+  },
 });
 
 console.log('[Preload] Electron API exposed to renderer');
