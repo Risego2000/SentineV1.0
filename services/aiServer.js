@@ -1,6 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { GoogleGenAI } from '@google/genai';
+import {
+  validateAuditResponse,
+  validateGeometryResponse,
+  scoreResponseConfidence,
+  requiresManualReview
+} from './geminiResponseValidator.js';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -179,6 +185,15 @@ export const generateGeometryWithGemini = async ({ directives, instruction, imag
       throw new Error('Respuesta de Gemini no es un objeto válido');
     }
 
+    // 🔴 VALIDACIÓN EXHAUSTIVA DE GEOMETRY
+    const validation = validateGeometryResponse(data);
+    if (!validation.valid) {
+      console.warn('[GEMINI_GEOMETRY_VALIDATOR] Validation errors:', validation.errors);
+    }
+    if (validation.warnings.length > 0) {
+      console.warn('[GEMINI_GEOMETRY_VALIDATOR] Warnings:', validation.warnings);
+    }
+
     const validatedLines = (data.lines || [])
       .filter((line) =>
         line &&
@@ -205,6 +220,9 @@ export const generateGeometryWithGemini = async ({ directives, instruction, imag
     return {
       lines: validatedLines,
       suggestedDirectives: sanitizeText(data.suggestedDirectives || ''),
+      _validationErrors: validation.errors,
+      _validationWarnings: validation.warnings,
+      _lineCount: validatedLines.length,
     };
   } catch (error) {
     console.error('[GEMINI] generateGeometry error:', error?.message);
@@ -343,12 +361,27 @@ export const analyzeTrajectoryWithGemini = async ({
       throw new Error(`JSON parsing error: ${parseError.message}`);
     }
 
-    // Validar estructura
-    if (!rawData || typeof rawData !== 'object') {
-      throw new Error('Respuesta de Gemini no es un objeto válido');
+    // 🔴 VALIDACIÓN EXHAUSTIVA DE RESPUESTA GEMINI
+    const validation = validateAuditResponse(rawData);
+    if (!validation.valid) {
+      console.warn('[GEMINI_VALIDATOR] Validation errors:', validation.errors);
+      console.warn('[GEMINI_VALIDATOR] Warnings:', validation.warnings);
+      // Si hay errores críticos, marcar para revisión manual
+      rawData._validationErrors = validation.errors;
+      rawData._validationWarnings = validation.warnings;
+      rawData._requiresManualReview = true;
     }
 
-    return {
+    // Calcular confidence score
+    const confidenceScore = scoreResponseConfidence(rawData, selectedSnapshots, track);
+    rawData._confidenceScore = confidenceScore;
+    rawData._requiresManualReview = rawData._requiresManualReview || requiresManualReview(rawData, confidenceScore);
+
+    if (confidenceScore < 0.7) {
+      console.warn(`[GEMINI_CONFIDENCE] Low confidence score: ${confidenceScore.toFixed(2)}`);
+    }
+
+    const response = {
       infraction: rawData.infraction === true,
       plate: sanitizeText(rawData.plate || 'DESCONOCIDO'),
       makeModel: sanitizeText(rawData.makeModel || 'DESCONOCIDO'),
@@ -366,7 +399,14 @@ export const analyzeTrajectoryWithGemini = async ({
         speedEstimated: rawData.telemetry?.speedEstimated || kinematics.speed,
         behaviorAnomalies: sanitizeText(rawData.telemetry?.behaviorAnomalies || 'None'),
       },
+      // 🔴 AGREGACIONES PARA CONTROL DE CALIDAD
+      _validationErrors: validation.errors,
+      _validationWarnings: validation.warnings,
+      _confidenceScore: confidenceScore,
+      _requiresManualReview: rawData._requiresManualReview,
     };
+
+    return response;
   } catch (error) {
     console.error('[GEMINI] analyzeTrajectory error:', error?.message);
     // Fallback: retornar análisis vacío marcando para revisión manual
