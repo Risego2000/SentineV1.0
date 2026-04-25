@@ -23,28 +23,22 @@ try {
   console.log('[Build] Compiling electron/main.ts...');
   esbuild.buildSync({
     entryPoints: ['electron/main.ts'],
-    outfile: 'dist/electron/main.js',
-    bundle: true,
+    outfile: 'dist/electron/main.cjs', // Use .cjs extension for CommonJS with "type": "module"
+    bundle: false, // Don't bundle - rely on node_modules resolution
     platform: 'node',
     target: 'node18',
-    format: 'esm', // Use ESM to match package.json "type": "module"
-    external: ['electron'],
-    // ESM-specific options
-    mainFields: ['module', 'main'],
+    format: 'cjs', // Use CommonJS for Electron main process compatibility
   });
 
   // Build preload.ts
   console.log('[Build] Compiling electron/preload.ts...');
   esbuild.buildSync({
     entryPoints: ['electron/preload.ts'],
-    outfile: 'dist/electron/preload.js',
-    bundle: true,
+    outfile: 'dist/electron/preload.cjs', // Use .cjs extension for CommonJS with "type": "module"
+    bundle: false, // Don't bundle - rely on node_modules resolution
     platform: 'node',
     target: 'node18',
-    format: 'esm', // Use ESM to match package.json "type": "module"
-    external: ['electron'],
-    // ESM-specific options
-    mainFields: ['module', 'main'],
+    format: 'cjs', // Use CommonJS for Electron preload compatibility
   });
 
   console.log('[Build] ✓ Electron compilation complete');

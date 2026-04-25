@@ -5,11 +5,10 @@
 
 import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { initializeExpressServer } from '../server.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Get app directory - in dev mode use process.cwd(), in production use app.getAppPath()
+const __dirname = process.cwd();
 
 let mainWindow: BrowserWindow | null = null;
 let expressServer: any = null;
@@ -24,7 +23,7 @@ function createWindow(serverPort?: number) {
     minWidth: 1024,
     minHeight: 768,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'dist/electron/preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -117,6 +116,9 @@ async function initializeServer() {
   try {
     // Configure resource paths before starting server
     configureResourcePaths();
+
+    // Dynamically import server module (ESM module in CommonJS context)
+    const { initializeExpressServer } = await import('../server.js');
 
     const config = {
       port: 0, // Let OS assign a free port
