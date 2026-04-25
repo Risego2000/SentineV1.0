@@ -1,28 +1,28 @@
-# SentinelV16 Electron - Manual Setup Guide
+# SentinelV16 Electron - Guía de Configuración Manual
 
-## Status
+## Estado
 
-✓ **FFmpeg**: Already downloaded and installed  
-⏳ **Python**: Manual download required  
-⏳ **PaddleOCR**: Auto-installable after Python  
+✓ **FFmpeg**: Ya descargado e instalado  
+⏳ **Python**: Descarga manual requerida  
+⏳ **PaddleOCR**: Auto-instalable después de Python  
 
-## Setup Steps (5 minutes)
+## Pasos de Configuración (5 minutos)
 
-### Step 1: Download Python Embeddable Package
+### Paso 1: Descargar Paquete Python Embebido
 
-1. Visit: https://www.python.org/downloads/windows/
-2. Scroll down to "Advanced"
-3. Find **Python 3.10.x** section
-4. Download: **Windows embeddable package (64-bit)**
-   - Should be named: `python-3.10.x-embed-amd64.zip` (~50 MB)
+1. Visita: https://www.python.org/downloads/windows/
+2. Desplázate hacia abajo a "Advanced"
+3. Encuentra la sección **Python 3.10.x**
+4. Descarga: **Windows embeddable package (64-bit)**
+   - Debe llamarse: `python-3.10.x-embed-amd64.zip` (~50 MB)
 
-### Step 2: Extract Python
+### Paso 2: Extraer Python
 
-1. Create folder: `resources/python/` (in your SentinelV16 directory)
-2. Extract the zip file contents directly into `resources/python/`
-3. Verify: You should see `python.exe` in `resources/python/python.exe`
+1. Crea carpeta: `resources/python/` (en tu directorio SentinelV16)
+2. Extrae el contenido del archivo zip directamente en `resources/python/`
+3. Verifica: Deberías ver `python.exe` en `resources/python/python.exe`
 
-**Expected structure:**
+**Estructura esperada:**
 ```
 resources/
   python/
@@ -30,29 +30,29 @@ resources/
     python3.exe
     Lib/
     Scripts/
-    (other files...)
+    (otros archivos...)
 ```
 
-### Step 3: Install PaddleOCR
+### Paso 3: Instalar PaddleOCR
 
-Open PowerShell or Command Prompt and run:
+Abre PowerShell o Símbolo del Sistema y ejecuta:
 
 ```bash
-cd C:\Users\[YourUsername]\Desktop\Apps\SentinelV16
+cd C:\Users\[TuUsuario]\Desktop\Apps\SentinelV16
 resources\python\python.exe -m pip install paddleocr paddlepaddle pillow
 ```
 
-This will take 5-10 minutes (it's downloading model weights ~200 MB).
+Esto tomará 5-10 minutos (está descargando pesos de modelos ~200 MB).
 
-### Step 4: Verify Installation
+### Paso 4: Verificar Instalación
 
-Run the test suite:
+Ejecuta la suite de pruebas:
 
 ```bash
 npm run test:electron
 ```
 
-Expected output:
+Salida esperada:
 ```
 ✓ FFmpeg found
 ✓ Python found  
@@ -60,103 +60,103 @@ Expected output:
 ✓ All tests passed
 ```
 
-### Step 5: Run the Application
+### Paso 5: Ejecutar la Aplicación
 
-**Development:**
+**Desarrollo:**
 ```bash
 npm run electron
 ```
 
-**Production Build:**
+**Compilación de Producción:**
 ```bash
 npm run build
 ```
 
-This creates: `build/SentinelV16-Setup.exe`
+Esto crea: `build/SentinelV16-Setup.exe`
 
 ---
 
-## Alternative: Download Python Manually (if above doesn't work)
+## Alternativa: Descargar Python Manualmente (si lo anterior no funciona)
 
-If the official Python page is unavailable:
+Si la página oficial de Python no está disponible:
 
-1. Go to: https://github.com/indygreg/python-build-standalone/releases
-2. Find the latest release with "cpython-3.10.x" (64-bit Windows)
-3. Download the "install_only" variant
-4. Extract to `resources/python/`
+1. Ve a: https://github.com/indygreg/python-build-standalone/releases
+2. Encuentra la última versión con "cpython-3.10.x" (64-bit Windows)
+3. Descarga la variante "install_only"
+4. Extrae a `resources/python/`
 
 ---
 
-## Troubleshooting
+## Solución de Problemas
 
 ### "FFmpeg not found"
-FFmpeg should already be installed at: `resources/ffmpeg/ffmpeg.exe`
+FFmpeg ya debe estar instalado en: `resources/ffmpeg/ffmpeg.exe`
 
-If missing, run:
+Si falta, ejecuta:
 ```bash
 npm run download:ffmpeg
 ```
 
 ### "Python not found"
-Follow Steps 1-2 above to manually download and extract Python.
+Sigue los Pasos 1-2 anteriores para descargar y extraer Python manualmente.
 
 ### "PaddleOCR not installed"
-Run Step 3:
+Ejecuta el Paso 3:
 ```bash
 resources\python\python.exe -m pip install paddleocr paddlepaddle pillow
 ```
 
-### Permission denied on pip install
-Run PowerShell as Administrator and try again.
+### Permiso denegado en pip install
+Ejecuta PowerShell como Administrador e intenta de nuevo.
 
-### Still having issues?
+### ¿Aún tienes problemas?
 
-1. Verify Python works:
+1. Verifica que Python funciona:
    ```bash
    resources\python\python.exe --version
    ```
 
-2. Verify pip works:
+2. Verifica que pip funciona:
    ```bash
    resources\python\python.exe -m pip --version
    ```
 
-3. Check network connection (PaddleOCR downloads ~200 MB of models)
+3. Verifica la conexión de red (PaddleOCR descarga ~200 MB de modelos)
 
 ---
 
-## Next Steps After Setup
+## Siguientes Pasos Después de la Configuración
 
-Once all 3 are installed:
+Una vez que los 3 estén instalados:
 
-1. Run tests:
+1. Ejecuta pruebas:
    ```bash
    npm run test:electron
    ```
 
-2. Launch dev app:
+2. Lanza la aplicación dev:
    ```bash
    npm run electron
    ```
 
-3. Test the full workflow in the app:
-   - Upload a video
-   - Verify vehicle detection (MediaPipe)
-   - Verify license plate detection (PaddleOCR)
-   - Generate PDF report
+3. Prueba el flujo de trabajo completo en la aplicación:
+   - Carga un video
+   - Verifica la detección de vehículos (MediaPipe)
+   - Verifica la detección de placas (PaddleOCR)
+   - Genera un informe PDF
 
-4. Build production:
+4. Compila para producción:
    ```bash
    npm run build
    ```
 
 ---
 
-**Estimated Total Time**: 30-45 minutes
-- Download FFmpeg: ✓ Done (10 min)
-- Download Python: 5-10 min
-- Install PaddleOCR: 10-15 min
-- Run tests: 2-5 min
-- Build production: 5 min
+**Tiempo Total Estimado**: 30-45 minutos
+- Descargar FFmpeg: ✓ Hecho (10 min)
+- Descargar Python: 5-10 min
+- Instalar PaddleOCR: 10-15 min
+- Ejecutar pruebas: 2-5 min
+- Compilar producción: 5 min
 
-You're almost there! Just need Python and PaddleOCR.
+¡Ya casi está! Solo necesitas Python y PaddleOCR.

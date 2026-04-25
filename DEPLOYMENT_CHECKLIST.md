@@ -1,238 +1,238 @@
-# SentinelV16 Electron - Deployment Checklist
+# SentinelV16 Electron - Lista de Verificación de Despliegue
 
-## Pre-Deployment (FASE 6)
+## Pre-Despliegue (FASE 6)
 
-### 1. Environment Validation
-- [ ] Run: `npm run test:electron`
-- [ ] All tests should pass except FFmpeg/Python (if not installed)
-- [ ] No critical errors in logs
+### 1. Validación del Entorno
+- [ ] Ejecuta: `npm run test:electron`
+- [ ] Todas las pruebas deberían pasar excepto FFmpeg/Python (si no están instalados)
+- [ ] Sin errores críticos en los logs
 
-### 2. Resource Validation
+### 2. Validación de Recursos
 ```bash
-# Check if resources are present
-if exist resources\ffmpeg\ffmpeg.exe echo "FFmpeg OK" else echo "FFmpeg MISSING"
-if exist resources\python\python.exe echo "Python OK" else echo "Python MISSING"
+# Verifica si los recursos están presentes
+if exist resources\ffmpeg\ffmpeg.exe echo "FFmpeg OK" else echo "FFmpeg FALTA"
+if exist resources\python\python.exe echo "Python OK" else echo "Python FALTA"
 ```
 
-- [ ] FFmpeg exists at: `resources/ffmpeg/ffmpeg.exe`
-- [ ] Python exists at: `resources/python/python.exe`
-- [ ] PaddleOCR installed: `resources/python/Lib/site-packages/paddleocr/`
+- [ ] FFmpeg existe en: `resources/ffmpeg/ffmpeg.exe`
+- [ ] Python existe en: `resources/python/python.exe`
+- [ ] PaddleOCR instalado: `resources/python/Lib/site-packages/paddleocr/`
 
-### 3. Compilation Check
+### 3. Verificación de Compilación
 ```bash
 npm run build:electron
 ```
 
-- [ ] No TypeScript errors
-- [ ] `dist/electron/main.js` exists and is valid
-- [ ] `dist/electron/preload.js` exists and is valid
+- [ ] Sin errores TypeScript
+- [ ] `dist/electron/main.js` existe y es válido
+- [ ] `dist/electron/preload.js` existe y es válido
 
-### 4. Development Test
+### 4. Prueba de Desarrollo
 ```bash
 npm run electron
 ```
 
-**In the running app:**
-- [ ] Window opens without freeze
-- [ ] React components load visibly
-- [ ] Console (F12) has no red errors
-- [ ] Can interact with UI (buttons, inputs)
-- [ ] Window controls work (minimize, maximize, close)
+**En la aplicación en ejecución:**
+- [ ] La ventana se abre sin congelarse
+- [ ] Los componentes React cargan visiblemente
+- [ ] La consola (F12) no tiene errores rojos
+- [ ] Puedes interactuar con la UI (botones, entradas)
+- [ ] Los controles de ventana funcionan (minimizar, maximizar, cerrar)
 
-### 5. Functional Testing
+### 5. Pruebas Funcionales
 
-#### 5.1 Video Upload & Detection
+#### 5.1 Carga de Video y Detección
 ```
-Expected: App handles video upload, displays in viewer
-- [ ] Click upload button or drag-drop video
-- [ ] Video appears in preview
-- [ ] MediaPipe runs (may take 5-10 sec on first run)
-- [ ] Green bounding boxes appear around vehicles
-- [ ] Boxes track vehicles as video plays
-```
-
-#### 5.2 Frame Extraction
-```
-Expected: Frames extracted in 2688x1520 resolution
-- [ ] Video processed frame-by-frame
-- [ ] No console errors about extraction
-- [ ] Performance acceptable (<100ms per frame)
+Esperado: La aplicación maneja la carga de video, lo muestra en el visor
+- [ ] Haz clic en el botón de carga o arrastra un video
+- [ ] El video aparece en la vista previa
+- [ ] MediaPipe se ejecuta (puede tomar 5-10 seg en la primera ejecución)
+- [ ] Los cuadros delimitadores verdes aparecen alrededor de los vehículos
+- [ ] Los cuadros rastrean vehículos mientras el video se reproduce
 ```
 
-#### 5.3 OCR Functionality
+#### 5.2 Extracción de Fotogramas
 ```
-Expected: License plate extraction works via IPC
-- [ ] Vehicle with visible plate in frame
-- [ ] Console shows: "[IPC] ocr:extractPlate called"
-- [ ] Plate extracted correctly (Spanish format: 1234ABC)
-- [ ] No HTTP 404 errors in console
-- [ ] Takes <1000ms to complete
+Esperado: Fotogramas extraídos en resolución 2688x1520
+- [ ] Video procesado fotograma por fotograma
+- [ ] Sin errores de consola sobre extracción
+- [ ] Desempeño aceptable (<100ms por fotograma)
 ```
 
-#### 5.4 AI Analysis
+#### 5.3 Funcionalidad OCR
 ```
-Expected: Geometry and audit analysis works
-- [ ] Create traffic line (geometry creation)
-- [ ] Vehicle crosses line detected
-- [ ] Console shows: "[IPC] api:ai:geometry called"
-- [ ] Console shows: "[IPC] api:ai:audit called"
-- [ ] Infraction type detected (GIRO_PROHIBIDO, etc.)
-- [ ] Result saved to database
-```
-
-#### 5.5 PDF Generation
-```
-Expected: Boletín de denuncia generates and downloads
-- [ ] Click "Generate Report" or equivalent
-- [ ] PDF downloads (check Downloads folder)
-- [ ] PDF opens correctly in reader
-- [ ] Contains: Plate, timestamp, violation type, location
-- [ ] Spanish text renders correctly
+Esperado: La extracción de placas funciona vía IPC
+- [ ] Vehículo con placa visible en fotograma
+- [ ] La consola muestra: "[IPC] ocr:extractPlate called"
+- [ ] Placa extraída correctamente (formato español: 1234ABC)
+- [ ] Sin errores HTTP 404 en la consola
+- [ ] Se completa en <1000ms
 ```
 
-#### 5.6 Session Management
+#### 5.4 Análisis de IA
 ```
-Expected: Multiple sessions work without conflict
-- [ ] Upload video A, analyze
-- [ ] Upload video B without closing A
-- [ ] Both sessions independent
-- [ ] Switch between sessions
-- [ ] No memory leak (Task Manager: <500MB)
+Esperado: El análisis de geometría y auditoría funciona
+- [ ] Crear línea de tráfico (creación de geometría)
+- [ ] Cruce de vehículo detectado
+- [ ] La consola muestra: "[IPC] api:ai:geometry called"
+- [ ] La consola muestra: "[IPC] api:ai:audit called"
+- [ ] Tipo de infracción detectado (GIRO_PROHIBIDO, etc.)
+- [ ] Resultado guardado en la base de datos
 ```
 
-### 6. Performance Benchmarks
+#### 5.5 Generación de PDF
+```
+Esperado: Se genera Boletín de denuncia y se descarga
+- [ ] Haz clic en "Generar Informe" o equivalente
+- [ ] Se descarga PDF (verifica la carpeta Descargas)
+- [ ] PDF se abre correctamente en el lector
+- [ ] Contiene: Placa, timestamp, tipo de violación, ubicación
+- [ ] El texto en español se renderiza correctamente
+```
 
-Run while app is active:
+#### 5.6 Gestión de Sesiones
+```
+Esperado: Múltiples sesiones funcionan sin conflictos
+- [ ] Carga y analiza video A
+- [ ] Carga video B sin cerrar A
+- [ ] Ambas sesiones son independientes
+- [ ] Cambia entre sesiones
+- [ ] Sin fuga de memoria (Administrador de tareas: <500MB)
+```
+
+### 6. Puntos de Referencia de Desempeño
+
+Ejecuta mientras la aplicación está activa:
 
 ```
-Metric              | Target    | Actual | Pass
+Métrica              | Objetivo  | Real   | Pasó
 --------------------|-----------|--------|------
-Memory after 5 min  | <300 MB   | _____  | [ ]
-Memory after 30 min | <500 MB   | _____  | [ ]
-CPU average         | <20%      | _____  | [ ]
-Frame rate (video)  | 30 FPS    | _____  | [ ]
-OCR per image       | <1000ms   | _____  | [ ]
-AI analysis         | <2000ms   | _____  | [ ]
-Crash count         | 0         | _____  | [ ]
+Memoria en 5 min    | <300 MB   | _____  | [ ]
+Memoria en 30 min   | <500 MB   | _____  | [ ]
+Promedio CPU        | <20%      | _____  | [ ]
+Tasa de fotogramas  | 30 FPS    | _____  | [ ]
+OCR por imagen      | <1000ms   | _____  | [ ]
+Análisis de IA      | <2000ms   | _____  | [ ]
+Conteo de fallos    | 0         | _____  | [ ]
 ```
 
-### 7. Production Build
+### 7. Compilación de Producción
 
 ```bash
 npm run build
 ```
 
-- [ ] Build completes without errors
-- [ ] `build/SentinelV16-Setup.exe` created
-- [ ] File size reasonable (~400-500 MB)
-- [ ] No warnings about missing resources
+- [ ] Compilación completada sin errores
+- [ ] `build/SentinelV16-Setup.exe` creado
+- [ ] Tamaño de archivo razonable (~400-500 MB)
+- [ ] Sin advertencias sobre recursos faltantes
 
-### 8. Installer Testing (Final)
+### 8. Pruebas de Instalador (Final)
 
-**On a clean Windows VM or separate computer:**
+**En una VM limpia de Windows o computadora separada:**
 
-1. **Installation**
+1. **Instalación**
    ```
-   [ ] Double-click SentinelV16-Setup.exe
-   [ ] Installer starts
-   [ ] License screen appears (if configured)
-   [ ] Installation path dialog shows
-   [ ] Installation completes without errors
-   [ ] Desktop shortcut created
-   [ ] Start Menu shortcut created
-   ```
-
-2. **Launch**
-   ```
-   [ ] Click desktop shortcut
-   [ ] App launches within 3 seconds
-   [ ] Window appears fully rendered
-   [ ] No splash screen hang
-   [ ] React app loads visibly
+   [ ] Haz doble clic en SentinelV16-Setup.exe
+   [ ] El instalador comienza
+   [ ] Aparece pantalla de licencia (si está configurada)
+   [ ] Aparece diálogo de ruta de instalación
+   [ ] La instalación se completa sin errores
+   [ ] Se crea acceso directo de escritorio
+   [ ] Se crea acceso directo del menú Inicio
    ```
 
-3. **Full Workflow**
+2. **Lanzamiento**
    ```
-   [ ] All functional tests pass (5.1-5.6)
-   [ ] No dependency errors
-   [ ] No "missing DLL" errors
-   [ ] Performance acceptable
-   ```
-
-4. **Uninstallation**
-   ```
-   [ ] Control Panel → Programs → Uninstall
-   [ ] SentinelV16 appears in list
-   [ ] Uninstall completes cleanly
-   [ ] Shortcuts removed
-   [ ] No leftover files in Program Files
+   [ ] Haz clic en el acceso directo del escritorio
+   [ ] La aplicación se inicia en 3 segundos
+   [ ] La ventana aparece completamente renderizada
+   [ ] Sin congelación de pantalla de presentación
+   [ ] La aplicación React carga visiblemente
    ```
 
-### 9. Regression Testing
+3. **Flujo de Trabajo Completo**
+   ```
+   [ ] Todas las pruebas funcionales pasan (5.1-5.6)
+   [ ] Sin errores de dependencias
+   [ ] Sin errores de "DLL faltante"
+   [ ] Desempeño aceptable
+   ```
 
-Verify no regressions from web version:
+4. **Desinstalación**
+   ```
+   [ ] Panel de Control → Programas → Desinstalar
+   [ ] SentinelV16 aparece en la lista
+   [ ] Desinstalación se completa limpiamente
+   [ ] Se eliminan accesos directos
+   [ ] Sin archivos residuales en Archivos de Programa
+   ```
 
-- [ ] Video processing identical to web version
-- [ ] OCR accuracy same or better
-- [ ] Infraction detection matches web version
-- [ ] PDF output identical
-- [ ] Database storage works
-- [ ] Supabase auth works (if configured)
+### 9. Pruebas de Regresión
 
-### 10. Documentation Check
+Verifica que no hay regresiones de la versión web:
 
-- [ ] README_ELECTRON.md is accurate
-- [ ] QUICK_START.md reflects actual steps
-- [ ] Troubleshooting section covers found issues
-- [ ] System requirements documented
-- [ ] Known limitations documented
+- [ ] Procesamiento de video idéntico a versión web
+- [ ] Precisión de OCR igual o mejor
+- [ ] Detección de infracciones coincide con versión web
+- [ ] Salida PDF idéntica
+- [ ] Almacenamiento en base de datos funciona
+- [ ] Autenticación de Supabase funciona (si está configurada)
 
-## Sign-Off
+### 10. Verificación de Documentación
 
-**Deployment Ready:** [ ] YES / [ ] NO
+- [ ] README_ELECTRON.md es preciso
+- [ ] QUICK_START.md refleja los pasos reales
+- [ ] La sección de solución de problemas cubre los problemas encontrados
+- [ ] Requisitos del sistema documentados
+- [ ] Limitaciones conocidas documentadas
 
-**Blockers Found:**
+## Autorización
+
+**Listo para Despliegue:** [ ] SÍ / [ ] NO
+
+**Bloqueadores Encontrados:**
 ```
 1. ____________________
 2. ____________________
 3. ____________________
 ```
 
-**Notes:**
+**Notas:**
 ```
 ____________________
 ____________________
 ____________________
 ```
 
-**Tested By:** _______________
-**Date:** _______________
-**Build Version:** _______________
+**Probado Por:** _______________
+**Fecha:** _______________
+**Versión de Compilación:** _______________
 
-## Post-Deployment
+## Post-Despliegue
 
-### Monitoring
-- [ ] Monitor user feedback
-- [ ] Check crash reports (if telemetry enabled)
-- [ ] Monitor performance metrics
-- [ ] Log errors from users
+### Monitoreo
+- [ ] Monitorea retroalimentación de usuarios
+- [ ] Verifica informes de fallos (si la telemetría está habilitada)
+- [ ] Monitorea métricas de desempeño
+- [ ] Registra errores de usuarios
 
-### Hotfix Protocol
-If issues found:
-1. Identify root cause
-2. Fix in source code
-3. Run: `npm run build`
-4. Release new version
-5. Notify users
+### Protocolo de Corrección Rápida
+Si se encuentran problemas:
+1. Identifica la causa raíz
+2. Corrije en el código fuente
+3. Ejecuta: `npm run build`
+4. Lanza nueva versión
+5. Notifica a los usuarios
 
-### Analytics
-- [ ] Track feature usage
-- [ ] Monitor performance metrics
-- [ ] Collect user feedback
-- [ ] Plan next release
+### Analítica
+- [ ] Rastrear uso de características
+- [ ] Monitorear métricas de desempeño
+- [ ] Recopilar retroalimentación de usuarios
+- [ ] Planificar próximo lanzamiento
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2026-04-24
-**Status:** Ready for deployment
+**Versión:** 1.0
+**Última Actualización:** 2026-04-25
+**Estado:** Listo para despliegue

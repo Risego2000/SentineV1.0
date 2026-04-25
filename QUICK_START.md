@@ -1,98 +1,98 @@
-# SentinelV16 Electron - Quick Start Guide
+# SentinelV16 Electron - Guía de Inicio Rápido
 
-## ✅ Status
-- Electron setup: COMPLETE
-- Build system: COMPLETE  
-- React integration: COMPLETE
-- Backend integration: COMPLETE
-- Testing suite: COMPLETE
+## ✅ Estado
+- Configuración Electron: COMPLETADA
+- Sistema de construcción: COMPLETADO  
+- Integración React: COMPLETADA
+- Integración del backend: COMPLETADA
+- Suite de pruebas: COMPLETADA
 
-## ⏳ What's Missing
-- FFmpeg binary (~150 MB) - **Manual download required**
-- Python runtime (~100 MB) - **Manual download required**
-- PaddleOCR package - **Auto-installable once Python is ready**
+## ⏳ Qué Falta
+- Binario FFmpeg (~150 MB) - **Descarga manual requerida**
+- Runtime de Python (~100 MB) - **Descarga manual requerida**
+- Paquete PaddleOCR - **Auto-instalable una vez Python esté listo**
 
-## 🚀 Start Here (5 minutes)
+## 🚀 Comienza Aquí (5 minutos)
 
-### Option A: Automatic Installation (Recommended)
+### Opción A: Instalación Automática (Recomendada)
 ```bash
-# This will guide you through downloads
+# Esto te guiará a través de las descargas
 npm run install:all
 ```
 
-### Option B: Manual Installation
+### Opción B: Instalación Manual
 
-**Step 1: Download FFmpeg (5 min)**
+**Paso 1: Descargar FFmpeg (5 min)**
 ```
 1. https://github.com/BtbN/FFmpeg-Builds/releases
-2. Download: ffmpeg-master-latest-win64-gpl.zip
-3. Extract to: resources/ffmpeg/
-4. Keep: ffmpeg.exe, ffprobe.exe
-5. Delete: Everything else
+2. Descarga: ffmpeg-master-latest-win64-gpl.zip
+3. Extrae a: resources/ffmpeg/
+4. Conserva: ffmpeg.exe, ffprobe.exe
+5. Elimina: Todo lo demás
 ```
 
-**Step 2: Download Python (5 min)**
+**Paso 2: Descargar Python (5 min)**
 ```
 1. https://www.python.org/downloads/windows/
-2. Find Python 3.10.13
-3. Download: Windows embeddable package (64-bit)
-4. Extract to: resources/python/
+2. Encuentra Python 3.10.13
+3. Descarga: Windows embeddable package (64-bit)
+4. Extrae a: resources/python/
 ```
 
-**Step 3: Install PaddleOCR (10 min)**
+**Paso 3: Instalar PaddleOCR (10 min)**
 ```bash
 resources\python\python.exe -m pip install paddleocr paddlepaddle pillow
 ```
 
-## ✔️ Verify Installation
+## ✔️ Verificar Instalación
 ```bash
 npm run test:electron
 ```
 
-Expected output:
+Salida esperada:
 ```
 ✓ FFmpeg found
 ✓ Python found
 ✓ PaddleOCR installed
 ```
 
-## 🎮 Run Application
+## 🎮 Ejecutar Aplicación
 
-**Development:**
+**Desarrollo:**
 ```bash
 npm run electron
 ```
 
-**Production Build:**
+**Compilación de Producción:**
 ```bash
 npm run build
-# Output: build/SentinelV16-Setup.exe
+# Salida: build/SentinelV16-Setup.exe
 ```
 
-## 📋 Testing Checklist
+## 📋 Lista de Verificación de Testing
 
-Once running, verify:
-- [ ] Window opens without errors
-- [ ] React app loads (no red console errors)
-- [ ] DevTools works (F12)
-- [ ] Can upload video
-- [ ] MediaPipe detects vehicles
-- [ ] OCR extracts license plates correctly
-- [ ] AI analysis generates infractions
-- [ ] PDF reports generate
+Una vez en ejecución, verifica:
+- [ ] La ventana se abre sin errores
+- [ ] La aplicación React carga (sin errores rojos en consola)
+- [ ] DevTools funciona (F12)
+- [ ] Puedes cargar un video
+- [ ] MediaPipe detecta vehículos
+- [ ] OCR extrae placas correctamente
+- [ ] El análisis de IA genera infracciones
+- [ ] Se generan informes PDF
 
-## 🐛 Troubleshooting
+## 🐛 Solución de Problemas
 
 ### "FFmpeg not found"
 ```bash
 npm run download:ffmpeg
-# OR manually place ffmpeg.exe, ffprobe.exe in resources/ffmpeg/
+# O coloca manualmente ffmpeg.exe, ffprobe.exe en resources/ffmpeg/
 ```
 
 ### "Python not found"
 ```bash
 npm run download:python
-# OR manually extract Python to resources/python/
+# O extrae manualmente Python a resources/python/
 ```
 
 ### "PaddleOCR not installed"
@@ -106,23 +106,23 @@ npm run build:electron
 npm run electron
 ```
 
-## 📚 More Documentation
+## 📚 Más Documentación
 
-- `README_ELECTRON.md` - Complete guide
-- `NEXT_STEPS.md` - Detailed walkthrough
-- `PHASE6_TESTING.md` - Testing strategy
+- `README_ELECTRON.md` - Guía completa
+- `NEXT_STEPS.md` - Recorrido detallado
+- `PHASE6_TESTING.md` - Estrategia de testing
 
-## ⏱️ Estimated Time
+## ⏱️ Tiempo Estimado
 
-| Task | Time |
-|------|------|
-| Download FFmpeg | 5-10 min |
-| Download Python | 5-10 min |
-| Install PaddleOCR | 10-15 min |
-| Test app | 5 min |
-| Build production | 5 min |
+| Tarea | Tiempo |
+|------|--------|
+| Descargar FFmpeg | 5-10 min |
+| Descargar Python | 5-10 min |
+| Instalar PaddleOCR | 10-15 min |
+| Probar aplicación | 5 min |
+| Compilar producción | 5 min |
 | **Total** | **30-50 min** |
 
 ---
 
-**You're ~95% done. Just download the files and install PaddleOCR!**
+**¡Ya estás al ~95%! Solo necesitas descargar los archivos e instalar PaddleOCR!**
