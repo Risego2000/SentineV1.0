@@ -1,136 +1,137 @@
-# SentinelV16 - Electron Development Guide
+# SentinelV16 - Guía de Desarrollo de Electron
 
-## Running in Electron (Development Mode)
+## Ejecutar en Electron (Modo Desarrollo)
 
-### Prerequisites
-- Node.js 18+ installed
-- All npm dependencies installed (`npm install`)
+### Requisitos Previos
+- Node.js 18+ instalado
+- Todas las dependencias npm instaladas (`npm install`)
 
-### Start Electron Development Environment
+### Iniciar Entorno de Desarrollo de Electron
 
 ```bash
-# One-time setup: Compile Electron files
+# Configuración única: Compilar archivos Electron
 npm run build:electron
 
-# Start Electron + Vite dev server in parallel
+# Iniciar Electron + servidor Vite dev en paralelo
 npm run electron
 ```
 
-This will:
-1. Start Vite dev server on `http://localhost:5173` (hot reload)
-2. Start Electron main process, which initializes Express backend on a free port
-3. Pass backend port to renderer via IPC
+Esto hará:
+1. Inicia servidor Vite en `http://localhost:5173` (hot reload)
+2. Inicia el proceso principal de Electron, que inicializa el backend Express en un puerto libre
+3. Pasa el puerto del backend al renderer vía IPC
 
-### Or Run Separately (for debugging)
+### O Ejecutar Separadamente (para depuración)
 
-**Terminal 1: Start Vite frontend**
+**Terminal 1: Iniciar frontend Vite**
 ```bash
 npm run dev
 ```
 
-**Terminal 2: Start Electron**
+**Terminal 2: Iniciar Electron**
 ```bash
 npm run dev:electron
 ```
 
-**Terminal 3: (Optional) Start Express backend separately**
+**Terminal 3: (Opcional) Iniciar backend Express separadamente**
 ```bash
 npm run dev:api
 ```
 
-## Building for Distribution
+## Compilación para Distribución
 
 ```bash
-# Build Vite + Electron + Package
+# Compilar Vite + Electron + Paquete
 npm run build
 
-# Output: build/SentinelV16-Setup.exe (Windows)
+# Salida: build/SentinelV16-Setup.exe (Windows)
 ```
 
-## Architecture
+## Arquitectura
 
-### Electron Main Process
-- File: `electron/main.ts` → compiled to `dist/electron/main.js`
-- Responsibilities:
-  - Create application window
-  - Initialize Express backend
-  - Handle IPC requests from renderer
-  - Forward API calls to localhost Express server
+### Proceso Principal de Electron
+- Archivo: `electron/main.ts` → compilado a `dist/electron/main.js`
+- Responsabilidades:
+  - Crear ventana de aplicación
+  - Inicializar backend Express
+  - Manejar solicitudes IPC del renderer
+  - Reenviar llamadas API al servidor Express en localhost
 
-### Electron Renderer (React)
-- File: `App.tsx` and React components
-- Capabilities:
-  - Regular DOM manipulation via React
-  - IPC calls via `window.electron.ipc.invoke()`
-  - Cannot access Node.js directly (sandboxed)
+### Renderer de Electron (React)
+- Archivo: `App.tsx` y componentes React
+- Capacidades:
+  - Manipulación regular del DOM vía React
+  - Llamadas IPC vía `window.electron.ipc.invoke()`
+  - No puede acceder directo a Node.js (sandboxed)
 
-### IPC Communication
-- **Preload**: `electron/preload.ts` (secure bridge)
-- **Exposed methods**:
-  - `window.electron.ipc.invoke(channel, data)` - Call main process
-  - `window.electron.app.getAppPath(pathName)` - Get app paths
-  - `window.electron.window.*` - Window controls
+### Comunicación IPC
+- **Preload**: `electron/preload.ts` (puente seguro)
+- **Métodos expuestos**:
+  - `window.electron.ipc.invoke(channel, data)` - Llamar al proceso principal
+  - `window.electron.app.getAppPath(pathName)` - Obtener rutas de aplicación
+  - `window.electron.window.*` - Controles de ventana
 
-### Services with IPC Support
-- **OCRSynchronizer**: Detects Electron, uses IPC for `/api/ocr/*` endpoints
-- **AIService**: Detects Electron, uses IPC for `/api/ai/*` endpoints
-- Fallback to HTTP when not in Electron (web mode)
+### Servicios con Soporte IPC
+- **OCRSynchronizer**: Detecta Electron, usa IPC para endpoints `/api/ocr/*`
+- **AIService**: Detecta Electron, usa IPC para endpoints `/api/ai/*`
+- Fallback a HTTP cuando no está en Electron (modo web)
 
-## Environment Variables
+## Variables de Entorno
 
-None required for basic development. In production:
-- `GEMINI_API_KEY` - For Gemini AI analysis
-- `SUPABASE_URL` - For Supabase auth
-- `SUPABASE_ANON_KEY` - For Supabase client
+Ninguna requerida para desarrollo básico. En producción:
+- `GEMINI_API_KEY` - Para análisis de IA Gemini
+- `SUPABASE_URL` - Para autenticación Supabase
+- `SUPABASE_ANON_KEY` - Para cliente Supabase
 
-## Troubleshooting
+## Solución de Problemas
 
 ### "Cannot find module 'express'"
-Run `npm install` to install dependencies.
+Ejecuta `npm install` para instalar dependencias.
 
 ### Preload permission denied
-Ensure `electron/preload.ts` is correctly compiled to `dist/electron/preload.js`.
+Asegúrate de que `electron/preload.ts` está correctamente compilado a `dist/electron/preload.js`.
 
 ### IPC handler not found
-Check that:
-1. Handler is registered in `electron/main.ts` via `ipcMain.handle()`
-2. Service calls `window.electron.ipc.invoke()` with correct channel name
-3. Main process was recompiled (run `npm run build:electron`)
+Verifica que:
+1. El handler esté registrado en `electron/main.ts` vía `ipcMain.handle()`
+2. El servicio llame `window.electron.ipc.invoke()` con el nombre de canal correcto
+3. El proceso principal fue recompilado (ejecuta `npm run build:electron`)
 
-### Port conflicts
-Electron assigns a free port automatically. If you need a specific port, modify `electron/main.ts`.
+### Conflictos de puerto
+Electron asigna un puerto libre automáticamente. Si necesitas un puerto específico, modifica `electron/main.ts`.
 
-## Next Steps
+## Siguientes Pasos
 
-1. **FASE 5**: Bundle FFmpeg and Python with Electron
-2. **FASE 6**: Comprehensive testing (all features work in Electron)
-3. **Distribution**: Build installers for Windows/macOS/Linux
+1. **FASE 5**: Empaquetar FFmpeg y Python con Electron
+2. **FASE 6**: Testing comprensivo (todas las características funcionan en Electron)
+3. **Distribución**: Compilar instaladores para Windows/macOS/Linux
 
-## Architecture Diagram
+## Diagrama de Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────┐
-│        Electron Main Process                    │
+│        Proceso Principal de Electron            │
 │  ┌──────────────────────────────────────────┐  │
 │  │ electron/main.ts                         │  │
 │  ├──────────────────────────────────────────┤  │
-│  │ - Window Management                      │  │
-│  │ - Express Server (localhost:3002+)       │  │
-│  │ - IPC Handler Registry                   │  │
+│  │ - Gestión de Ventana                     │  │
+│  │ - Servidor Express (localhost:3002+)     │  │
+│  │ - Registro de Manejadores IPC            │  │
 │  └──────────────────────────────────────────┘  │
-│           ↕ IPC Bridge (preload.ts)            │
+│           ↕ Puente IPC (preload.ts)            │
 └──────────────┬────────────────────────────────┘
                │
        ┌───────▼────────┐
        │ Renderer       │
-       │ (React App)    │
+       │ (Aplicación    │
+       │  React)        │
        │ - App.tsx      │
-       │ - Services     │
+       │ - Servicios    │
        │  (IPC aware)   │
        └────────────────┘
 ```
 
-## References
-- [Electron Docs](https://www.electronjs.org/docs)
-- [IPC Communication](https://www.electronjs.org/docs/latest/tutorial/ipc)
-- [Context Isolation & Preload](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
+## Referencias
+- [Documentación Electron](https://www.electronjs.org/docs)
+- [Comunicación IPC](https://www.electronjs.org/docs/latest/tutorial/ipc)
+- [Context Isolation y Preload](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
