@@ -7,8 +7,8 @@ import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 
-// Get app directory - in dev mode use process.cwd(), in production use app.getAppPath()
-const __dirname = process.cwd();
+// Note: __dirname is automatically available in CommonJS (when compiled to .cjs)
+// In Electron context, it will point to the app's directory
 
 let mainWindow: BrowserWindow | null = null;
 let expressServer: any = null;
