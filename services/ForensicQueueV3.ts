@@ -431,7 +431,7 @@ export class ForensicQueueV3 {
         const geometricAnalysis = this.determineInfractionGeometric(
           current.job.trackState,
           current.job.geometryState,
-          current.job.trackState.roiHistory
+          [...current.job.trackState.roiHistory] // Convert readonly to mutable array
         );
 
         // Use geometric analysis if confidence is high, otherwise fallback to AI
@@ -692,6 +692,7 @@ export class ForensicQueueV3 {
         localTime: current.job.snapshot.localTime,
         playbackTime: current.job.snapshot.playbackTime,
         viewerId: current.job.viewerId,
+        visualTimestamp: current.job.snapshot.videoTimeCode, // ISO timestamp from snapshot
         telemetry: {
           speedEstimated: `${current.job.trackState.avgVelocity || 0} km/h`,
           behaviorAnomalies: current.job.trackState.anomalyLabel || 'None',

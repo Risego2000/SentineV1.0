@@ -4,8 +4,8 @@
  */
 
 import { create } from 'zustand';
-import { AuditJob, AuditJobStatus, AuditPresetType, InfractionLog } from '../types';
-import { ForensicRule, FORENSIC_RULES } from '../types/forensicRules';
+import { AuditJob, AuditJobStatus, AuditPresetType, InfractionLog } from '../../types';
+import { ForensicRule, FORENSIC_RULES } from '../../types/forensicRules';
 import { forensicQueue } from '../../services/ForensicQueue';
 import { logger } from '../../services/logger';
 

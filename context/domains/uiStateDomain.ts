@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { SystemStatus, SystemLog } from '../types';
+import { SystemStatus, SystemLog } from '../../types';
 
 interface UIState {
   // Sidebar state

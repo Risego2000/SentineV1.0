@@ -105,6 +105,7 @@ export interface Track {
   collisionTargetId?: number;
   auditStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   auditTimestamp?: number;
+  infractionTimestamp?: string; // ISO timestamp when infraction was detected (OSD)
   dwellTime: number; // Residence time in zone (ms)
   lastIntersection?: string;
   lastZoneId?: string;

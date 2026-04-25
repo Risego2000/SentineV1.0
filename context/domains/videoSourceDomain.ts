@@ -4,8 +4,8 @@
  */
 
 import { create } from 'zustand';
-import { VideoSource } from '../types';
-import { logger } from '../services/logger';
+import { VideoSource } from '../../stores/videoSourceStore';
+import { logger } from '../../services/logger';
 
 export interface VideoSourceConfig {
   type: VideoSource;

@@ -4,9 +4,9 @@
  */
 
 import { create } from 'zustand';
-import { InfractionLog } from '../types';
-import { ReportService } from '../services/ReportService';
-import { logger } from '../services/logger';
+import { InfractionLog } from '../../types';
+import { ReportService } from '../../services/ReportService';
+import { logger } from '../../services/logger';
 
 interface ReportState {
   // Report generation
