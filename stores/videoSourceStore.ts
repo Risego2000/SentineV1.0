@@ -8,7 +8,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 
 export type VideoSource = 'none' | 'upload' | 'live' | 'ip';
 
-interface VideoSourceState {
+interface VideoSourceStateBase {
   // Current source type
   source: VideoSource;
 
@@ -27,8 +27,9 @@ interface VideoSourceState {
 
   // Status
   statusMsg: string | null;
+}
 
-  // Actions
+interface VideoSourceActions {
   setSource: (source: VideoSource) => void;
   setPlaying: (playing: boolean) => void;
   togglePlaying: () => void;
@@ -42,7 +43,9 @@ interface VideoSourceState {
   reset: () => void;
 }
 
-const initialState: VideoSourceState = {
+type VideoSourceState = VideoSourceStateBase & VideoSourceActions;
+
+const initialState: VideoSourceStateBase = {
   source: 'none',
   isPlaying: false,
   isBatchMode: false,

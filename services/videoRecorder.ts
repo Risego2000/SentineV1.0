@@ -104,7 +104,7 @@ export class VideoBufferService {
       if (this.mode === 'roi_based') {
         this.isRecording = false;
         const elapsed = ((Date.now() - this.recordingStartTime) / 1000).toFixed(1);
-        logger.info(`RECORDER', 'Grabación finalizada en ROI B (duración: ${elapsed}s)`);
+        logger.info('RECORDER', `Grabación finalizada en ROI B (duración: ${elapsed}s)`);
       }
       this.mediaRecorder.stop();
     }

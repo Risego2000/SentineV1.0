@@ -19,6 +19,7 @@ interface State {
  * canvas operation inside MainViewer).
  */
 export class ErrorBoundary extends Component<Props, State> {
+  declare readonly props: Readonly<Props>;
   state: State = { hasError: false, errorMessage: '' };
 
   static getDerivedStateFromError(error: Error): State {
