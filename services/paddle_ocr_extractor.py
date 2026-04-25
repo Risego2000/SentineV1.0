@@ -2,12 +2,17 @@
 """
 PaddleOCR Extractor - License plate and timestamp extraction
 Optimized for speed and accuracy with Spanish license plates
+WITH IMAGE ENHANCEMENT (HR + preprocessing)
 """
 
 import json
 import sys
 import base64
 import io
+import re
+from datetime import datetime
+import cv2
+import numpy as np
 from PIL import Image
 
 try:
@@ -24,6 +29,60 @@ ocr = PaddleOCR(
     lang=['en', 'es'],    # English + Spanish
     show_log=False,       # Reduce logging
 )
+
+def enhance_image_for_ocr(img, target_height=600):
+    """
+    Enhance image before OCR for maximum accuracy.
+    Pipeline:
+    1. Upsampling si necesario (HR)
+    2. CLAHE contrast enhancement
+    3. Bilateral denoising
+    4. Sharpening
+    5. Adaptive thresholding
+    6. Morphological cleanup
+    """
+    try:
+        original_height = img.shape[0]
+
+        # 1. UPSAMPLING (Super-Resolution)
+        if original_height < target_height:
+            scale = target_height / original_height
+            new_width = int(img.shape[1] * scale)
+            img = cv2.resize(img, (new_width, target_height), interpolation=cv2.INTER_CUBIC)
+            # Sharpening post-upsampling
+            kernel = np.array([[-1,-1,-1],
+                              [-1, 9,-1],
+                              [-1,-1,-1]]) / 1.0
+            img = cv2.filter2D(img, -1, kernel)
+
+        # 2. Convert to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+
+        # 3. CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+
+        # 4. BILATERAL DENOISING (preserves edges)
+        denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
+
+        # 5. SHARPENING (Unsharp Mask)
+        gaussian = cv2.GaussianBlur(denoised, (0, 0), 2.0)
+        sharpened = cv2.addWeighted(denoised, 1.5, gaussian, -0.5, 0)
+
+        # 6. MORPHOLOGICAL OPERATIONS
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        morph = cv2.morphologyEx(sharpened, cv2.MORPH_CLOSE, kernel, iterations=1)
+        morph = cv2.morphologyEx(morph, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        # 7. ADAPTIVE THRESHOLD (binarization para OCR)
+        binary = cv2.adaptiveThreshold(morph, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                       cv2.THRESH_BINARY, 11, 2)
+
+        return binary
+    except Exception as e:
+        print(f"[OCR_ENHANCE] Enhancement failed: {str(e)}", file=sys.stderr)
+        # Return original image if enhancement fails
+        return gray if 'gray' in locals() else img
 
 def normalize_plate(text):
     """
@@ -98,58 +157,249 @@ def normalize_timestamp(text):
     return ' '.join(result) if result else text
 
 def extract_plate(images_b64):
-    """Extract license plate from multiple images"""
+    """
+    Extract license plate from multiple images with enhancement.
+
+    Process:
+    1. Decode base64 → OpenCV image
+    2. Enhance image (HR upsampling + preprocessing)
+    3. PaddleOCR extraction
+    4. Normalize to Spanish plate format
+    5. Voting mechanism (pick most common)
+    """
     candidates = {}
-    
-    for img_b64 in images_b64[:10]:
+    enhancement_metrics = []
+
+    for idx, img_b64 in enumerate(images_b64[:10]):  # Max 10 images
         try:
+            # 1. DECODE
             img_data = base64.b64decode(img_b64)
-            img = Image.open(io.BytesIO(img_data))
-            result = ocr.ocr(img, cls=False)
-            
+            img = cv2.imdecode(np.frombuffer(img_data, np.uint8), cv2.IMREAD_COLOR)
+
+            if img is None:
+                print(f"[OCR] Image {idx}: decode failed", file=sys.stderr)
+                continue
+
+            # 2. ENHANCE
+            enhanced_img = enhance_image_for_ocr(img, target_height=600)
+            enhancement_metrics.append({
+                "image_idx": idx,
+                "enhancement_applied": True,
+                "original_shape": img.shape,
+                "enhanced_shape": enhanced_img.shape
+            })
+
+            # 3. OCR ON ENHANCED IMAGE
+            # Convert back to PIL for PaddleOCR
+            enhanced_pil = Image.fromarray(enhanced_img)
+            result = ocr.ocr(enhanced_pil, cls=False)
+
+            # 4. EXTRACT & NORMALIZE
             for line in result:
+                if not line:
+                    continue
                 for word_info in line:
+                    if len(word_info) < 2:
+                        continue
                     text = word_info[1]
+                    confidence = word_info[2] if len(word_info) > 2 else 0.5
+
+                    # Only consider high-confidence detections
+                    if confidence < 0.3:
+                        continue
+
                     normalized = normalize_plate(text)
                     if normalized:
-                        candidates[normalized] = candidates.get(normalized, 0) + 1
+                        # Weight by confidence
+                        candidates[normalized] = candidates.get(normalized, 0) + confidence
+
         except Exception as e:
-            print(f"[OCR_ERROR] {str(e)}", file=sys.stderr)
+            print(f"[OCR_ERROR] Image {idx}: {str(e)}", file=sys.stderr)
+            enhancement_metrics.append({
+                "image_idx": idx,
+                "enhancement_applied": False,
+                "error": str(e)
+            })
             continue
-    
+
+    # 5. VOTING MECHANISM
     if candidates:
+        # Pick plate with highest total confidence
         best_plate = max(candidates, key=candidates.get)
+        total_confidence = candidates[best_plate]
+        num_images = len([m for m in enhancement_metrics if m.get("enhancement_applied")])
+
         return {
             "plate": best_plate,
-            "candidates": list(candidates.keys()),
-            "confidence": candidates[best_plate] / max(1, len(images_b64))
+            "candidates": sorted(candidates.keys(), key=lambda x: candidates[x], reverse=True),
+            "confidence": min(1.0, total_confidence / max(1, num_images)),
+            "metrics": {
+                "images_processed": len(enhancement_metrics),
+                "plates_detected": len(candidates),
+                "enhancement_applied_count": sum(1 for m in enhancement_metrics if m.get("enhancement_applied")),
+                "enhancement_metrics": enhancement_metrics
+            }
         }
-    
-    return {"plate": "", "candidates": [], "confidence": 0}
+
+    return {
+        "plate": "",
+        "candidates": [],
+        "confidence": 0,
+        "metrics": {
+            "images_processed": len(enhancement_metrics),
+            "enhancement_applied_count": sum(1 for m in enhancement_metrics if m.get("enhancement_applied")),
+            "enhancement_metrics": enhancement_metrics
+        }
+    }
+
+def validate_timestamp(timestamp_str):
+    """
+    Validate timestamp extracted from OSD.
+
+    Formats supported:
+    - DD/MM/YYYY HH:MM:SS
+    - YYYY-MM-DD HH:MM:SS
+    - DD-MM-YYYY HH:MM:SS
+
+    Returns: validated timestamp or None
+    """
+    import re
+    from datetime import datetime
+
+    if not timestamp_str or not isinstance(timestamp_str, str):
+        return None
+
+    # Pattern 1: DD/MM/YYYY HH:MM:SS or YYYY/MM/DD HH:MM:SS
+    pattern1 = r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})'
+    match = re.search(pattern1, timestamp_str)
+
+    if match:
+        try:
+            groups = match.groups()
+            first, second, year, hour, minute, second_val = map(int, groups)
+
+            # Determine format (DD/MM vs MM/DD)
+            # If first > 12, it's definitely DD
+            if first > 12:
+                day, month = first, second
+            # If second > 12, it's DD/MM
+            elif second > 12:
+                day, month = first, second
+            # If both ≤ 12, assume DD/MM (Spanish format)
+            else:
+                day, month = first, second
+
+            # Validate ranges
+            assert 1 <= month <= 12, f"Invalid month: {month}"
+            assert 1 <= day <= 31, f"Invalid day: {day}"
+            assert 1000 <= year <= 2100, f"Invalid year: {year}"
+            assert 0 <= hour <= 23, f"Invalid hour: {hour}"
+            assert 0 <= minute <= 59, f"Invalid minute: {minute}"
+            assert 0 <= second_val <= 59, f"Invalid second: {second_val}"
+
+            # Create datetime to validate date exists
+            dt = datetime(year, month, day, hour, minute, second_val)
+
+            # Return normalized format
+            return f"{day:02d}/{month:02d}/{year} {hour:02d}:{minute:02d}:{second_val:02d}"
+
+        except (ValueError, AssertionError) as e:
+            print(f"[OCR_TIMESTAMP] Validation failed: {str(e)}", file=sys.stderr)
+            return None
+
+    return None
+
 
 def extract_timestamp(image_b64):
-    """Extract timestamp from OSD region"""
+    """
+    Extract timestamp from OSD region with validation.
+
+    Process:
+    1. Decode image
+    2. Enhance (HR + preprocessing)
+    3. OCR text extraction
+    4. Parse and validate timestamp format
+    """
     try:
+        # 1. DECODE
         img_data = base64.b64decode(image_b64)
-        img = Image.open(io.BytesIO(img_data))
-        result = ocr.ocr(img, cls=False)
-        
+        img = cv2.imdecode(np.frombuffer(img_data, np.uint8), cv2.IMREAD_COLOR)
+
+        if img is None:
+            return {
+                "timestamp": "",
+                "raw_text": "",
+                "confidence": False,
+                "error": "Image decode failed"
+            }
+
+        # 2. ENHANCE
+        enhanced_img = enhance_image_for_ocr(img, target_height=400)
+
+        # 3. OCR
+        enhanced_pil = Image.fromarray(enhanced_img)
+        result = ocr.ocr(enhanced_pil, cls=False)
+
         texts = []
         for line in result:
+            if not line:
+                continue
             for word_info in line:
-                texts.append(word_info[1])
-        
+                if len(word_info) >= 2:
+                    confidence = word_info[2] if len(word_info) > 2 else 0.5
+                    # Only include high-confidence text
+                    if confidence > 0.3:
+                        texts.append(word_info[1])
+
+        if not texts:
+            return {
+                "timestamp": "",
+                "raw_text": "",
+                "confidence": False,
+                "error": "No text detected in OSD region"
+            }
+
         combined_text = ' '.join(texts)
-        normalized = normalize_timestamp(combined_text)
-        
-        return {
-            "timestamp": normalized,
-            "raw_text": combined_text,
-            "confidence": len(texts) > 0
-        }
+
+        # 4. VALIDATE TIMESTAMP
+        validated_timestamp = validate_timestamp(combined_text)
+
+        if validated_timestamp:
+            return {
+                "timestamp": validated_timestamp,
+                "raw_text": combined_text,
+                "confidence": True,
+                "validation_status": "valid"
+            }
+        else:
+            # Try fallback: simple regex parse
+            import re
+            time_match = re.search(r'(\d{1,2}):(\d{2}):(\d{2})', combined_text)
+            date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', combined_text)
+
+            fallback = []
+            if date_match:
+                fallback.append(f"{date_match.group(1)}/{date_match.group(2)}/{date_match.group(3)}")
+            if time_match:
+                fallback.append(f"{time_match.group(1)}:{time_match.group(2)}:{time_match.group(3)}")
+
+            fallback_timestamp = ' '.join(fallback) if fallback else ""
+
+            return {
+                "timestamp": fallback_timestamp,
+                "raw_text": combined_text,
+                "confidence": bool(fallback_timestamp),
+                "validation_status": "unvalidated"
+            }
+
     except Exception as e:
-        print(f"[OCR_ERROR] {str(e)}", file=sys.stderr)
-        return {"timestamp": "", "raw_text": "", "confidence": False}
+        print(f"[OCR_ERROR] Timestamp extraction: {str(e)}", file=sys.stderr)
+        return {
+            "timestamp": "",
+            "raw_text": "",
+            "confidence": False,
+            "error": str(e)
+        }
 
 def main():
     try:

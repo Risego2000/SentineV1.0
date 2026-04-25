@@ -22,6 +22,10 @@ import {
   shutdownOcrWorker,
 } from './services/paddleOcrService.js';
 import {
+  enhanceImageForOCR,
+  enhanceImagesForOCR,
+} from './services/imageEnhancementService.js';
+import {
   isPrivateAddress,
   sanitizeFilename,
   isPathWithinDir,
@@ -630,6 +634,77 @@ app.post('/api/ai/audit', async (req, res) => {
     logger.errorWithContext('API_AI_AUDIT', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error analizando trayectoria',
+    });
+  }
+});
+
+// ============= IMAGE ENHANCEMENT =============
+
+/**
+ * POST /api/images/enhance
+ * Enhance images for OCR: HR upsampling + preprocessing
+ *
+ * Body:
+ * {
+ *   image?: string (single base64 image),
+ *   images?: string[] (multiple base64 images),
+ *   target_height?: number (default 600, height for upsampling)
+ * }
+ *
+ * Response: {enhanced, metadata, error?} or {enhanced_images, metadata[], ...}
+ */
+app.post('/api/images/enhance', async (req, res) => {
+  try {
+    const { image, images, target_height = 600 } = req.body;
+
+    // Validations
+    if (!image && !images) {
+      return res.status(400).json({
+        error: 'At least one image required (image or images array)'
+      });
+    }
+
+    if (images && (!Array.isArray(images) || images.length === 0)) {
+      return res.status(400).json({
+        error: 'images must be a non-empty array of base64 strings'
+      });
+    }
+
+    if (target_height < 200 || target_height > 2000) {
+      return res.status(400).json({
+        error: 'target_height must be between 200 and 2000'
+      });
+    }
+
+    logger.info('API_IMAGES_ENHANCE', `Enhancing ${images ? images.length : 1} image(s)`);
+
+    let result;
+
+    if (images && images.length > 1) {
+      // Batch enhance
+      result = await enhanceImagesForOCR(images, target_height);
+      logger.info('API_IMAGES_ENHANCE', `Batch complete: ${result.success_count}/${result.total} enhanced`);
+    } else {
+      // Single enhance
+      const singleImage = image || (images && images[0]);
+      result = await enhanceImageForOCR(singleImage, target_height);
+
+      if (result.error) {
+        logger.warn('API_IMAGES_ENHANCE', `Enhancement warning: ${result.error}`);
+        return res.status(400).json({
+          error: result.error,
+          enhanced: null
+        });
+      }
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    logger.errorWithContext('API_IMAGES_ENHANCE', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error enhancing images',
+      enhanced: null
     });
   }
 });
