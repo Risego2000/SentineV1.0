@@ -195,14 +195,27 @@ def extract_plate(images_b64):
             result = ocr.ocr(enhanced_pil, cls=False)
 
             # 4. EXTRACT & NORMALIZE
+            # PaddleOCR format per word: [bbox_points, (text, confidence)]
+            # bbox_points = [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+            # word_info[1] = ('recognized_text', confidence_float) — NOT just the text!
             for line in result:
                 if not line:
                     continue
                 for word_info in line:
                     if len(word_info) < 2:
                         continue
-                    text = word_info[1]
-                    confidence = word_info[2] if len(word_info) > 2 else 0.5
+                    text_conf = word_info[1]  # This is (text, confidence) tuple
+                    # Safely unpack the (text, confidence) tuple
+                    if isinstance(text_conf, (list, tuple)) and len(text_conf) >= 2:
+                        text = str(text_conf[0])
+                        try:
+                            confidence = float(text_conf[1]) if text_conf[1] is not None else 0.5
+                        except (TypeError, ValueError):
+                            confidence = 0.5
+                    else:
+                        # Fallback: treat as raw text with default confidence
+                        text = str(text_conf)
+                        confidence = 0.5
 
                     # Only consider high-confidence detections
                     if confidence < 0.3:
@@ -210,7 +223,7 @@ def extract_plate(images_b64):
 
                     normalized = normalize_plate(text)
                     if normalized:
-                        # Weight by confidence
+                        # Weight by confidence for voting
                         candidates[normalized] = candidates.get(normalized, 0) + confidence
 
         except Exception as e:
@@ -345,11 +358,22 @@ def extract_timestamp(image_b64):
             if not line:
                 continue
             for word_info in line:
-                if len(word_info) >= 2:
-                    confidence = word_info[2] if len(word_info) > 2 else 0.5
-                    # Only include high-confidence text
-                    if confidence > 0.3:
-                        texts.append(word_info[1])
+                if len(word_info) < 2:
+                    continue
+                # PaddleOCR format: [bbox, (text, confidence)]
+                text_conf = word_info[1]  # (text, confidence) tuple
+                if isinstance(text_conf, (list, tuple)) and len(text_conf) >= 2:
+                    text = str(text_conf[0])
+                    try:
+                        confidence = float(text_conf[1]) if text_conf[1] is not None else 0.5
+                    except (TypeError, ValueError):
+                        confidence = 0.5
+                else:
+                    text = str(text_conf)
+                    confidence = 0.5
+                # Only include high-confidence text for timestamp extraction
+                if confidence > 0.3:
+                    texts.append(text)
 
         if not texts:
             return {

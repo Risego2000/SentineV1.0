@@ -193,7 +193,7 @@ export function validateGeometryResponse(response) {
   for (let i = 0; i < response.lines.length; i++) {
     const line = response.lines[i];
 
-    if (!line.x1 !== undefined || line.y1 === undefined || line.x2 === undefined || line.y2 === undefined) {
+    if (line.x1 === undefined || line.y1 === undefined || line.x2 === undefined || line.y2 === undefined) {
       errors.push(`Line ${i}: missing coordinates`);
       continue;
     }

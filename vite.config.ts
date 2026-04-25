@@ -56,6 +56,19 @@ export default defineConfig(() => {
         host: 'localhost',
         // Let Vite auto-detect the correct port instead of hardcoding
       },
+      // Exclude binary/resource directories from the file watcher.
+      // resources/ contains Python runtime, FFmpeg binaries and PaddleOCR models —
+      // watching them causes chokidar lstat errors on locked Windows DLLs and is
+      // completely unnecessary for HMR (these are not source files).
+      watch: {
+        ignored: [
+          '**/resources/**',
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/dist/**',
+          '**/build/**',
+        ],
+      },
       headers: {
         'Cross-Origin-Embedder-Policy': 'require-corp',
         'Cross-Origin-Opener-Policy': 'same-origin',

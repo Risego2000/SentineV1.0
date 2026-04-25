@@ -199,15 +199,16 @@ const getEncoderArgs = (outputCodec = 'h264') => {
     if (hardwareAccel === 'apple') {
       return ['-c:v', 'h264_videotoolbox'];
     }
-    // CPU encoding: optimized for speed/quality tradeoff
-    // CRF 23 = visually lossless, 26 = good quality, 28 = acceptable
-    // -preset medium = balance speed/quality, fast = faster encoding
+    // CPU encoding: máxima calidad forense
+    // CRF 18 = visualmente idéntico al original (rango broadcast/forense)
+    // -preset slow = mejor compresión/calidad (los archivos son evidencia, no streaming)
     return [
       '-c:v', 'libx264',
-      '-preset', 'medium',  // Balance: faster than 'slow', better quality than 'fast'
-      '-crf', '23',         // Quality: 23 = nearly lossless (0-51, lower = better)
-      '-pix_fmt', 'yuv420p', // Pixel format: required for H.264 compatibility
-      '-profile:v', 'high', // Profile: high = better compression than baseline
+      '-preset', 'slow',    // Mejor relación calidad/tamaño (evidencia forense, no streaming)
+      '-crf', '18',         // CRF 18 = calidad muy alta (0-51, menor = mejor)
+      '-pix_fmt', 'yuv420p', // Pixel format: requerido para compatibilidad H.264
+      '-profile:v', 'high', // Profile high = mejor compresión que baseline
+      '-level', '4.1',      // Level 4.1 = compatible con reproductores forenses estándar
     ];
   }
 };

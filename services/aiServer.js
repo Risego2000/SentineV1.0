@@ -103,16 +103,37 @@ const compressImageForAI = (base64Image) => {
 };
 
 /**
- * Filter snapshots to only the most critical one for analysis
- * Using only 1 image is more efficient and reduces payload
+ * Select forensic evidence triplet for AI analysis.
+ * Priority: use pre-computed contextSnapshots/zoomSnapshots (already selected by ForensicQueueV3
+ * as entrada+crítica+salida triplets), falling back to extracting the triplet from raw snapshots.
+ * Returns 3 frames max: [entrada, crítica, salida] — enough for Gemini to understand the
+ * full trajectory arc without exceeding payload limits.
  */
-const filterSnapshotsForAI = (snapshots = []) => {
-  if (!snapshots || snapshots.length === 0) return [];
+const filterSnapshotsForAI = (snapshots = [], contextSnapshots = [], zoomSnapshots = []) => {
+  // Priority 1: use pre-computed forensic triplet from context + zoom frames
+  // contextSnapshots = wide-angle scene view triplet (entrada, crítica, salida)
+  // zoomSnapshots    = vehicle close-up triplet for plate/detail visibility
+  // We interleave them: [context_entrada, zoom_crítica, context_salida] for maximum information
+  const forensicTriplet = [];
+  if (contextSnapshots.length > 0) forensicTriplet.push(contextSnapshots[0]);         // entrada (context)
+  if (zoomSnapshots.length > 1) forensicTriplet.push(zoomSnapshots[Math.floor((zoomSnapshots.length - 1) / 2)]); // crítica (zoom)
+  else if (contextSnapshots.length > 1) forensicTriplet.push(contextSnapshots[Math.floor((contextSnapshots.length - 1) / 2)]);
+  if (contextSnapshots.length > 2) forensicTriplet.push(contextSnapshots[contextSnapshots.length - 1]); // salida (context)
+  else if (zoomSnapshots.length > 0) forensicTriplet.push(zoomSnapshots[zoomSnapshots.length - 1]);
 
-  // Return ONLY the most informative snapshot (middle frame)
-  // This is sufficient for trajectory analysis and significantly reduces payload
-  const middleIndex = Math.floor(snapshots.length / 2);
-  return [snapshots[middleIndex]];
+  if (forensicTriplet.length > 0) {
+    return forensicTriplet.filter(Boolean).slice(0, 3);
+  }
+
+  // Priority 2: extract triplet from raw snapshots array
+  if (!snapshots || snapshots.length === 0) return [];
+  if (snapshots.length === 1) return [snapshots[0]];
+  if (snapshots.length === 2) return [snapshots[0], snapshots[1]];
+
+  const first = snapshots[0];
+  const mid   = snapshots[Math.floor((snapshots.length - 1) / 2)];
+  const last  = snapshots[snapshots.length - 1];
+  return [first, mid, last];
 };
 
 export const generateGeometryWithGemini = async ({ directives, instruction, image }) => {
@@ -257,8 +278,13 @@ export const analyzeTrajectoryWithGemini = async ({
       zoneName: line.label,
     };
 
-    // Filter to most relevant snapshots and compress
-    const selectedSnapshots = filterSnapshotsForAI(track.snapshots || []);
+    // Select forensic evidence triplet: entrada + crítica + salida
+    // Uses pre-computed contextSnapshots/zoomSnapshots when available (set by ForensicQueueV3)
+    const selectedSnapshots = filterSnapshotsForAI(
+      track.snapshots || [],
+      track.contextSnapshots || [],
+      track.zoomSnapshots || []
+    );
     const evidenceParts = selectedSnapshots
       .map((data) => {
         const compressedData = compressImageForAI(data);
@@ -289,6 +315,7 @@ export const analyzeTrajectoryWithGemini = async ({
     - GEOMETRÍA A VIGILAR: ${lineVector} -- TIPO: ${kinematics.zoneType} (${kinematics.zoneName})
     - CINEMÁTICA: Velocidad ${kinematics.speed}, Dirección ${kinematics.heading}.
     - PRESET DE AUDITORÍA: ${auditPreset}
+    - SECUENCIA DE IMÁGENES: ${selectedSnapshots.length} fotograma(s) forense(s) adjuntos — [ENTRADA → CRÍTICA → SALIDA]. Cada imagen representa un instante clave de la maniobra.
 
     DIRECTIVAS VIGENTES: "${directives}"
     CONTEXTO DE REGLA: "${line.analysisContext || 'Sin contexto adicional.'}"

@@ -41,7 +41,9 @@ export class VideoBufferService {
 
       this.mediaRecorder = new MediaRecorder(this.stream, {
         mimeType,
-        videoBitsPerSecond: 2500000,
+        // 8 Mbps — calidad forense alta. MediaRecorder webm/h264 necesita buen bitrate
+        // para que los frames de evidencia a 2688px tengan nitidez en la matrícula.
+        videoBitsPerSecond: 8000000,
       });
 
       this.mediaRecorder.ondataavailable = (e) => {
