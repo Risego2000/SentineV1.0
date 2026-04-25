@@ -9,7 +9,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { retryWithBackoff, fallbacks } from './errorRecoveryService.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Get __dirname - use URL fallback for CommonJS compatibility
+let __dirname;
+try {
+  __dirname = path.dirname(fileURLToPath(import.meta.url));
+} catch {
+  // Fallback for CommonJS or when import.meta is unavailable
+  __dirname = path.join(process.cwd(), 'services');
+}
+
 const PADDLE_OCR_SCRIPT = path.join(__dirname, 'paddle_ocr_extractor.py');
 
 /**

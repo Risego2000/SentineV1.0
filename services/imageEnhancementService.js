@@ -7,7 +7,14 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Get __dirname - use URL fallback for CommonJS compatibility
+let __dirname;
+try {
+  __dirname = path.dirname(fileURLToPath(import.meta.url));
+} catch {
+  // Fallback for CommonJS or when import.meta is unavailable
+  __dirname = path.join(process.cwd(), 'services');
+}
 
 /**
  * Enhance single image for OCR

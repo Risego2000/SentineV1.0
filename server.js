@@ -7,7 +7,8 @@ import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
 import { Readable } from 'stream';
-import { createRequire } from 'module';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import {
   analyzeTrajectoryWithGemini,
   generateGeometryWithGemini,
@@ -38,8 +39,6 @@ import { logger } from './services/logger.ts';
 import { createEvidenceStoreRouter } from './server/services/evidenceStore.ts';
 
 loadLocalEnvFile();
-
-const _require = createRequire(import.meta.url);
 const app = express();
 const parsePositiveIntEnv = (name, fallback, min = 1, max = Number.MAX_SAFE_INTEGER) => {
   const raw = process.env[name];
@@ -121,8 +120,8 @@ let ffmpegPath;
 let ffprobePath;
 let hardwareAccel = 'none'; // 'none', 'amd', 'nvidia', 'intel', 'apple'
 try {
-  ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
-  ffprobePath = _require('@ffprobe-installer/ffprobe').path;
+  ffmpegPath = ffmpegInstaller.path;
+  ffprobePath = ffprobeInstaller.path;
 } catch {
   ffmpegPath = 'ffmpeg';
   ffprobePath = 'ffprobe';
@@ -1038,8 +1037,8 @@ app.post(
 // NEW: Evidence Store API routes
 app.use('/api/store', createEvidenceStoreRouter());
 
-const __dirname = path.resolve();
-const distPath = path.join(__dirname, 'dist');
+// Use current working directory for static files
+const distPath = path.join(process.cwd(), 'dist');
 
 if (fs.existsSync(distPath)) {
   console.log(`[SENTINEL_CORE] Detectado directorio 'dist'. Sirviendo archivos estáticos...`);

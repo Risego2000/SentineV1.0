@@ -41,6 +41,18 @@ try {
     format: 'cjs', // Use CommonJS for Electron preload compatibility
   });
 
+  // Build server.js (convert ESM + TS imports to CommonJS with bundling)
+  console.log('[Build] Compiling server.js...');
+  esbuild.buildSync({
+    entryPoints: ['server.js'],
+    outfile: 'dist/server.cjs', // Output as .cjs since we're converting to CommonJS
+    bundle: true, // Bundle all dependencies to handle relative imports
+    platform: 'node',
+    target: 'node18',
+    format: 'cjs', // Convert ESM to CommonJS for Node.js compatibility
+    external: ['electron'], // Don't bundle electron itself
+  });
+
   console.log('[Build] ✓ Electron compilation complete');
 } catch (error) {
   console.error('[Build] ✗ Failed to compile Electron:', error.message);

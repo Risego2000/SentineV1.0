@@ -117,8 +117,11 @@ async function initializeServer() {
     // Configure resource paths before starting server
     configureResourcePaths();
 
-    // Dynamically import server module (ESM module in CommonJS context)
-    const { initializeExpressServer } = await import('../server.js');
+    // Load server module using require (CommonJS)
+    // When compiled to dist/electron/main.cjs, __dirname is dist/electron/
+    // So we need to go up one level to reach dist/server.cjs
+    const serverPath = path.join(__dirname, '../server.cjs');
+    const { initializeExpressServer } = require(serverPath);
 
     const config = {
       port: 0, // Let OS assign a free port
