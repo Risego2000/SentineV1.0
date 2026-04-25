@@ -81,21 +81,21 @@ export interface Track {
   id: number;
   bbox: TrackBBox;
   label: string;
-  conf: number;
-  hits: number;
-  age: number;
+  conf?: number;
+  hits?: number;
+  age?: number;
   tail: { x: number; y: number }[];
-  snapshots: string[];
+  snapshots?: string[];
   contextSnapshots?: string[];
   zoomSnapshots?: string[];
-  audited: boolean;
+  audited?: boolean;
   crossedLine?: boolean;
   isInfractor?: boolean;
-  processedLines: string[];
-  velocity: number;
+  processedLines?: string[];
+  velocity?: number;
   velocityHistory?: number[]; // Velocity telemetry for smoothing and analysis
   avgVelocity: number;
-  acceleration: number;
+  acceleration?: number;
   heading: number;
   headingChange?: number;
   isAnomalous?: boolean;
@@ -109,9 +109,9 @@ export interface Track {
   dwellTime: number; // Residence time in zone (ms)
   lastIntersection?: string;
   lastZoneId?: string;
-  kf: IKalman; // Concrete physics engine instance
-  missedFrames: number; // Counter for persistence
-  isCoasting: boolean; // Prediction mode without visual confirmation
+  kf?: IKalman; // Concrete physics engine instance
+  missedFrames?: number; // Counter for persistence
+  isCoasting?: boolean; // Prediction mode without visual confirmation
   labelHistory?: string[]; // Class smoothing history (majority vote)
   roiHistory: string[]; // Sequential ROI entries [ROI A, ROI B...]
   forbiddenTurnCaptured?: boolean; // Prevents re-triggering on 3rd+ roi_turn zone
