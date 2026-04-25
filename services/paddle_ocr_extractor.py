@@ -84,6 +84,74 @@ def enhance_image_for_ocr(img, target_height=600):
         # Return original image if enhancement fails
         return gray if 'gray' in locals() else img
 
+def detect_and_crop_license_plate(img):
+    """
+    Detect license plate region and return cropped image.
+    Strategies:
+    1. Find white/yellow rectangular region in lower half (Spanish plates have white/yellow backgrounds)
+    2. Use Canny edge detection to find strong edges (plate borders)
+    3. Crop region to maximize plate visibility
+
+    Returns: cropped_image or original_image if detection fails
+    """
+    try:
+        h, w = img.shape[:2]
+
+        # Focus on lower 40% of image where license plates typically are
+        roi_start = int(h * 0.5)
+        roi = img[roi_start:, :]
+        roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) if len(roi.shape) == 3 else roi
+
+        # Edge detection - look for sharp boundaries (plate edges)
+        edges = cv2.Canny(roi_gray, 30, 100)
+
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Look for rectangular contours (license plates are rectangular)
+        best_crop = None
+        best_score = 0
+
+        for contour in contours:
+            area = cv2.contourArea(contour)
+
+            # License plates have specific size ranges
+            # Typical plate: 520×110mm, ratio ~4.7:1
+            if area < 500:  # Too small
+                continue
+
+            x, y, bw, bh = cv2.boundingRect(contour)
+            ratio = bw / (bh + 0.1)  # Aspect ratio
+
+            # Spanish plates are wider than tall (roughly 4-6:1)
+            if 2.5 < ratio < 7.5:
+                # Score based on how much it looks like a plate
+                score = area * (1 if 3 < ratio < 6 else 0.5)
+
+                if score > best_score:
+                    best_score = score
+                    # Crop with margin
+                    margin = int(bh * 0.2)
+                    x1 = max(0, x - margin)
+                    y1 = max(0, y - margin + roi_start)
+                    x2 = min(w, x + bw + margin)
+                    y2 = min(h, y + bh + margin + roi_start)
+                    best_crop = img[y1:y2, x1:x2]
+
+        if best_crop is not None and best_crop.shape[0] > 20 and best_crop.shape[1] > 50:
+            return best_crop
+        else:
+            # Fallback: crop bottom 25% where plates are typically located
+            fallback_crop = img[int(h * 0.6):int(h * 0.95), int(w * 0.1):int(w * 0.9)]
+            if fallback_crop.shape[0] > 10 and fallback_crop.shape[1] > 30:
+                return fallback_crop
+
+        return img  # Return full image if cropping fails
+
+    except Exception as e:
+        print(f"[PLATE_CROP] Detection failed: {str(e)}", file=sys.stderr)
+        return img  # Return original image on error
+
 def normalize_plate(text):
     """
     Normalize OCR text to Spanish license plate format.
@@ -180,8 +248,11 @@ def extract_plate(images_b64):
                 print(f"[OCR] Image {idx}: decode failed", file=sys.stderr)
                 continue
 
+            # 1.5. CROP LICENSE PLATE REGION (NEW - incremental improvement)
+            cropped_img = detect_and_crop_license_plate(img)
+
             # 2. ENHANCE
-            enhanced_img = enhance_image_for_ocr(img, target_height=600)
+            enhanced_img = enhance_image_for_ocr(cropped_img, target_height=600)
             enhancement_metrics.append({
                 "image_idx": idx,
                 "enhancement_applied": True,
