@@ -26,20 +26,59 @@ ocr = PaddleOCR(
 )
 
 def normalize_plate(text):
-    """Normalize OCR text to Spanish license plate format (4 digits + 3 letters)"""
+    """
+    Normalize OCR text to Spanish license plate format.
+
+    Tipos de matrículas españolas soportadas:
+    1. ESTÁNDAR (2000-2025): 4 dígitos + 3 letras (1234ABC, 5678XYZ)
+    2. NUEVA SERIE (2025+): N + 4 dígitos + 3 letras (N1234ABC)
+    3. HISTÓRICAS (H-plates): H + 4 dígitos + 3 letras (H1234ABC)
+    4. CICLOMOTORES: C + 4 dígitos + 3 letras (C1234ABC)
+    5. DIPLOMÁTICAS: CD (Cuerpo Diplomático), CC (Cuerpo Consular)
+    6. FORMATO ANTIGUO (1971-2000): 2 letras + 4 dígitos + 2 letras (MA0000BA)
+
+    Caracteres válidos: 0-9 y letras excepto A, E, I, O, U, Ñ, Q
+    Letras válidas: B, C, D, F, G, H, J, K, L, M, N, P, R, S, T, V, W, X, Y, Z
+    """
     import re
+
     text = text.upper().replace(' ', '').replace('-', '')
     text = ''.join(c for c in text if c.isalnum())
-    
-    # Look for pattern: 4 digits + 3 letters
-    matches = re.findall(r'\d{4}[A-Z]{3}', text)
-    if matches:
-        return matches[0]
-    
-    matches = re.findall(r'[A-Z0-9]{6,8}', text)
-    if matches:
-        return matches[0]
-    
+
+    if not text:
+        return ''
+
+    # Pattern 1: ESTÁNDAR ACTUAL - 4 dígitos + 3 letras (1234ABC)
+    match = re.search(r'(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{3})', text)
+    if match:
+        return f"{match.group(1)}{match.group(2)}"
+
+    # Pattern 2: NUEVA SERIE - N + 4 dígitos + 3 letras (N1234ABC)
+    match = re.search(r'(N)(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{3})', text)
+    if match:
+        return f"{match.group(1)}{match.group(2)}{match.group(3)}"
+
+    # Pattern 3: HISTÓRICAS - H + 4 dígitos + 3 letras (H1234ABC)
+    match = re.search(r'(H)(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{3})', text)
+    if match:
+        return f"{match.group(1)}{match.group(2)}{match.group(3)}"
+
+    # Pattern 4: CICLOMOTORES - C + 4 dígitos + 3 letras (C1234ABC)
+    match = re.search(r'(C)(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{3})', text)
+    if match:
+        return f"{match.group(1)}{match.group(2)}{match.group(3)}"
+
+    # Pattern 5: DIPLOMÁTICAS - CD o CC
+    match = re.search(r'(CD|CC)', text)
+    if match:
+        return match.group(1)
+
+    # Pattern 6: FORMATO ANTIGUO PROVINCIAL (1971-2000) - 2 letras + 4 dígitos + 2 letras (MA0000BA)
+    match = re.search(r'([BCDFGHJKLMNPRSTVWXYZ]{2})(\d{4})([BCDFGHJKLMNPRSTVWXYZ]{2})', text)
+    if match:
+        return f"{match.group(1)}{match.group(2)}{match.group(3)}"
+
+    # Fallback: cualquier combinación válida de 6+ caracteres
     return text if len(text) >= 6 else ''
 
 def normalize_timestamp(text):
