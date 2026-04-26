@@ -109,64 +109,6 @@ export const SharedBottomBar = () => {
         </span>
       </div>
 
-      <div className="relative flex-1 group py-4">
-        <div
-          ref={timelineRef}
-          role="slider"
-          aria-label="Control de tiempo"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progress)}
-          tabIndex={0}
-          onClick={handleClick}
-          onKeyDown={handleKey}
-          className="h-1 bg-white/5 rounded-full cursor-pointer relative transition-all duration-300 group-hover:h-2 focus:outline-none"
-        >
-          <div
-            className="h-full bg-blue-600 relative transition-all ease-linear rounded-full"
-            style={{ width: progress + '%' }}
-          >
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-        </div>
-        {incidents.map((log, i) => {
-          if (log.playbackTime === undefined || duration === 0) return null;
-          const pos = (log.playbackTime / duration) * 100;
-          return (
-            <div
-              key={log.id || i}
-              role="button"
-              tabIndex={0}
-              className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-red-500/80 hover:bg-red-500 border-x border-black/50 cursor-pointer group/marker z-20 transition-all hover:h-6 focus:outline-none"
-              style={{ left: `calc(${pos}% - 3px)` }}
-              onClick={(e) => {
-                e.stopPropagation();
-                const v = videoRef?.current;
-                if (v && log.playbackTime !== undefined) v.currentTime = log.playbackTime;
-              }}
-            >
-              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-all translate-y-2 group-hover/marker:translate-y-0 bg-[#121216] border border-white/10 p-2 rounded shadow-2xl pointer-events-none z-50">
-                <span className="text-[9px] font-bold text-white uppercase block tracking-wider">
-                  {log.ruleCategory}
-                </span>
-                <span className="text-[8px] text-slate-500 font-mono mt-0.5 block">
-                  {log.plate} • {fmt(log.playbackTime)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-col min-w-[64px] text-right">
-        <span className="text-[10px] font-mono font-bold text-slate-500 tracking-tight leading-none">
-          {fmt(duration)}
-        </span>
-        <span className="text-[9px] font-mono font-medium text-slate-700 tracking-tighter mt-1">
-          TOTAL_DUR
-        </span>
-      </div>
-
       <div className="relative flex-1 group py-3">
         <div
           ref={timelineRef}
