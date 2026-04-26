@@ -371,14 +371,14 @@ export const ExpedientListPage: React.FC = () => {
       </div>
 
       <style>{`
-        /* DARK THEME - Consistent with SENTINEL.AI Detection Screen */
+        /* DARK THEME - Unified with SENTINEL.AI Detection Screen Design */
         .expedient-list-page {
           position: relative;
           width: 100%;
           height: 100%;
           display: flex;
           flex-direction: column;
-          background: #0f1419;
+          background: #01030d;
           font-family: 'Share Tech Mono', 'Courier New', monospace;
           color: #ecf0f1;
           overflow: hidden;
@@ -390,61 +390,68 @@ export const ExpedientListPage: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 20px 30px;
-          background: linear-gradient(135deg, #1a2332 0%, #0f1419 100%);
-          border-bottom: 2px solid #00d9ff;
-          box-shadow: 0 4px 20px rgba(0, 217, 255, 0.15);
+          padding: 16px 24px;
+          background: rgba(0, 0, 0, 0.3) backdrop-filter: blur(8px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .page-header h1 {
           margin: 0;
-          font-size: 28px;
-          font-weight: bold;
+          font-size: 18px;
+          font-weight: 900;
           color: #00d9ff;
-          text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+          text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
         }
 
         .user-info {
           display: flex;
           align-items: center;
-          gap: 15px;
-          font-size: 13px;
-          color: #b0bec5;
+          gap: 12px;
+          font-size: 11px;
+          color: #94a3b8;
+          font-family: monospace;
         }
 
         .role-badge {
-          background: linear-gradient(135deg, #00d9ff, #0099cc);
-          color: #0f1419;
-          padding: 6px 14px;
-          border-radius: 20px;
-          font-weight: bold;
-          font-size: 11px;
+          background: rgba(59, 130, 246, 0.1);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: #3b82f6;
+          padding: 4px 12px;
+          border-radius: 4px;
+          font-weight: 700;
+          font-size: 10px;
           text-transform: uppercase;
-          box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+          letter-spacing: 0.5px;
+          box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
         }
 
         .alert {
           position: relative;
           z-index: 15;
-          padding: 14px 18px;
-          border-radius: 6px;
-          margin: 12px 15px;
+          padding: 12px 16px;
+          border-radius: 4px;
+          margin: 10px 12px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border-left: 4px solid;
+          border-left: 3px solid;
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          font-size: 12px;
         }
 
         .alert-error {
-          background: rgba(220, 53, 69, 0.15);
-          color: #ff6b6b;
-          border-left-color: #ff6b6b;
+          border-left-color: #ef4444;
+          color: #fca5a5;
         }
 
         .alert-success {
-          background: rgba(40, 167, 69, 0.15);
-          color: #51cf66;
-          border-left-color: #51cf66;
+          border-left-color: #10b981;
+          color: #86efac;
         }
 
         .alert button {
@@ -452,7 +459,7 @@ export const ExpedientListPage: React.FC = () => {
           border: none;
           color: inherit;
           cursor: pointer;
-          font-size: 18px;
+          font-size: 16px;
           transition: opacity 0.2s;
         }
 
@@ -466,84 +473,102 @@ export const ExpedientListPage: React.FC = () => {
           display: flex;
           flex: 1;
           overflow: hidden;
-          gap: 15px;
-          padding: 15px;
+          gap: 12px;
+          padding: 12px;
         }
 
         .left-panel {
-          flex: 0 0 350px;
+          flex: 0 0 320px;
           display: flex;
           flex-direction: column;
-          background: rgba(26, 35, 50, 0.8);
-          border: 1px solid rgba(0, 217, 255, 0.2);
-          border-radius: 8px;
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 6px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           backdrop-filter: blur(10px);
         }
 
+        .left-panel::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+          pointer-events: none;
+          border-radius: 6px;
+        }
+
         .panel-header {
+          position: relative;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 16px;
-          border-bottom: 1px solid rgba(0, 217, 255, 0.2);
-          background: rgba(0, 217, 255, 0.05);
+          padding: 12px 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(59, 130, 246, 0.05);
         }
 
         .panel-header h2 {
           margin: 0;
-          font-size: 16px;
-          color: #00d9ff;
+          font-size: 12px;
+          font-weight: 900;
+          color: #3b82f6;
           display: flex;
           align-items: center;
           gap: 8px;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 0.08em;
         }
 
         .count {
-          background: linear-gradient(135deg, #00d9ff, #0099cc);
-          color: #0f1419;
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 11px;
-          font-weight: bold;
-          box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+          background: rgba(59, 130, 246, 0.15);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: #3b82f6;
+          padding: 3px 8px;
+          border-radius: 3px;
+          font-size: 10px;
+          font-weight: 700;
+          box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
         }
 
         .btn-refresh {
-          padding: 8px 12px;
-          background: rgba(0, 217, 255, 0.1);
-          border: 1px solid #00d9ff;
-          border-radius: 4px;
+          padding: 6px 10px;
+          background: rgba(59, 130, 246, 0.1);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          border-radius: 3px;
           cursor: pointer;
-          font-size: 12px;
-          color: #00d9ff;
-          transition: all 0.3s;
-          font-weight: bold;
+          font-size: 10px;
+          color: #3b82f6;
+          transition: all 0.2s;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .btn-refresh:hover:not(:disabled) {
-          background: rgba(0, 217, 255, 0.2);
-          box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+          background: rgba(59, 130, 246, 0.2);
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+          border-color: rgba(59, 130, 246, 0.5);
         }
 
         .btn-refresh:disabled {
-          opacity: 0.4;
+          opacity: 0.5;
           cursor: not-allowed;
         }
 
         .expedient-list {
           flex: 1;
           overflow-y: auto;
-          padding: 12px;
-          scrollbar-color: rgba(0, 217, 255, 0.3) transparent;
+          padding: 8px;
+          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
           scrollbar-width: thin;
         }
 
         .expedient-list::-webkit-scrollbar {
-          width: 8px;
+          width: 6px;
         }
 
         .expedient-list::-webkit-scrollbar-track {
@@ -551,12 +576,12 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-list::-webkit-scrollbar-thumb {
-          background: rgba(0, 217, 255, 0.3);
-          border-radius: 4px;
+          background: rgba(59, 130, 246, 0.2);
+          border-radius: 3px;
         }
 
         .expedient-list::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 217, 255, 0.6);
+          background: rgba(59, 130, 246, 0.4);
         }
 
         .loading-state,
@@ -565,97 +590,131 @@ export const ExpedientListPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #7a8fa6;
+          color: #64748b;
           text-align: center;
-          font-size: 13px;
+          font-size: 11px;
+          letter-spacing: 0.05em;
         }
 
         .expedient-item {
-          padding: 12px;
-          margin-bottom: 8px;
-          background: rgba(0, 217, 255, 0.05);
-          border: 2px solid rgba(0, 217, 255, 0.15);
-          border-radius: 6px;
+          padding: 10px;
+          margin-bottom: 6px;
+          background: rgba(59, 130, 246, 0.05);
+          border: 1px solid rgba(59, 130, 246, 0.15);
+          border-radius: 4px;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.25s ease-out;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .expedient-item::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+          opacity: 0;
+          transition: opacity 0.25s;
         }
 
         .expedient-item:hover {
-          background: rgba(0, 217, 255, 0.1);
-          border-color: rgba(0, 217, 255, 0.4);
-          box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+          background: rgba(59, 130, 246, 0.1);
+          border-color: rgba(59, 130, 246, 0.3);
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .expedient-item:hover::before {
+          opacity: 1;
         }
 
         .expedient-item.selected {
-          background: rgba(0, 217, 255, 0.15);
-          border-color: #00d9ff;
-          box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+          background: rgba(59, 130, 246, 0.15);
+          border-color: rgba(59, 130, 246, 0.5);
+          box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
         }
 
         .expedient-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
+          position: relative;
+          z-index: 1;
         }
 
         .plate {
-          font-weight: bold;
+          font-weight: 900;
           font-family: 'OCR A', monospace;
-          font-size: 14px;
-          color: #00d9ff;
-          letter-spacing: 1px;
+          font-size: 12px;
+          color: #3b82f6;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
         }
 
         .state-badge {
-          font-size: 10px;
-          padding: 4px 9px;
-          border-radius: 3px;
-          color: #0f1419;
-          font-weight: bold;
+          font-size: 9px;
+          padding: 3px 7px;
+          border-radius: 2px;
+          color: white;
+          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.3px;
+          box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
         }
 
-        .state-detected { background: #ffc107; box-shadow: 0 0 8px rgba(255, 193, 7, 0.5); }
-        .state-under_review { background: #17a2b8; box-shadow: 0 0 8px rgba(23, 162, 184, 0.5); }
-        .state-validated { background: #28a745; box-shadow: 0 0 8px rgba(40, 167, 69, 0.5); }
-        .state-signed { background: #6610f2; box-shadow: 0 0 8px rgba(102, 16, 242, 0.5); }
-        .state-exported { background: #20c997; box-shadow: 0 0 8px rgba(32, 201, 151, 0.5); }
+        .state-detected { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .state-under_review { background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%); }
+        .state-validated { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); }
+        .state-signed { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); }
+        .state-exported { background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%); }
 
         .expedient-details {
-          font-size: 11px;
-          color: #b0bec5;
+          font-size: 10px;
+          color: #94a3b8;
+          position: relative;
+          z-index: 1;
         }
 
         .violation {
-          margin: 3px 0;
-          font-weight: 500;
-          color: #ecf0f1;
+          margin: 2px 0;
+          font-weight: 600;
+          color: #e2e8f0;
         }
 
         .location {
-          margin: 3px 0;
-          color: #7a8fa6;
-          font-size: 10px;
+          margin: 2px 0;
+          color: #64748b;
+          font-size: 9px;
         }
 
         .time {
-          margin: 5px 0 0 0;
-          color: #546e7a;
-          font-size: 10px;
+          margin: 4px 0 0 0;
+          color: #475569;
+          font-size: 9px;
         }
 
         .right-panel {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background: rgba(26, 35, 50, 0.8);
-          border: 1px solid rgba(0, 217, 255, 0.2);
-          border-radius: 8px;
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 6px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           backdrop-filter: blur(10px);
+        }
+
+        .right-panel::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+          pointer-events: none;
+          border-radius: 6px;
         }
 
         .empty-selection {
@@ -663,19 +722,21 @@ export const ExpedientListPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #546e7a;
-          font-size: 14px;
+          color: #64748b;
+          font-size: 12px;
+          letter-spacing: 0.05em;
         }
 
         .expedient-workflow {
           flex: 1;
           overflow-y: auto;
-          scrollbar-color: rgba(0, 217, 255, 0.3) transparent;
+          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
           scrollbar-width: thin;
+          padding: 12px;
         }
 
         .expedient-workflow::-webkit-scrollbar {
-          width: 8px;
+          width: 6px;
         }
 
         .expedient-workflow::-webkit-scrollbar-track {
@@ -683,76 +744,91 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-workflow::-webkit-scrollbar-thumb {
-          background: rgba(0, 217, 255, 0.3);
-          border-radius: 4px;
+          background: rgba(59, 130, 246, 0.2);
+          border-radius: 3px;
         }
 
         .expedient-workflow::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 217, 255, 0.6);
+          background: rgba(59, 130, 246, 0.4);
         }
 
         .export-section {
-          padding: 16px;
-          border-top: 1px solid rgba(0, 217, 255, 0.2);
-          background: rgba(0, 217, 255, 0.05);
+          padding: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(59, 130, 246, 0.05);
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 8px;
+          margin: 0;
         }
 
         .btn-export {
           width: 100%;
-          padding: 12px;
-          background: #28a745;
-          color: white;
-          border: none;
-          border-radius: 6px;
+          padding: 10px;
+          background: rgba(34, 197, 94, 0.2);
+          border: 1px solid rgba(34, 197, 94, 0.4);
+          color: #86efac;
+          border-radius: 4px;
           cursor: pointer;
-          font-weight: bold;
-          font-size: 14px;
+          font-weight: 700;
+          font-size: 11px;
           transition: all 0.2s;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .btn-export:hover:not(:disabled) {
-          background: #218838;
+          background: rgba(34, 197, 94, 0.3);
+          border-color: rgba(34, 197, 94, 0.6);
+          box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
         }
 
         .btn-export:disabled {
-          background: #ccc;
+          background: rgba(100, 116, 139, 0.1);
+          border-color: rgba(100, 116, 139, 0.2);
+          color: #94a3b8;
           cursor: not-allowed;
           opacity: 0.6;
         }
 
         .btn-preinforme {
-          background: #17a2b8;
-          font-size: 13px;
+          background: rgba(34, 211, 238, 0.2);
+          border-color: rgba(34, 211, 238, 0.4);
+          color: #a5f3fc;
         }
 
         .btn-preinforme:hover:not(:disabled) {
-          background: #138496;
+          background: rgba(34, 211, 238, 0.3);
+          border-color: rgba(34, 211, 238, 0.6);
+          box-shadow: 0 0 12px rgba(34, 211, 238, 0.2);
         }
 
         .btn-excel {
-          background: #27ae60;
-          font-size: 13px;
+          background: rgba(59, 130, 246, 0.2);
+          border-color: rgba(59, 130, 246, 0.4);
+          color: #93c5fd;
         }
 
         .btn-excel:hover:not(:disabled) {
-          background: #229954;
+          background: rgba(59, 130, 246, 0.3);
+          border-color: rgba(59, 130, 246, 0.6);
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
         }
 
         .export-help {
-          margin-top: 5px;
+          margin-top: 8px;
           padding: 10px;
-          background: #e3f2fd;
-          border-left: 4px solid #2196f3;
-          color: #1565c0;
-          font-size: 12px;
-          border-radius: 4px;
+          background: rgba(59, 130, 246, 0.1);
+          border-left: 3px solid rgba(59, 130, 246, 0.4);
+          color: #93c5fd;
+          font-size: 10px;
+          border-radius: 3px;
+          letter-spacing: 0.3px;
         }
 
         .export-help strong {
-          font-weight: bold;
+          font-weight: 700;
+          color: #bfdbfe;
         }
 
         @media (max-width: 1024px) {
@@ -762,12 +838,26 @@ export const ExpedientListPage: React.FC = () => {
 
           .left-panel {
             flex: 0 0 auto;
-            max-height: 300px;
+            max-height: 280px;
           }
 
           .right-panel {
             flex: 1;
+            min-height: 0;
           }
+        }
+
+        @keyframes glow-pulse {
+          0%, 100% {
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+          }
+        }
+
+        .expedient-item.selected {
+          animation: glow-pulse 2s ease-in-out infinite;
         }
       `}</style>
     </div>
