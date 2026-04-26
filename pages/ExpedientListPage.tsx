@@ -391,7 +391,8 @@ export const ExpedientListPage: React.FC = () => {
           justify-content: space-between;
           align-items: center;
           padding: 16px 24px;
-          background: rgba(0, 0, 0, 0.3) backdrop-filter: blur(8px);
+          background: rgba(0, 0, 0, 0.3);
+          backdrop-filter: blur(8px);
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
