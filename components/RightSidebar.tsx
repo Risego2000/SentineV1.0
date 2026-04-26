@@ -34,8 +34,17 @@ export const RightSidebar = memo(() => {
       <div
         className={`p-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0 ${isRightSidebarCollapsed ? 'px-3' : ''}`}
       >
+        <button
+          onClick={toggleRightSidebar}
+          className="p-1.5 hover:bg-white/5 rounded-md text-slate-400 transition-colors shrink-0"
+          {...helpProps(
+            isRightSidebarCollapsed ? 'Expandir panel derecho' : 'Colapsar panel derecho'
+          )}
+        >
+          {isRightSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
         {!isRightSidebarCollapsed && (
-          <div className="flex items-center flex-1 mr-4 gap-3">
+          <div className="flex items-center flex-1 ml-4 gap-3">
             <img src="/LOGO.png" alt="Logo" className="w-12 h-12 object-contain" />
             <div className="flex flex-col items-center flex-1">
               <div className="flex items-center gap-2">
@@ -60,15 +69,6 @@ export const RightSidebar = memo(() => {
             </div>
           </div>
         )}
-        <button
-          onClick={toggleRightSidebar}
-          className="p-1.5 hover:bg-white/5 rounded-md text-slate-400 transition-colors"
-          {...helpProps(
-            isRightSidebarCollapsed ? 'Expandir panel derecho' : 'Colapsar panel derecho'
-          )}
-        >
-          {isRightSidebarCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-        </button>
       </div>
 
       {!isRightSidebarCollapsed && (
