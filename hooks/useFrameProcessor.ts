@@ -9,7 +9,7 @@ import { ByteTracker } from '../services/ByteTracker';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
-import { ForensicRule, getRulesForGeometry, findForbiddenTurnRule } from '../types/forensicRules';
+import { ForensicRule, FORENSIC_RULES } from '../types/forensicRules';
 import { getApiUrl } from '../services/apiConfig';
 
 const MAX_TAIL_POINTS = 50;
@@ -74,12 +74,15 @@ export const useFrameProcessor = () => {
    * Finds matching forensic rules for a geometry.
    */
   const findRulesForGeometry = useCallback((geom: GeometryLine): ForensicRule | undefined => {
-    const rules = getRulesForGeometry(geom.id);
+    // Find rules that match this geometry ID
+    const rules = FORENSIC_RULES.filter(
+      (r) => r.enabled && r.geometryIds && r.geometryIds.includes(geom.id)
+    );
     if (rules.length > 0) {
       return rules.sort((a, b) => b.priority - a.priority)[0];
     }
-    // Fallback to type-based rule
-    return getRulesForGeometry(geom.type)[0];
+    // Fallback: no matching rule found
+    return undefined;
   }, []);
 
   /**

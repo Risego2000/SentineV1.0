@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
 import { SharedBottomBar } from './components/SharedBar/SharedBottomBar';
+import { ExpedientListPage } from './pages/ExpedientListPage';
 import { isElectron, getServerPortFromElectron } from './utils/electronDetect';
 import './index.css';
 
@@ -54,24 +55,107 @@ const discoverBackendPort = async () => {
   }
 };
 
+type ViewMode = 'detection' | 'expedients';
+
 export const App = () => {
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // Check URL params or session storage for view preference
+    const params = new URLSearchParams(window.location.search);
+    return (params.get('view') as ViewMode) || 'detection';
+  });
+
   useEffect(() => {
     // Discover backend port on app startup
     discoverBackendPort();
+  }, []);
+
+  // Handle view switching via keyboard shortcut (Ctrl+E for Expedients)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        setViewMode((prev) => (prev === 'detection' ? 'expedients' : 'detection'));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (
     <div className="h-screen w-screen bg-[#0a0a0c] text-slate-100 flex overflow-hidden font-sans select-none relative">
       <div id="sidebar-root" className="h-full z-40 shrink-0" />
 
-      {/* Centre column: viewer grid + bottom bar — same width, aligned */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
-        <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
-          <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-            <MultiViewerGrid />
-          </ErrorBoundary>
+        {/* View Mode Toggle */}
+        <div className="view-mode-toggle" style={{
+          display: 'flex',
+          gap: '5px',
+          padding: '8px 12px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+          <button
+            onClick={() => setViewMode('detection')}
+            style={{
+              padding: '6px 12px',
+              background: viewMode === 'detection' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
+            }}
+          >
+            🎥 Detección
+          </button>
+          <button
+            onClick={() => setViewMode('expedients')}
+            style={{
+              padding: '6px 12px',
+              background: viewMode === 'expedients' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
+            }}
+          >
+            📋 Expedientes
+          </button>
+          <span style={{
+            marginLeft: 'auto',
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.6)',
+            padding: '6px 0',
+          }}>
+            Ctrl+E para cambiar vista
+          </span>
         </div>
-        <SharedBottomBar />
+
+        {/* View Content - Detection Mode */}
+        {viewMode === 'detection' && (
+          <>
+            <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
+              <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+                <MultiViewerGrid />
+              </ErrorBoundary>
+            </div>
+            <SharedBottomBar />
+          </>
+        )}
+
+        {/* View Content - Expedients Mode */}
+        {viewMode === 'expedients' && (
+          <div className="flex-1 relative z-10 min-h-0 overflow-hidden">
+            <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+              <ExpedientListPage />
+            </ErrorBoundary>
+          </div>
+        )}
       </div>
 
       <div id="right-sidebar-root" className="h-full z-40 shrink-0" />

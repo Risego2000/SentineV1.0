@@ -9,8 +9,11 @@ import { evidenceDB } from '../services/EvidenceDB';
 import { VideoBufferService } from '../services/videoRecorder';
 import { forensicQueue } from '../services/ForensicQueue';
 import { OCRSynchronizer } from '../services/OCRSynchronizer';
+import { getOCRService } from '../services/OCRService';
 import { Track, GeometryLine } from '../types';
 import { ForensicRule } from '../types/forensicRules';
+import { custodyLog, CustodyLogService } from './CustodyLogService';
+import { calculateSHA256 } from './ChainOfCustodyService';
 
 export interface EvidenceCaptureTarget {
   trackId: number;
@@ -181,8 +184,7 @@ export class EvidenceCaptureManager {
 
       const snapshots = this.snapshotStorage.get(key) || [];
 
-      // Run OCR on all detail frames to get plate candidates
-      // Capture up to 10 frames for better accuracy (multiple angles)
+      // PHASE 6: Run robust OCR with validation on all detail frames
       const detailFrames = snapshots
         .filter((s) => s.kind === 'detail')
         .map((s) => s.data)
@@ -195,17 +197,39 @@ export class EvidenceCaptureManager {
         .slice(0, 3);
 
       let ocrResults: string[] = [];
+      let ocrCandidates: any[] = [];
+      let ocrValidationReport = '';
 
       if (detailFrames.length > 0) {
         try {
-          // Use OCRSynchronizer which calls backend PaddleOCR service
-          const localResult = await OCRSynchronizer.extractLicensePlate(detailFrames);
-          if (localResult && localResult.plate) {
-            ocrResults = [localResult.plate];
+          // Use OCRService with validation and multi-frame support
+          const ocrService = getOCRService();
+          const ocrResult = await ocrService.extractFromMultipleFrames(detailFrames);
+
+          if (ocrResult.plate) {
+            ocrResults = [ocrResult.plate];
           }
+
+          // PHASE 6: Store all candidates + validation results for forensic review
+          ocrCandidates = ocrResult.candidates.map((c) => ({
+            text: c.text,
+            confidence: c.confidence,
+            frame: c.frame,
+            isValid: c.validation.isValid,
+            format: c.validation.format,
+            validationReasons: c.validation.reasons,
+            selected: c.selected,
+            reason: c.reason,
+          }));
+
+          ocrValidationReport = ocrResult.validationReport;
+
+          console.log(
+            `[PHASE 6 OCR] Plate: ${ocrResult.plate || 'NOT_FOUND'} | Candidates: ${ocrResult.candidates.length} | Confidence: ${(ocrResult.confidence * 100).toFixed(1)}% | Processing: ${ocrResult.processingTimeMs.toFixed(0)}ms`
+          );
         } catch (err) {
-          console.warn('[OCR] License plate extraction failed:', err);
-          // OCR is best-effort
+          console.warn('[PHASE 6 OCR] License plate extraction failed:', err);
+          ocrValidationReport = `Extraction error: ${err instanceof Error ? err.message : 'Unknown error'}`;
         }
       }
 
@@ -236,22 +260,52 @@ export class EvidenceCaptureManager {
 
       const localTime = new Date().toLocaleString();
 
-      // Persist to EvidenceDB with semantic structure
+      // PHASE 6: Persist evidence with hashing + OCR candidates
       const evidenceId = key;
       const contextSnapshots = snapshots.filter((s) => s.kind === 'general').map((s) => s.data);
       const zoomSnapshots = snapshots.filter((s) => s.kind === 'detail').map((s) => s.data);
 
-      console.log(
-        `[CAPTURE] Finalized for Track #${track.id}: ${snapshots.length} total snapshots (${contextSnapshots.length} context, ${zoomSnapshots.length} zoom)`
-      );
+      // Calculate SHA-256 hashes for forensic preservation
+      const contextBlob = new Blob([JSON.stringify(contextSnapshots)]);
+      const zoomBlob = new Blob([JSON.stringify(zoomSnapshots)]);
+      const contextHash = await calculateSHA256(contextBlob);
+      const zoomHash = await calculateSHA256(zoomBlob);
 
-      await evidenceDB.saveEvidence(evidenceId, {
+      const evidenceData = {
         snapshots: snapshots.map((s) => s.data),
         contextSnapshots,
+        contextHash,
         zoomSnapshots,
+        zoomHash,
         ocrResults,
+        ocrCandidates, // PHASE 6: All OCR candidates + validation
+        ocrValidationReport, // PHASE 6: Full validation report
         clip,
-      });
+      };
+
+      console.log(
+        `[PHASE 6 CAPTURE] Finalized for Track #${track.id}: ${snapshots.length} snapshots (${contextSnapshots.length} context, ${zoomSnapshots.length} detail) | OCR: ${ocrResults.length} plate(s) | Hash: ${zoomHash.substring(0, 8)}...`
+      );
+
+      await evidenceDB.saveEvidence(evidenceId, evidenceData);
+
+      // PHASE 3/6: Log evidence access with SHA-256 hashes
+      const evidenceBlob = new Blob([JSON.stringify(evidenceData)]);
+      const evidenceHash = await calculateSHA256(evidenceBlob);
+      custodyLog.addEntry(
+        CustodyLogService.logEvidenceAction(
+          'EVIDENCE_ACCESSED',
+          'OPERATOR_SYSTEM',
+          evidenceId,
+          evidenceBlob.size,
+          evidenceHash
+        )
+      );
+
+      // Log additional evidence metrics to console for audit trail
+      console.log(
+        `[EVIDENCE AUDIT] Track #${evidenceId}: contextHash=${contextHash.substring(0, 8)}..., zoomHash=${zoomHash.substring(0, 8)}..., plate=${ocrResults[0] || 'NOT_EXTRACTED'}, candidates=${ocrCandidates.length}`
+      );
 
       forensicQueue.enqueueJob(
         { ...track, isAnomalous: !!track.isAnomalous } as any,

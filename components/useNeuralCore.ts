@@ -7,7 +7,7 @@ import {
 } from '../constants';
 import { logger } from '../services/logger';
 import { StandardDetection, PoseResult, LogType } from '../types';
-import { YOLOv5Detector } from '../services/YOLOv5Detector';
+import { TensorFlowDetector } from '../services/TensorFlowDetector';
 
 /**
  * Hook properties for Neural Core initialization.
@@ -31,7 +31,7 @@ export const useNeuralCore = ({
   const [statusLabel, setStatusLabel] = useState('INICIANDO_NÚCLEO...');
 
   // Engine Instances
-  const yoloRef = useRef<YOLOv5Detector | null>(null);
+  const tensorFlowRef = useRef<TensorFlowDetector | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
   const visionRef = useRef<Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>> | null>(null);
 
@@ -39,7 +39,7 @@ export const useNeuralCore = ({
   const isInitializingRef = useRef<boolean>(false);
   const isPoseInitializingRef = useRef<boolean>(false);
 
-  // Timestamp Synchronization (Pose only, YOLOv5 doesn't need it)
+  // Timestamp Synchronization (Pose only, TensorFlow doesn't need it)
   const poseTimestampRef = useRef<number>(0);
 
   const releasePose = useCallback(() => {
@@ -51,7 +51,7 @@ export const useNeuralCore = ({
   }, []);
 
   /**
-   * Initializes the base Object Detection engine (YOLOv5m via ONNX Runtime).
+   * Initializes the base Object Detection engine (TensorFlow COCO-SSD).
    */
   const initCore = useCallback(async (): Promise<void> => {
     if (isInitializingRef.current) return;
@@ -59,25 +59,24 @@ export const useNeuralCore = ({
 
     try {
       setStatus('loading');
-      setStatusLabel('CARGANDO_YOLOv5m...');
+      setStatusLabel('CARGANDO_TENSORFLOW...');
 
-      // Initialize YOLOv5m detector
-      if (!yoloRef.current) {
+      // Initialize TensorFlow COCO-SSD detector
+      if (!tensorFlowRef.current) {
         setStatusLabel('VINCULANDO_DETECTOR...');
-        logger.core('NEURAL_CORE', 'Inicializando YOLOv5m (ONNX Runtime, +43% precisión vs MediaPipe)...');
-        yoloRef.current = new YOLOv5Detector({
+        logger.core('NEURAL_CORE', 'Inicializando TensorFlow COCO-SSD (90 clases, aceleración GPU)...');
+        tensorFlowRef.current = new TensorFlowDetector({
           confidenceThreshold: 0.25,
-          iouThreshold: 0.45,
         });
-        await yoloRef.current.init();
-        logger.ai('NEURAL_CORE', 'YOLOv5m Detector Calibrado y Activo (50% mAP vs 35% EfficientDet).');
+        await tensorFlowRef.current.init();
+        logger.ai('NEURAL_CORE', 'COCO-SSD Detector Calibrado y Activo (Detección en Tiempo Real, GPU).');
       }
 
-      setStatusLabel('NEURAL_SENTINEL_YOLOv5');
+      setStatusLabel('NEURAL_SENTINEL_COCO');
       setStatus('ready');
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('NEURAL_CORE', 'Fallo de Inicialización YOLOv5m', err);
+      logger.error('NEURAL_CORE', 'Fallo de Inicialización TensorFlow', err);
       setStatus('error');
       setStatusLabel('FALLO_NUCLEO');
       onLog('ERROR', `Error en Motor Neural: ${err.message}`);
@@ -117,10 +116,10 @@ export const useNeuralCore = ({
     initCore();
 
     return () => {
-      if (yoloRef.current) {
-        logger.core('NEURAL_CORE', 'Liberando recursos YOLOv5m...');
-        yoloRef.current.dispose();
-        yoloRef.current = null;
+      if (tensorFlowRef.current) {
+        logger.core('NEURAL_CORE', 'Liberando recursos TensorFlow...');
+        tensorFlowRef.current.dispose();
+        tensorFlowRef.current = null;
       }
     };
   }, [initCore]);
@@ -139,11 +138,11 @@ export const useNeuralCore = ({
   }, [isPoseEnabled, status, releasePose]);
 
   /**
-   * Primary Object Detection Logic (YOLOv5m).
+   * Primary Object Detection Logic (TensorFlow COCO-SSD).
    */
   const detect = useCallback(
     async (source: HTMLVideoElement | HTMLCanvasElement): Promise<StandardDetection[]> => {
-      if (status !== 'ready' || !yoloRef.current) return [];
+      if (status !== 'ready' || !tensorFlowRef.current) return [];
 
       const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
       const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
@@ -151,8 +150,8 @@ export const useNeuralCore = ({
       if (width === 0 || height === 0 || readyState < 2) return [];
 
       try {
-        // YOLOv5m detection (returns StandardDetection[] directly)
-        const detections = await yoloRef.current.detect(source);
+        // TensorFlow COCO-SSD detection (returns StandardDetection[] directly)
+        const detections = await tensorFlowRef.current.detect(source);
 
         // Apply dynamic threshold for vulnerable road users
         return detections
@@ -168,7 +167,7 @@ export const useNeuralCore = ({
           })
           .filter((d): d is StandardDetection => d !== null);
       } catch (error) {
-        logger.error('NEURAL_CORE', 'YOLOv5m Detection Error', error);
+        logger.error('NEURAL_CORE', 'TensorFlow Detection Error', error);
         return [];
       }
     },
@@ -201,5 +200,5 @@ export const useNeuralCore = ({
     }
   }, []);
 
-  return { status, statusLabel, detect, detectPose, mediapipeReady: !!yoloRef.current };
+  return { status, statusLabel, detect, detectPose, mediapipeReady: !!tensorFlowRef.current };
 };

@@ -17,11 +17,11 @@ export const SystemStatus = () => {
       </h3>
       <div className="horizon-card rounded-xl p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3 relative z-10">
-          {/* NÚCLEO NEURONAL - YOLOv5m */}
+          {/* NÚCLEO NEURONAL - TensorFlow COCO-SSD */}
           <div
             className="col-span-2 p-4 bg-white/[0.02] rounded-lg border border-white/5 space-y-3 relative overflow-hidden group transition-all hover:bg-white/[0.04]"
             {...helpProps(
-              'Motor de detección YOLOv5m (50% mAP COCO). Visión artificial acelerada por GPU con ONNX Runtime. Precisión +43% vs generación anterior.'
+              'Motor de detección TensorFlow COCO-SSD (41% mAP COCO, 90 clases). Visión artificial acelerada por GPU con WebGL. Tiempo real en navegador, estable y probado en producción.'
             )}
           >
             <div
@@ -29,7 +29,7 @@ export const SystemStatus = () => {
             />
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                Visión Artificial (YOLOv5m)
+                Visión Artificial (COCO-SSD)
               </span>
               <div className="relative">
                 <div
@@ -38,11 +38,11 @@ export const SystemStatus = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono text-blue-500 font-bold uppercase tracking-tight">
-                NEURAL_SENTINEL_YOLOv5m
+              <span className="text-xs font-mono text-emerald-500 font-bold uppercase tracking-tight">
+                NEURAL_SENTINEL_COCO
               </span>
-              <span className="text-[8px] text-emerald-500/70 font-bold uppercase tracking-tight">
-                ONNX+GPU
+              <span className="text-[8px] text-blue-500/70 font-bold uppercase tracking-tight">
+                TensorFlow+GPU
               </span>
             </div>
           </div>

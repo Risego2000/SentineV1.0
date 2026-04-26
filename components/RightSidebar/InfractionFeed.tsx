@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle, Ban, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Ban, Clock, AlertCircle, Shield, Zap } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
 
@@ -14,6 +14,62 @@ export const InfractionFeed = () => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setSelectedLog(log);
+    }
+  };
+
+  /**
+   * Get priority badge styles and icon type
+   */
+  const getPriorityBadgeStyle = (priority?: string) => {
+    switch (priority) {
+      case 'CRÍTICA':
+        return {
+          bgColor: 'bg-red-600/15',
+          borderColor: 'border-red-500/40',
+          textColor: 'text-red-400',
+          iconType: 'critical',
+          label: 'CRÍTICA',
+        };
+      case 'ALTA':
+        return {
+          bgColor: 'bg-orange-600/15',
+          borderColor: 'border-orange-500/40',
+          textColor: 'text-orange-400',
+          iconType: 'alert',
+          label: 'ALTA',
+        };
+      case 'MEDIA-ALTA':
+        return {
+          bgColor: 'bg-yellow-600/15',
+          borderColor: 'border-yellow-500/40',
+          textColor: 'text-yellow-400',
+          iconType: 'shield',
+          label: 'MEDIA-ALTA',
+        };
+      case 'MEDIA':
+        return {
+          bgColor: 'bg-blue-600/15',
+          borderColor: 'border-blue-500/40',
+          textColor: 'text-blue-400',
+          iconType: 'clock',
+          label: 'MEDIA',
+        };
+      case 'BAJA':
+        return {
+          bgColor: 'bg-cyan-600/15',
+          borderColor: 'border-cyan-500/40',
+          textColor: 'text-cyan-400',
+          iconType: 'zap',
+          label: 'BAJA',
+        };
+      default:
+        return {
+          bgColor: 'bg-slate-600/15',
+          borderColor: 'border-slate-500/40',
+          textColor: 'text-slate-400',
+          iconType: 'clock',
+          label: 'DESCONOCIDA',
+        };
     }
   };
 
@@ -112,6 +168,32 @@ export const InfractionFeed = () => {
                 />
 
                 <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
+                  {(() => {
+                    const priorityStyle = getPriorityBadgeStyle(log.priority);
+                    const renderPriorityIcon = () => {
+                      switch (priorityStyle.iconType) {
+                        case 'critical':
+                          return <AlertCircle size={10} />;
+                        case 'alert':
+                          return <AlertTriangle size={10} />;
+                        case 'shield':
+                          return <Shield size={10} />;
+                        case 'zap':
+                          return <Zap size={10} />;
+                        case 'clock':
+                        default:
+                          return <Clock size={10} />;
+                      }
+                    };
+                    return (
+                      <div
+                        className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border flex items-center gap-1 ${priorityStyle.bgColor} ${priorityStyle.borderColor} ${priorityStyle.textColor}`}
+                      >
+                        {renderPriorityIcon()}
+                        {priorityStyle.label}
+                      </div>
+                    );
+                  })()}
                   <div
                     className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border ${log.severity === 'CRITICAL' ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}
                   >
@@ -134,8 +216,20 @@ export const InfractionFeed = () => {
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 line-clamp-1 leading-relaxed uppercase font-medium">
-                  {log.ruleCategory}
+                  {log.operativeCode || log.ruleCategory}
                 </p>
+                {log.fineAmount && (
+                  <div className="flex justify-between items-center text-[9px]">
+                    <span className="text-cyan-400/70">Multa:</span>
+                    <span className="font-mono font-bold text-cyan-300">{log.fineAmount}€</span>
+                  </div>
+                )}
+                {log.pointsDeducted && (
+                  <div className="flex justify-between items-center text-[9px]">
+                    <span className="text-orange-400/70">Puntos:</span>
+                    <span className="font-mono font-bold text-orange-300">-{Math.abs(log.pointsDeducted)}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))

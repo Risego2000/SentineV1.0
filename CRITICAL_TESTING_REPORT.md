@@ -158,7 +158,7 @@ Step 3: Electron-Builder Packaging (✓ DONE)
 - ✅ Electron app starts without crashes
 - ✅ Express API server responds on dynamic port
 - ✅ FFmpeg, Python, PaddleOCR all detected and ready
-- ✅ YOLOv5m detector integrated (ONNX Runtime)
+- ✅ COCO-SSD detector integrated (TensorFlow.js)
 - ✅ License plate crop + OCR pipeline functional
 - ✅ All forensic services available (audit, evidence capture)
 

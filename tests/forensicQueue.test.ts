@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ForensicQueue, forensicQueue } from '../services/ForensicQueue';
-import { matchesOrderedRoiSequence, buildForbiddenTurnAudit } from '../types/forensicRules';
+import { matchesOrderedRoiSequence, buildForbiddenTurnAudit } from '../services/forensicRules';
 
 // Mock dependencies
 vi.mock('../services/EvidenceDB', () => ({

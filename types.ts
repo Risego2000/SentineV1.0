@@ -122,6 +122,23 @@ export interface Track {
   roiATurnCaptureKey?: string; // Active pending capture key while waiting for ROI B
   color?: string; // Assigned color for visualization
   videoClip?: string; // Infraction clip (Base64)
+
+  // PHASE 5: Separate visual vs forensic metrics
+  visual?: {
+    velocity: number; // Visual velocity estimate (px/frame)
+    avgVelocity: number; // Visual average (Km/h approx)
+  };
+
+  forensic?: {
+    calibratedVelocity?: number; // Real velocity (with homography calibration)
+    speedViolation?: boolean; // Did it exceed speed limit?
+    violationMph?: number; // How much over limit?
+    calibrationDate?: number; // When was calibration done
+  };
+
+  // Additional event tracking for PHASE 5
+  velocityAtEvent?: number; // Velocity when crossing stop line
+  timeInROI?: Record<string, number>; // Time spent in each ROI (ms)
 }
 
 /**
@@ -182,6 +199,14 @@ export interface InfractionLog extends AuditResponse {
   validationStatus?: 'pending' | 'validated' | 'rejected';
   validatedAt?: number;
   operatorId?: string;
+
+  // Priority and classification fields
+  ruleId?: string; // ID of the forensic rule that matched
+  operativeCode?: string; // Operative code from the rule (e.g., 'STOP_NO_DETENCION')
+  priority?: 'CRÍTICA' | 'ALTA' | 'MEDIA-ALTA' | 'MEDIA' | 'BAJA'; // Priority level
+  priorityLevel?: number; // Numeric priority (0-25, higher = more critical)
+  fineAmount?: number; // Fine in euros
+  pointsDeducted?: number; // License points deducted
 }
 
 /**

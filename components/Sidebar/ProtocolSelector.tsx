@@ -23,6 +23,8 @@ import {
   Zap,
   Code2,
   Target,
+  Circle,
+  AlertCircle,
   LucideProps,
   LucideIcon,
 } from 'lucide-react';
@@ -40,6 +42,8 @@ const ICON_MAP: Record<string, LucideIcon | React.ComponentType<LucideProps>> = 
   'seguridad-paso-peatones': Accessibility,
   'seguridad-sentido-contrario': MinusCircle,
   'seguridad-giro-u': RotateCcw,
+  'seguridad-ceda-paso': Circle,
+  'seguridad-semaforo-rojo': AlertCircle,
   'infraccion-doble-fila': Car,
   'infraccion-bloqueo-cruce': Square,
   'zona-carga-descarga': Box,
@@ -142,7 +146,6 @@ export const ProtocolSelector = () => {
             <div className="grid grid-cols-3 gap-1.5">
               {group.items.map((item) => {
                 const isActive = selectedProtocolIds.includes(item.id);
-                const Icon = ICON_MAP[item.id] || Square;
                 return (
                   <button
                     key={item.id}
@@ -154,10 +157,6 @@ export const ProtocolSelector = () => {
                     }`}
                     {...helpProps(item.desc)}
                   >
-                    <Icon
-                      size={isActive ? 14 : 12}
-                      className={isActive ? 'text-blue-500' : 'text-slate-600'}
-                    />
                     <span
                       className={`text-[7px] font-black uppercase tracking-tight text-center leading-[1.1] ${
                         isActive ? 'text-blue-500' : 'text-slate-500'

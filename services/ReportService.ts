@@ -1,5 +1,7 @@
 import { InfractionLog } from '../types';
 import { getApiUrl } from './apiConfig';
+import { custodyLog, CustodyLogService } from './CustodyLogService';
+import { calculateSHA256 } from './ChainOfCustodyService';
 
 type JsPDFType = typeof import('jspdf').jsPDF;
 
@@ -178,14 +180,14 @@ const drawHeader = async (doc: InstanceType<JsPDFType>, pageNumber: number, tota
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
   doc.setTextColor(255, 255, 255);
-  doc.text('BOLETÍN DE DENUNCIA', PAGE_W - 36.5, 16.1, { align: 'center' });
+  doc.text('PREINFORME DE DENUNCIA', PAGE_W - 36.5, 16.1, { align: 'center' });
 
   doc.setFillColor(33, 65, 105);
   doc.rect(12, FOOTER_Y, PAGE_W - 24, 8, 'F');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(5.5);
   doc.setTextColor(235, 240, 248);
-  doc.text('Documento oficial · Validez jurídica conforme a RDL 6/2015 · RD 320/1994 · Ley 39/2015', 17, FOOTER_Y + 3.4);
+  doc.text('Documento de trabajo validado por operador · Pendiente de tramitación administrativa formal', 17, FOOTER_Y + 3.4);
   doc.text('Modelo Normalizado · Jefatura de Policía Local · Glorieta de Alcalá s/n · 28814 Daganzo de Arriba (Madrid) · policia@ayto-daganzo.org · Tel. 91 887 59 19 · www.ayto-daganzo.org', 17, FOOTER_Y + 6.2);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
@@ -374,7 +376,7 @@ const buildInfractionPages = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4);
   doc.setTextColor(100, 100, 100);
-  doc.text('CONSTANCIA: Constatados mediante SACRI - Sistema automático de captación de imágenes homologado conforme a art. 23 RDL 6/2015', 16, 272, { maxWidth: 178 });
+  doc.text('REGISTRO: Análisis asistido por software. La validez administrativa requiere revisión, custodia y tramitación por el órgano competente.', 16, 272, { maxWidth: 178 });
   doc.setTextColor(0, 0, 0);
 
   // ===== PAGE 2: SANCIONES AND PHOTOS =====
@@ -649,7 +651,20 @@ export const ReportService = {
     const expNum = getExpedienteNumber().replace(/\//g, '_');
     const file = filename || `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
     const buffer = await this.generateInfractionPdf(log, file);
-    const url = URL.createObjectURL(bufferToBlob(buffer));
+
+    // PHASE 3: Log report export
+    const reportBlob = bufferToBlob(buffer);
+    const reportHash = await calculateSHA256(reportBlob);
+    custodyLog.addEntry(
+      CustodyLogService.logReportAction(
+        'REPORT_EXPORTED',
+        'OPERATOR_SYSTEM',
+        String(log.id),
+        { exportFormat: 'PDF', fileName: file, fileHash: reportHash }
+      )
+    );
+
+    const url = URL.createObjectURL(reportBlob);
     const link = document.createElement('a');
     link.href = url;
     link.download = file;

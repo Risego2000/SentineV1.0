@@ -53,8 +53,12 @@ export class EvidenceDB {
       };
 
       request.onerror = () => {
+        // TIER 1: IndexedDB is optional - data persists in Supabase
+        // Graceful fallback: continue without local cache
+        console.warn('[EvidenceDB] IndexedDB unavailable (Electron/private mode) - using Supabase only');
+        this.db = null;
         this.initPromise = null;
-        reject(new Error('FAILED_TO_OPEN_INDEXED_DB'));
+        resolve(); // Don't reject - continue without local cache
       };
     });
 
@@ -66,49 +70,85 @@ export class EvidenceDB {
     data: {
       snapshots: string[];
       contextSnapshots?: string[];
+      contextHash?: string;
       zoomSnapshots?: string[];
+      zoomHash?: string;
       ocrResults?: string[];
+      ocrCandidates?: any[];
+      ocrValidationReport?: string;
       clip?: string;
     }
   ): Promise<void> {
     if (!this.db) await this.init();
+
+    // TIER 1: If IndexedDB unavailable, skip local cache (Supabase is primary)
+    if (!this.db) {
+      console.warn('[EvidenceDB] Skipping local cache - IndexedDB unavailable');
+      return;
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
       const request = store.put({ id, ...data, timestamp: Date.now() });
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(new Error('FAILED_TO_SAVE_EVIDENCE'));
+      request.onerror = () => {
+        console.warn('[EvidenceDB] Failed to save evidence locally');
+        resolve(); // Don't reject - local cache is optional
+      };
     });
   }
 
   async getEvidence(id: string): Promise<{
     snapshots: string[];
     contextSnapshots?: string[];
+    contextHash?: string;
     zoomSnapshots?: string[];
+    zoomHash?: string;
     ocrResults?: string[];
+    ocrCandidates?: any[];
+    ocrValidationReport?: string;
     clip?: string;
   } | null> {
     if (!this.db) await this.init();
+
+    // TIER 1: If IndexedDB unavailable, return null (no local cache)
+    if (!this.db) {
+      return null;
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly');
       const store = transaction.objectStore(this.storeName);
       const request = store.get(id);
 
       request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(new Error('FAILED_TO_GET_EVIDENCE'));
+      request.onerror = () => {
+        console.warn('[EvidenceDB] Failed to get evidence from local cache');
+        resolve(null); // Return null instead of rejecting
+      };
     });
   }
 
   async deleteEvidence(id: string): Promise<void> {
     if (!this.db) await this.init();
+
+    // TIER 1: If IndexedDB unavailable, skip deletion (no local cache)
+    if (!this.db) {
+      return;
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
       const request = store.delete(id);
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(new Error('FAILED_TO_DELETE_EVIDENCE'));
+      request.onerror = () => {
+        console.warn('[EvidenceDB] Failed to delete evidence from local cache');
+        resolve(); // Don't reject
+      };
     });
   }
 

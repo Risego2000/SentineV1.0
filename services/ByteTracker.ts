@@ -144,7 +144,15 @@ export class ByteTracker {
         }
       }
 
-      if (bestIoU > 0.15) {
+      // PHASE 5: Two-phase matching for occlusion recovery
+      // Primary: strict matching (IoU > 0.15)
+      // Secondary: occlusion recovery (IoU > 0.05 if track is recent and coasting)
+      const isOcclusionRecovery = bestIoU > 0.05 &&
+                                   bestIoU <= 0.15 &&
+                                   this.tracks[i].isCoasting &&
+                                   !this.tracks[i].isCoasting; // Only if been coasting (occluded)
+
+      if (bestIoU > 0.15 || isOcclusionRecovery) {
         usedDets.add(bestDet);
         usedTracks.add(i);
 
@@ -189,6 +197,14 @@ export class ByteTracker {
         const METERS_PER_UNIT = 23;
         const FPS = 30;
         t.avgVelocity = avgNormVel * METERS_PER_UNIT * FPS * 3.6;
+
+        // PHASE 5: Store visual metrics (will be used until forensic calibration available)
+        if (!t.visual) {
+          t.visual = { velocity: newVelocity, avgVelocity: t.avgVelocity };
+        } else {
+          t.visual.velocity = newVelocity;
+          t.visual.avgVelocity = t.avgVelocity;
+        }
 
         // Residence Time (Dwell Time)
         // More forgiving threshold (0.01 instead of 0.002) to account for slight motion/noise

@@ -15,8 +15,7 @@
 import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
 
 // Re-export for backward compatibility
-export { matchesOrderedRoiSequence } from '../types/forensicRules';
-export { buildForbiddenTurnAudit } from '../types/forensicRules';
+export { matchesOrderedRoiSequence, buildForbiddenTurnAudit } from './forensicRules';
 
 import { forensicQueueV3 } from './ForensicQueueV3';
 import type { ForensicQueueEvent } from './ForensicQueueV3';

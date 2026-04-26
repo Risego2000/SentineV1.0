@@ -130,6 +130,34 @@ export const ROAD_PRESETS: Record<string, RoadPreset> = {
     ],
     directivesTemplate: `PROTOCOL_ILLEGAL_UTURN:\n- Detectar maniobras de inversión de giro en línea continua.`,
   },
+  'seguridad-ceda-paso': {
+    lines: [
+      {
+        id: 'yield_1',
+        x1: 0.3,
+        y1: 0.75,
+        x2: 0.7,
+        y2: 0.75,
+        label: 'CEDA EL PASO',
+        type: 'stop_line',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_YIELD_VIOLATION:\n- Detectar falta de ceda el paso en señal triangular.\n- Art. 152 RGC - Falta grave.`,
+  },
+  'seguridad-semaforo-rojo': {
+    lines: [
+      {
+        id: 'traffic_red_1',
+        x1: 0.4,
+        y1: 0.8,
+        x2: 0.6,
+        y2: 0.8,
+        label: 'SEMÁFORO ROJO',
+        type: 'stop_line',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_RED_LIGHT:\n- Detectar cruce en fase roja del semáforo.\n- Art. 150 RGC - Falta muy grave.`,
+  },
 
   // OBSTRUCCIÓN Y APARCAMIENTO
   'infraccion-doble-fila': {
@@ -240,6 +268,112 @@ export const ROAD_PRESETS: Record<string, RoadPreset> = {
     ],
     directivesTemplate: `PROTOCOL_T_JUNCTION:\n- Control de incorporación desde vía secundaria.`,
   },
+
+  // NUEVAS INFRACCIONES - SISTEMA COMPLETO
+  'seguridad-giro-prohibido': {
+    lines: [
+      {
+        id: 'giro_prohibido',
+        x1: 0.3,
+        y1: 0.5,
+        x2: 0.7,
+        y2: 0.6,
+        label: 'GIRO PROHIBIDO',
+        type: 'forbidden',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_FORBIDDEN_TURN:\n- Detectar maniobras de giro prohibido por geometría o ROI.\n- Art. 36.2 RGC - Sanción 200€ / -3 pts.`,
+  },
+  'seguridad-direccion-obligatoria': {
+    lines: [
+      {
+        id: 'direccion_obligatoria',
+        x1: 0.45,
+        y1: 0.3,
+        x2: 0.55,
+        y2: 0.7,
+        label: 'DIRECCIÓN OBLIGATORIA',
+        type: 'forbidden',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_MANDATORY_DIRECTION:\n- Control de trayectoria vs dirección obligatoria.\n- Señales R-400 a R-406 RGC.`,
+  },
+  'infraccion-doble-fila-geo': {
+    lines: [
+      {
+        id: 'doble_fila',
+        x1: 0.75,
+        y1: 0.3,
+        x2: 0.85,
+        y2: 0.8,
+        label: 'ZONA DE DOBLE FILA',
+        type: 'forbidden',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_DOUBLE_PARKING:\n- Vehículo en segunda fila obstaculizando carril activo.\n- Art. 87.1 RGC - 200€.`,
+  },
+  'infraccion-bloqueo-cruce-geo': {
+    lines: [
+      {
+        id: 'bloqueo_cruce',
+        x1: 0.3,
+        y1: 0.4,
+        x2: 0.7,
+        y2: 0.7,
+        label: 'ZONA DE CRUCE (Yellow Box)',
+        type: 'box_junction',
+        points: [
+          { x: 0.3, y: 0.4 },
+          { x: 0.7, y: 0.4 },
+          { x: 0.8, y: 0.7 },
+          { x: 0.2, y: 0.7 },
+        ],
+      },
+    ],
+    directivesTemplate: `PROTOCOL_JUNCTION_BLOCKING:\n- Prohibido detenerse dentro del cruce.\n- Art. 142 RGC.`,
+  },
+  'carril-bus-geo': {
+    lines: [
+      {
+        id: 'carril_bus',
+        x1: 0.8,
+        y1: 0.2,
+        x2: 0.9,
+        y2: 0.9,
+        label: 'CARRIL BUS/TAXI EXCLUSIVO',
+        type: 'bus_lane',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_BUS_LANE_RESTRICTION:\n- Acceso restringido a transporte público y vehículos autorizados.\n- Art. 48 RGC.`,
+  },
+  'invasion-arcen-geo': {
+    lines: [
+      {
+        id: 'invasion_arcen',
+        x1: 0.9,
+        y1: 0.2,
+        x2: 0.98,
+        y2: 0.9,
+        label: 'ARCÉN DE SEGURIDAD',
+        type: 'forbidden',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_SHOULDER_INVASION:\n- Circulación indebida por arcén sin causa.\n- Art. 49 RGC.`,
+  },
+  'linea-continua-geo': {
+    lines: [
+      {
+        id: 'linea_continua_nueva',
+        x1: 0.45,
+        y1: 0.2,
+        x2: 0.55,
+        y2: 0.8,
+        label: 'LÍNEA CONTINUA - ADELANTAMIENTO PROHIBIDO',
+        type: 'lane_divider',
+      },
+    ],
+    directivesTemplate: `PROTOCOL_SOLID_LINE_CROSSING:\n- Control de rebasamiento y adelantamientos en línea continua.\n- Art. 43 RGC - Sanción 200€ / -4 pts.`,
+  },
 };
 
 export const ROAD_MENU_GROUPS = [
@@ -256,80 +390,104 @@ export const ROAD_MENU_GROUPS = [
     ],
   },
   {
-    label: 'INFRACCIONES DE SEGURIDAD',
+    label: '🔴 INTERSECCIONES Y SEGURIDAD VIAL',
     icon: '🚨',
     items: [
       {
         id: 'seguridad-stop-falso',
-        label: 'SALTARSE STOP',
+        label: 'STOP — NO DETENCIÓN',
         icon: '🛑',
-        desc: 'Detecta falta de detención completa.',
+        desc: 'Art. 151 RGC | 200€ | -4 pts | Detecta falta de detención completa ante STOP.',
+      },
+      {
+        id: 'seguridad-ceda-paso',
+        label: '⚠️ CEDA EL PASO',
+        icon: '⚪',
+        desc: 'Art. 57 RGC | 200€ | -4 pts | No cede prioridad a vehículo o peatón.',
       },
       {
         id: 'seguridad-paso-peatones',
-        label: 'PRIORIDAD PEATONAL',
+        label: '🚶 PRIORIDAD PEATONAL',
         icon: '🚶',
-        desc: 'Control de pasos de cebra.',
+        desc: 'Art. 146 RGC | 200€ | -6 pts | No respeta paso de peatones.',
       },
       {
-        id: 'seguridad-sentido-contrario',
-        label: 'SENTIDO CONTRARIO',
-        icon: '⛔',
-        desc: 'Circular contra el flujo legal.',
-      },
-      {
-        id: 'seguridad-giro-u',
-        label: 'GIRO EN U PROHIBIDO',
-        icon: '↩️',
-        desc: 'Inversión de giro ilegal.',
+        id: 'seguridad-semaforo-rojo',
+        label: '🚥 SEMÁFORO EN ROJO',
+        icon: '🚦',
+        desc: 'Art. 150 RGC | 200€ | -4 pts | Rebasar línea en luz roja.',
       },
     ],
   },
   {
-    label: 'OBSTRUCCIÓN Y APARCAMIENTO',
+    label: '🔁 MANIOBRAS',
+    icon: '🔄',
+    items: [
+      {
+        id: 'seguridad-giro-prohibido',
+        label: '🔄 GIRO PROHIBIDO',
+        icon: '↩️',
+        desc: 'Art. 36.2 RGC | 200€ | -3 pts | Realizar giro no permitido.',
+      },
+      {
+        id: 'seguridad-direccion-obligatoria',
+        label: '➡️ DIRECCIÓN OBLIGATORIA',
+        icon: '➡️',
+        desc: 'Art. 36.1 RGC | 200€ | 0 pts | No seguir dirección obligatoria.',
+      },
+    ],
+  },
+  {
+    label: '🚫 CIRCULACIÓN PELIGROSA',
+    icon: '⛔',
+    items: [
+      {
+        id: 'seguridad-sentido-contrario',
+        label: '⛔ SENTIDO CONTRARIO',
+        icon: '⛔',
+        desc: 'Art. 31 RGC | 500€ | -6 pts | CRÍTICA | Circular en dirección opuesta.',
+      },
+    ],
+  },
+  {
+    label: '🚗 PARADA Y OBSTRUCCIÓN',
     icon: '🚧',
     items: [
       {
         id: 'infraccion-doble-fila',
-        label: 'DOBLE FILA',
+        label: '🚧 DOBLE FILA',
         icon: '🚗',
-        desc: 'Parada en carril activo.',
+        desc: 'Art. 87.1 RGC | 200€ | 0 pts | Estacionar obstaculizando circulación.',
       },
       {
         id: 'infraccion-bloqueo-cruce',
-        label: 'BLOQUEO INTERSECCIÓN',
+        label: '🚫 BLOQUEO DE INTERSECCIÓN',
         icon: '🔲',
-        desc: 'Quedarse dentro del cruce.',
-      },
-      {
-        id: 'zona-carga-descarga',
-        label: 'CARGA/DESCARGA',
-        icon: '📦',
-        desc: 'Uso indebido zona logística.',
+        desc: 'Art. 142 RGC | 200€ | 0 pts | Quedar detenido en cruce sin poder salir.',
       },
     ],
   },
   {
-    label: 'USO DE CARRILES',
+    label: '🛣️ USO DE CARRILES',
     icon: '🛣️',
     items: [
       {
         id: 'infraccion-carril-bus',
-        label: 'CARRIL BUS/TAXI',
+        label: '🚌 CARRIL BUS / TAXI',
         icon: '🚌',
-        desc: 'Uso indebido carril bus.',
+        desc: 'Art. 48 RGC | 200€ | 0 pts | Circular por carril reservado.',
       },
       {
         id: 'arcen-emergencia',
-        label: 'INVASIÓN DE ARCÉN',
+        label: '🪵 INVASIÓN DE ARCÉN',
         icon: '⚠️',
-        desc: 'Circular por el arcén.',
+        desc: 'Art. 49 RGC | 200€ | 0 pts | Circular por arcén sin causa.',
       },
       {
         id: 'daganzo-m100-autovia',
-        label: 'LÍNEA CONTINUA',
+        label: '➖ LÍNEA CONTINUA',
         icon: '➖',
-        desc: 'Rebasar línea continua M-100.',
+        desc: 'Art. 43 RGC | 200€ | -4 pts | Rebasar línea continua.',
       },
     ],
   },
@@ -356,7 +514,7 @@ export const ROAD_MENU_GROUPS = [
 export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   scout: {
     label: 'Scout',
-    description: 'YOLOv5m: Máxima velocidad (40ms), todos los fotogramas, latencia ultra-baja.',
+    description: 'COCO-SSD: Máxima velocidad (100ms), todos los fotogramas, latencia ultra-baja.',
     config: {
       confidenceThreshold: 0.25,
       nmsThreshold: 0.3,
@@ -367,7 +525,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   sentinel: {
     label: 'Sentinel',
-    description: 'YOLOv5m: Equilibrio óptimo (50ms), precisión +43%, tracking persistente.',
+    description: 'COCO-SSD: Equilibrio óptimo (120ms), 90 clases COCO, tracking persistente.',
     config: {
       confidenceThreshold: 0.28,
       nmsThreshold: 0.35,
@@ -378,7 +536,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   warden: {
     label: 'Warden',
-    description: 'YOLOv5m: Máxima precisión (65ms), confianza 32%, tráfico denso.',
+    description: 'COCO-SSD: Máxima precisión (140ms), confianza 32%, tráfico denso.',
     config: {
       confidenceThreshold: 0.32,
       nmsThreshold: 0.4,
@@ -389,7 +547,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
   },
   shadow: {
     label: 'Shadow',
-    description: 'YOLOv5m: Baja visibilidad (80ms), confianza 20%, análisis nocturno.',
+    description: 'COCO-SSD: Baja visibilidad (150ms), confianza 20%, análisis nocturno.',
     config: {
       confidenceThreshold: 0.2,
       nmsThreshold: 0.25,

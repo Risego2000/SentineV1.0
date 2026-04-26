@@ -1,308 +1,606 @@
 /**
- * Formal Forensic Rule System
- * Rules are explicit, declarative configurations - not heuristics based on labels.
+ * Sistema de Clasificación de Infracciones - TIER 1 COMPLETO
+ * Estructura profesional para denuncias de tráfico (Art. RGC / TRLTSV)
+ *
+ * Organizadas por:
+ * - Categoría operativa (Intersecciones, Maniobras, etc.)
+ * - Prioridad de detección
+ * - Base legal (Art. RGC / TRLTSV)
+ * - Parámetros IA
+ * - Evidencia requerida
  */
 
 import { EntityType, SeverityType } from '../types';
 
 export type RuleType =
-  | 'line_crossing' // Simple line intersection
-  | 'stop_violation' // Line crossing without proper stop
-  | 'forbidden_direction' // Wrong way / reverse
-  | 'forbidden_turn' // Sequential ROI A -> B
-  | 'zone_dwell' // Vehicle in zone > threshold
-  | 'roi_entry'; // Any vehicle entering ROI (general audit)
+  | 'line_crossing'              // Cruce de línea simple
+  | 'stop_violation'             // STOP - No detención
+  | 'yield_violation'            // CEDA - No cede paso
+  | 'pedestrian_priority'        // Prioridad peatonal
+  | 'red_light_violation'        // Semáforo en rojo
+  | 'forbidden_direction'        // Sentido contrario
+  | 'forbidden_turn'             // Giro prohibido
+  | 'mandatory_direction'        // Dirección obligatoria incumplida
+  | 'zone_dwell'                 // Estacionamiento/obstrucción
+  | 'roi_entry';                 // Entrada a zona de análisis
+
+export type OperativeCategory =
+  | 'INTERSECTIONS'              // 🔴 Intersecciones y Seguridad Vial
+  | 'MANEUVERS'                  // 🔁 Maniobras
+  | 'DANGEROUS_DRIVING'          // 🚫 Circulación Peligrosa
+  | 'PARKING_OBSTRUCTION'        // 🚗 Parada y Obstrucción
+  | 'LANE_USAGE';                // 🛣️ Uso de Carriles
+
+export interface AIRuleTrigger {
+  trigger: string;               // Condición de activación
+  [key: string]: any;            // Parámetros específicos de la regla
+}
+
+export interface InfractionSanctions {
+  fine_eur: number;              // Multa en euros
+  points: number;                // Puntos de carné (negativo = pérdida)
+  risk_score: number;            // 1-5 (riesgo)
+  priority: 'BAJA' | 'MEDIA' | 'MEDIA-ALTA' | 'ALTA' | 'CRÍTICA';
+}
+
+export interface RequiredEvidence {
+  before_frame: boolean;         // Fotograma previo
+  line_crossing: boolean;        // Cruce de línea
+  trajectory: boolean;           // Trayectoria
+  timestamp: boolean;            // Marca de tiempo
+  location: boolean;             // Ubicación
+  pedestrian?: boolean;          // Peatón (si aplica)
+  vehicle_state?: string;        // Estado vehículo (speed, stopped, etc.)
+}
 
 export interface ROISequence {
-  /** Unique sequence ID */
   id: string;
-  /** Ordered list of ROI IDs that must be visited */
   roiIds: string[];
-  /** Human-readable labels for display */
   roiLabels: string[];
-  /** Human-readable name of this turn sequence */
   name: string;
 }
 
+/**
+ * Regla Forense Mejorada con campos operativos completos
+ */
 export interface ForensicRule {
-  /** Globally unique rule identifier */
-  readonly id: string;
-  /** Human-readable name */
-  readonly name: string;
-  /** Rule classification */
+  // Identificación
+  readonly id: string;                      // STOP_NO_DETENCION
+  readonly name: string;                    // "STOP — NO DETENCIÓN"
+  readonly operativeCode: string;           // ID operativo único
+
+  // Clasificación
   readonly type: RuleType;
-  /** Severity if infraction confirmed */
+  readonly category: OperativeCategory;
   readonly severity: SeverityType;
-  /** Legal reference / article */
-  readonly legalBase?: string;
-  /** Which geometry lines this rule monitors */
+
+  // Base legal
+  readonly legalBase: string[];             // ["Art. 151 RGC", "Art. 76.j TRLTSV"]
+  readonly conduct: string;                 // Descripción de la conducta
+  readonly citation: string;                // Texto automático de denuncia
+
+  // Sanciones
+  readonly sanctions: InfractionSanctions;
+
+  // Detección IA
+  readonly aiRule: AIRuleTrigger;
+  readonly requiredEvidence: RequiredEvidence;
   readonly geometryIds: string[];
-  /** For sequential rules: ordered ROI sequence */
+
+  // Parámetros técnicos
   readonly sequence?: ROISequence;
-  /** Minimum dwell time for dwell-based rules (ms) */
   readonly minDwellTime?: number;
-  /** Context description passed to AI auditor */
   readonly analysisPrompt: string;
-  /** Rule is active */
   readonly enabled: boolean;
-  /** Priority (higher = processed first) */
   readonly priority: number;
+
+  // Reglas de exclusión (si esta infracción se detecta, ignorar otras)
+  readonly exclusionList?: string[];        // IDs de reglas a ignorar
 }
 
 /**
- * System rule presets for common traffic violations.
+ * 🔴 INTERSECCIONES Y SEGURIDAD VIAL
+ */
+export const STOP_NO_DETENCION: ForensicRule = {
+  id: 'rule_stop_no_detencion',
+  operativeCode: 'STOP_NO_DETENCION',
+  name: 'STOP — NO DETENCIÓN',
+  type: 'stop_violation',
+  category: 'INTERSECTIONS',
+  severity: 'HIGH',
+  legalBase: ['Art. 151 RGC', 'Art. 76.j TRLTSV'],
+  conduct: 'No realizar detención completa ante señal STOP.',
+  citation: 'No detenerse ante la señal de STOP, rebasando la línea de detención sin efectuar parada total.',
+  sanctions: {
+    fine_eur: 200,
+    points: -4,
+    risk_score: 5,
+    priority: 'ALTA',
+  },
+  aiRule: {
+    trigger: 'vehicle_crosses_stop_line_without_full_stop',
+    min_stop_time_ms: 900,
+    max_speed_kmh: 2,
+  },
+  requiredEvidence: {
+    before_frame: true,
+    line_crossing: true,
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    vehicle_state: 'moving_or_insufficient_stop',
+  },
+  geometryIds: ['stop_line'],
+  analysisPrompt: 'Detectar si el vehículo cruza la línea de STOP sin detención completa (v > 2 km/h o tiempo < 900ms).',
+  enabled: true,
+  priority: 20,
+};
+
+export const CEDA_NO_RESPETADO: ForensicRule = {
+  id: 'rule_ceda_no_respetado',
+  operativeCode: 'CEDA_NO_RESPETADO',
+  name: '⚠️ CEDA EL PASO',
+  type: 'yield_violation',
+  category: 'INTERSECTIONS',
+  severity: 'HIGH',
+  legalBase: ['Art. 57 RGC', 'Art. 76 TRLTSV'],
+  conduct: 'No ceder prioridad a vehículo o peatón.',
+  citation: 'No ceder el paso ante vehículo o peatón en señal de ceda, entrando en zona de conflicto sin respetar prioridad.',
+  sanctions: {
+    fine_eur: 200,
+    points: -4,
+    risk_score: 5,
+    priority: 'ALTA',
+  },
+  aiRule: {
+    trigger: 'vehicle_enters_conflict_zone_without_yield',
+    time_to_collision_s: 3,
+  },
+  requiredEvidence: {
+    before_frame: true,
+    line_crossing: true,
+    trajectory: true,
+    timestamp: true,
+    location: true,
+  },
+  geometryIds: ['yield_1'],
+  analysisPrompt: 'Analizar si el vehículo entra en zona de conflicto sin ceder paso (TTC < 3s).',
+  enabled: true,
+  priority: 19,
+};
+
+export const PRIORIDAD_PEATONAL: ForensicRule = {
+  id: 'rule_prioridad_peatonal',
+  operativeCode: 'PRIORIDAD_PEATONAL',
+  name: '🚶 PRIORIDAD PEATONAL',
+  type: 'pedestrian_priority',
+  category: 'INTERSECTIONS',
+  severity: 'HIGH',
+  legalBase: ['Art. 146 RGC', 'Art. 24 TRLTSV'],
+  conduct: 'No respetar paso de peatones.',
+  citation: 'No respetar el paso de peatones, circulando sobre paso de cebra sin ceder preferencia.',
+  sanctions: {
+    fine_eur: 200,
+    points: -6,
+    risk_score: 5,
+    priority: 'CRÍTICA',
+  },
+  aiRule: {
+    trigger: 'vehicle_fails_to_yield_pedestrian',
+    pedestrian_required: true,
+    min_distance_m: 3,
+  },
+  requiredEvidence: {
+    before_frame: true,
+    line_crossing: true,
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    pedestrian: true,
+  },
+  geometryIds: ['pedestrian'],
+  analysisPrompt: 'Detectar fallo en ceder paso a peatones en paso de cebra (requiere peatón presente).',
+  enabled: true,
+  priority: 22,
+};
+
+export const SEMAFORO_ROJO: ForensicRule = {
+  id: 'rule_semaforo_rojo',
+  operativeCode: 'SEMAFORO_ROJO',
+  name: '🚥 SEMÁFORO EN ROJO',
+  type: 'red_light_violation',
+  category: 'INTERSECTIONS',
+  severity: 'HIGH',
+  legalBase: ['Art. 150 RGC', 'Art. 76.c TRLTSV'],
+  conduct: 'Rebasar semáforo en rojo.',
+  citation: 'Rebasar la línea de detención cuando la señal luminosa roja se encontraba activa.',
+  sanctions: {
+    fine_eur: 200,
+    points: -4,
+    risk_score: 5,
+    priority: 'CRÍTICA',
+  },
+  aiRule: {
+    trigger: 'vehicle_crosses_line_on_red',
+    light_state: 'RED',
+  },
+  requiredEvidence: {
+    before_frame: true,
+    line_crossing: true,
+    trajectory: true,
+    timestamp: true,
+    location: true,
+  },
+  geometryIds: ['traffic_red_1'],
+  analysisPrompt: 'Detectar cruce de línea en fase roja (luz roja activa).',
+  enabled: true,
+  priority: 23,
+};
+
+/**
+ * 🔁 MANIOBRAS
+ */
+export const GIRO_PROHIBIDO: ForensicRule = {
+  id: 'rule_giro_prohibido',
+  operativeCode: 'GIRO_PROHIBIDO',
+  name: '🔄 GIRO PROHIBIDO',
+  type: 'forbidden_turn',
+  category: 'MANEUVERS',
+  severity: 'HIGH',
+  legalBase: ['Art. 36.2 RGC', 'Art. 76.e TRLTSV'],
+  conduct: 'Realizar giro no permitido.',
+  citation: 'Efectuar giro no autorizado en vía con sentido obligatorio o zona prohibida de giro.',
+  sanctions: {
+    fine_eur: 200,
+    points: -3,
+    risk_score: 4,
+    priority: 'ALTA',
+  },
+  aiRule: {
+    trigger: 'forbidden_turn_detected',
+    roi_required: ['A', 'B'],
+  },
+  requiredEvidence: {
+    before_frame: true,
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    line_crossing: false,
+  },
+  geometryIds: ['giro_prohibido'],
+  analysisPrompt: 'Detectar secuencia de ROIs que indica giro prohibido (entrada A → salida B).',
+  enabled: true,
+  priority: 18,
+  exclusionList: ['rule_sentido_contrario'],
+};
+
+export const DIRECCION_OBLIGATORIA_INCUMPLIDA: ForensicRule = {
+  id: 'rule_direccion_obligatoria',
+  operativeCode: 'DIRECCION_OBLIGATORIA_INCUMPLIDA',
+  name: '➡️ DIRECCIÓN OBLIGATORIA INCUMPLIDA',
+  type: 'mandatory_direction',
+  category: 'MANEUVERS',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 36.1 RGC', 'Señales R-400 a R-406'],
+  conduct: 'No seguir dirección obligatoria.',
+  citation: 'No respetar la dirección obligatoria señalizada en la vía.',
+  sanctions: {
+    fine_eur: 200,
+    points: 0,
+    risk_score: 3,
+    priority: 'MEDIA-ALTA',
+  },
+  aiRule: {
+    trigger: 'trajectory_not_matching_allowed_direction',
+    allowed: ['RIGHT', 'LEFT', 'STRAIGHT'],
+  },
+  requiredEvidence: {
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    before_frame: false,
+    line_crossing: false,
+  },
+  geometryIds: ['direccion_obligatoria'],
+  analysisPrompt: 'Detectar si trayectoria no coincide con dirección obligatoria permitida.',
+  enabled: true,
+  priority: 15,
+  exclusionList: ['rule_sentido_contrario'],
+};
+
+/**
+ * 🚫 CIRCULACIÓN PELIGROSA
+ */
+export const SENTIDO_CONTRARIO: ForensicRule = {
+  id: 'rule_sentido_contrario',
+  operativeCode: 'SENTIDO_CONTRARIO',
+  name: '⛔ SENTIDO CONTRARIO',
+  type: 'forbidden_direction',
+  category: 'DANGEROUS_DRIVING',
+  severity: 'CRITICAL',
+  legalBase: ['Art. 31 RGC', 'Art. 76.d TRLTSV', 'Art. 380 CP (posible)'],
+  conduct: 'Circular en dirección opuesta al sentido de la vía.',
+  citation: 'Circular en sentido contrario a la dirección legal de la vía, suponiendo grave riesgo para la seguridad vial.',
+  sanctions: {
+    fine_eur: 500,
+    points: -6,
+    risk_score: 5,
+    priority: 'CRÍTICA',
+  },
+  aiRule: {
+    trigger: 'vehicle_direction_opposed_to_lane',
+    min_distance_m: 8,
+    min_frames: 12,
+  },
+  requiredEvidence: {
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    before_frame: true,
+    line_crossing: true,
+  },
+  geometryIds: ['sentido_contrario'],
+  analysisPrompt: 'Detectar dirección opuesta a carril (trayectoria > 8m en sentido contrario por > 12 fotogramas).',
+  enabled: true,
+  priority: 25, // MÁXIMA PRIORIDAD
+  exclusionList: ['rule_giro_prohibido', 'rule_direccion_obligatoria', 'rule_linea_continua'],
+};
+
+/**
+ * 🚗 PARADA Y OBSTRUCCIÓN
+ */
+export const DOBLE_FILA: ForensicRule = {
+  id: 'rule_doble_fila',
+  operativeCode: 'DOBLE_FILA',
+  name: '🚧 DOBLE FILA',
+  type: 'zone_dwell',
+  category: 'PARKING_OBSTRUCTION',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 87.1 RGC', 'Ordenanza Municipal'],
+  conduct: 'Estacionar obstaculizando circulación.',
+  citation: 'Aparcar en segunda fila, obstaculizando el tráfico en carril activo.',
+  sanctions: {
+    fine_eur: 200,
+    points: 0,
+    risk_score: 3,
+    priority: 'MEDIA-ALTA',
+  },
+  aiRule: {
+    trigger: 'vehicle_stationary_blocking_lane',
+    min_time_s: 45,
+  },
+  requiredEvidence: {
+    location: true,
+    timestamp: true,
+    vehicle_state: 'stopped',
+  },
+  geometryIds: ['doble_fila'],
+  minDwellTime: 45000,
+  analysisPrompt: 'Detectar vehículo detenido en carril activo > 45 segundos.',
+  enabled: true,
+  priority: 12,
+};
+
+export const BLOQUEO_INTERSECCION: ForensicRule = {
+  id: 'rule_bloqueo_interseccion',
+  operativeCode: 'BLOQUEO_INTERSECCION',
+  name: '🚫 BLOQUEO DE INTERSECCIÓN',
+  type: 'zone_dwell',
+  category: 'PARKING_OBSTRUCTION',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 142 RGC'],
+  conduct: 'Quedar detenido en cruce sin poder salir.',
+  citation: 'Permanecer detenido dentro de la intersección, impidiendo el paso de otros vehículos.',
+  sanctions: {
+    fine_eur: 200,
+    points: 0,
+    risk_score: 3,
+    priority: 'MEDIA',
+  },
+  aiRule: {
+    trigger: 'vehicle_stopped_inside_intersection',
+    blocking: true,
+  },
+  requiredEvidence: {
+    location: true,
+    timestamp: true,
+    vehicle_state: 'stopped',
+  },
+  geometryIds: ['box_junction'],
+  minDwellTime: 5000,
+  analysisPrompt: 'Detectar vehículo detenido dentro de intersección.',
+  enabled: true,
+  priority: 13,
+};
+
+/**
+ * 🛣️ USO DE CARRILES
+ */
+export const CARRIL_BUS: ForensicRule = {
+  id: 'rule_carril_bus',
+  operativeCode: 'CARRIL_BUS',
+  name: '🚌 CARRIL BUS / TAXI',
+  type: 'zone_dwell',
+  category: 'LANE_USAGE',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 48 RGC', 'Ordenanza Municipal'],
+  conduct: 'Circular por carril reservado.',
+  citation: 'Circulación por carril reservado a transporte público sin autorización.',
+  sanctions: {
+    fine_eur: 200,
+    points: 0,
+    risk_score: 2,
+    priority: 'MEDIA',
+  },
+  aiRule: {
+    trigger: 'vehicle_in_bus_lane',
+    duration_s: 30,
+  },
+  requiredEvidence: {
+    trajectory: true,
+    timestamp: true,
+    location: true,
+  },
+  geometryIds: ['bus_lane'],
+  analysisPrompt: 'Detectar vehículo en carril BUS/TAXI durante > 30 segundos.',
+  enabled: true,
+  priority: 10,
+};
+
+export const INVASION_ARCEN: ForensicRule = {
+  id: 'rule_invasion_arcen',
+  operativeCode: 'INVASION_ARCEN',
+  name: '🪵 INVASIÓN DE ARCÉN',
+  type: 'zone_dwell',
+  category: 'LANE_USAGE',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 49 RGC'],
+  conduct: 'Circular por arcén sin causa.',
+  citation: 'Circulación por arcén sin justificación (no emergencia, avería, etc.).',
+  sanctions: {
+    fine_eur: 200,
+    points: 0,
+    risk_score: 2,
+    priority: 'MEDIA',
+  },
+  aiRule: {
+    trigger: 'vehicle_on_shoulder',
+    distance_m: 1.5,
+  },
+  requiredEvidence: {
+    trajectory: true,
+    timestamp: true,
+    location: true,
+  },
+  geometryIds: ['shoulder'],
+  analysisPrompt: 'Detectar vehículo circulando fuera de carril normal (arcén).',
+  enabled: true,
+  priority: 9,
+};
+
+export const LINEA_CONTINUA: ForensicRule = {
+  id: 'rule_linea_continua',
+  operativeCode: 'LINEA_CONTINUA',
+  name: '➖ LÍNEA CONTINUA',
+  type: 'line_crossing',
+  category: 'LANE_USAGE',
+  severity: 'MEDIUM',
+  legalBase: ['Art. 43 RGC', 'Art. 76.h TRLTSV'],
+  conduct: 'Rebasar línea continua.',
+  citation: 'Cruzar línea continua sin causa justificada (adelantamiento prohibido).',
+  sanctions: {
+    fine_eur: 200,
+    points: -4,
+    risk_score: 3,
+    priority: 'MEDIA-ALTA',
+  },
+  aiRule: {
+    trigger: 'vehicle_crosses_solid_line',
+    line_type: 'CONTINUOUS',
+  },
+  requiredEvidence: {
+    trajectory: true,
+    timestamp: true,
+    location: true,
+    line_crossing: true,
+  },
+  geometryIds: ['lane_divider'],
+  analysisPrompt: 'Detectar cruce de línea continua.',
+  enabled: true,
+  priority: 11,
+  exclusionList: ['rule_sentido_contrario'],
+};
+
+/**
+ * Array maestro de todas las reglas
  */
 export const FORENSIC_RULES: ForensicRule[] = [
-  // LINE CROSSING RULES
-  {
-    id: 'rule_stop_line',
-    name: 'Stop Line Violation',
-    type: 'stop_violation',
-    severity: 'MEDIUM',
-    legalBase: 'Art. 151 RGC',
-    geometryIds: ['stop_line'],
-    analysisPrompt: 'Analyze if the vehicle failed to come to a complete stop at the stop line.',
-    enabled: true,
-    priority: 10,
-  },
-  {
-    id: 'rule_pedestrian_crossing',
-    name: 'Pedestrian Priority Violation',
-    type: 'line_crossing',
-    severity: 'HIGH',
-    legalBase: 'Art. 146 RGC - Prioridad Peatonal',
-    geometryIds: ['pedestrian'],
-    analysisPrompt: 'Analyze if the vehicle failed to yield to pedestrians at the crossing.',
-    enabled: true,
-    priority: 15,
-  },
-  {
-    id: 'rule_forbidden_lane',
-    name: 'Forbidden Lane Invasion',
-    type: 'forbidden_direction',
-    severity: 'HIGH',
-    legalBase: 'Art. 144 RGC',
-    geometryIds: ['forbidden'],
-    analysisPrompt:
-      'Analyze if the vehicle traveled in a forbidden direction or invaded restricted lane.',
-    enabled: true,
-    priority: 12,
-  },
-  {
-    id: 'rule_solid_line',
-    name: 'Solid Line Violation',
-    type: 'line_crossing',
-    severity: 'MEDIUM',
-    legalBase: 'Art. 143 RGC - Línea Continua',
-    geometryIds: ['lane_divider'],
-    analysisPrompt: 'Analyze if the vehicle crossed a solid line improperly.',
-    enabled: true,
-    priority: 8,
-  },
-  {
-    id: 'rule_bus_lane',
-    name: 'Bus Lane Violation',
-    type: 'forbidden_direction',
-    severity: 'LOW',
-    legalBase: 'Ordenanza Municipal',
-    geometryIds: ['bus_lane'],
-    analysisPrompt: 'Analyze if an unauthorized vehicle used the bus lane.',
-    enabled: true,
-    priority: 5,
-  },
+  // INTERSECCIONES (prioridad alta)
+  STOP_NO_DETENCION,
+  CEDA_NO_RESPETADO,
+  PRIORIDAD_PEATONAL,
+  SEMAFORO_ROJO,
 
-  // ZONE-BASED RULES
-  {
-    id: 'rule_box_junction',
-    name: 'Box Junction Blocking',
-    type: 'zone_dwell',
-    severity: 'MEDIUM',
-    legalBase: 'Art. 142 RGC - Bloqueo de Intersección',
-    geometryIds: ['box_junction'],
-    minDwellTime: 5000,
-    analysisPrompt:
-      'Analyze if the vehicle blocked the box junction for more than the allowed time.',
-    enabled: true,
-    priority: 14,
-  },
-  {
-    id: 'rule_double_parking',
-    name: 'Double Parking Violation',
-    type: 'zone_dwell',
-    severity: 'LOW',
-    legalBase: 'Art. 107 OVM',
-    geometryIds: ['double_row'],
-    minDwellTime: 30000,
-    analysisPrompt: 'Analyze if the vehicle was double-parked, obstructing traffic flow.',
-    enabled: true,
-    priority: 3,
-  },
-  {
-    id: 'rule_parking_prohibited',
-    name: 'Prohibited Parking',
-    type: 'zone_dwell',
-    severity: 'LOW',
-    legalBase: 'Art. 108 OVM',
-    geometryIds: ['prohibited_parking'],
-    minDwellTime: 30000,
-    analysisPrompt: 'Analyze if the vehicle parked in a prohibited zone.',
-    enabled: true,
-    priority: 2,
-  },
+  // MANIOBRAS
+  GIRO_PROHIBIDO,
+  DIRECCION_OBLIGATORIA_INCUMPLIDA,
 
-  // ROI-BASED RULES
-  {
-    id: 'rule_roi_general',
-    name: 'General ROI Audit',
-    type: 'roi_entry',
-    severity: 'MEDIUM',
-    geometryIds: ['roi_general'],
-    analysisPrompt: 'Perform general forensic audit of vehicle in analysis zone.',
-    enabled: true,
-    priority: 1,
-  },
+  // CIRCULACIÓN PELIGROSA (MÁXIMA PRIORIDAD)
+  SENTIDO_CONTRARIO,
+
+  // PARADA Y OBSTRUCCIÓN
+  DOBLE_FILA,
+  BLOQUEO_INTERSECCION,
+
+  // USO DE CARRILES
+  CARRIL_BUS,
+  INVASION_ARCEN,
+  LINEA_CONTINUA,
 ];
 
 /**
- * Finds a rule by ID.
+ * Funciones utilitarias
  */
 export function getRuleById(id: string): ForensicRule | undefined {
   return FORENSIC_RULES.find((r) => r.id === id);
 }
 
-/**
- * Finds rules that monitor a specific geometry ID.
- */
-export function getRulesForGeometry(geometryId: string): ForensicRule[] {
-  return FORENSIC_RULES.filter((r) => r.enabled && r.geometryIds.includes(geometryId));
+export function getRulesByCategory(category: OperativeCategory): ForensicRule[] {
+  return FORENSIC_RULES.filter((r) => r.category === category && r.enabled);
+}
+
+export function getRulesByPriority(priority: ForensicRule['sanctions']['priority']): ForensicRule[] {
+  return FORENSIC_RULES.filter((r) => r.sanctions.priority === priority && r.enabled);
 }
 
 /**
- * Finds a forbidden turn rule matching a given sequence.
+ * Orden de prioridad de detección (CRITICAL FIRST)
  */
-export function findForbiddenTurnRule(
-  roiSequence: string[],
-  allRules: ForensicRule[] = FORENSIC_RULES
-): ForensicRule | undefined {
-  return allRules.find((r) => {
-    if (r.type !== 'forbidden_turn' || !r.sequence) return false;
-    if (r.sequence.roiIds.length !== roiSequence.length) return false;
-    return r.sequence.roiIds.every((id, i) => id === roiSequence[i]);
-  });
-}
+export const DETECTION_PRIORITY_ORDER: string[] = [
+  'rule_sentido_contrario',           // MÁXIMA: 25
+  'rule_prioridad_peatonal',          // 22
+  'rule_semaforo_rojo',               // 23
+  'rule_stop_no_detencion',           // 20
+  'rule_ceda_no_respetado',           // 19
+  'rule_giro_prohibido',              // 18
+  'rule_direccion_obligatoria',       // 15
+  'rule_bloqueo_interseccion',        // 13
+  'rule_doble_fila',                  // 12
+  'rule_linea_continua',              // 11
+  'rule_carril_bus',                  // 10
+  'rule_invasion_arcen',              // 9
+];
 
 /**
- * Checks if a track's ROI history matches an expected sequence.
+ * Reglas de exclusión mutua
+ * Si se detecta X, ignorar Y
  */
-export function matchesOrderedRoiSequence(history: string[], expectedSequence: string[]): boolean {
-  if (expectedSequence.length < 2 || history.length < expectedSequence.length) {
-    return false;
-  }
+export const EXCLUSION_RULES: Record<string, string[]> = {
+  'rule_sentido_contrario': [
+    'rule_direccion_obligatoria',
+    'rule_giro_prohibido',
+    'rule_linea_continua',
+  ],
+  'rule_giro_prohibido': [
+    'rule_sentido_contrario',
+  ],
+  'rule_direccion_obligatoria': [
+    'rule_sentido_contrario',
+  ],
+};
 
-  let expectedIndex = 0;
-  for (const roiId of history) {
-    if (roiId === expectedSequence[expectedIndex]) {
-      expectedIndex++;
-      if (expectedIndex === expectedSequence.length) {
-        return true;
-      }
+/**
+ * Aplicar reglas de exclusión a un conjunto de infracciones detectadas
+ */
+export function applyExclusionRules(detectedRuleIds: string[]): string[] {
+  const filtered = new Set(detectedRuleIds);
+
+  for (const ruleId of detectedRuleIds) {
+    const exclusions = EXCLUSION_RULES[ruleId];
+    if (exclusions) {
+      exclusions.forEach((excluded) => filtered.delete(excluded));
     }
   }
-  return false;
-}
 
-/**
- * Creates a new forbidden turn rule dynamically.
- */
-export function createForbiddenTurnRule(
-  name: string,
-  sequence: ROISequence,
-  legalBase?: string
-): ForensicRule {
-  return {
-    id: `rule_forbidden_turn_${sequence.id}`,
-    name,
-    type: 'forbidden_turn',
-    severity: 'HIGH',
-    legalBase: legalBase || `Giro prohibido: ${sequence.name}`,
-    geometryIds: sequence.roiIds,
-    sequence,
-    analysisPrompt: `Analyze if the vehicle followed the forbidden turn sequence: ${sequence.roiLabels.join(' -> ')}.`,
-    enabled: true,
-    priority: 13,
-  };
-}
-
-/**
- * Builds a deterministic forbidden-turn audit response.
- */
-export function buildForbiddenTurnAudit(
-  track: { id: number; avgVelocity: number; roiHistory: string[] },
-  line: { roiSequenceLabels?: string[]; roiSequenceIds?: string[] },
-  baseAudit?: Partial<{
-    infraction: boolean;
-    plate: string;
-    makeModel: string;
-    color: string;
-    description: string;
-    severity: string;
-    legalBase: string;
-    reasoning: string[];
-    visualTimestamp: string;
-    videoTimeCode: string;
-    localTime: string;
-    telemetry: { speedEstimated: string; behaviorAnomalies?: string };
-  }>
-): {
-  infraction: boolean;
-  plate: string;
-  makeModel: string;
-  color: string;
-  description: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  ruleCategory: string;
-  legalBase: string;
-  reasoning: string[];
-  visualTimestamp: string;
-  videoTimeCode: string;
-  localTime: string;
-  telemetry: { speedEstimated: string; behaviorAnomalies?: string };
-} {
-  const sequenceLabels =
-    line.roiSequenceLabels && line.roiSequenceLabels.length >= 2
-      ? line.roiSequenceLabels
-      : ['ROI A', 'ROI B'];
-  const sequenceText = sequenceLabels.join(' -> ');
-
-  return {
-    infraction: true,
-    plate: baseAudit?.plate || 'DESCONOCIDO',
-    makeModel: baseAudit?.makeModel || 'DESCONOCIDO',
-    color: baseAudit?.color || 'DESCONOCIDO',
-    description:
-      baseAudit?.description ||
-      `Giro prohibido confirmado por secuencia ordenada de zonas ${sequenceText}.`,
-    severity: (baseAudit?.severity === 'HIGH' || baseAudit?.severity === 'CRITICAL'
-      ? baseAudit?.severity
-      : 'HIGH') as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
-    ruleCategory: 'GIRO_PROHIBIDO',
-    legalBase: baseAudit?.legalBase || 'Giro prohibido detectado por secuencia ROI.',
-    reasoning:
-      baseAudit?.reasoning && baseAudit.reasoning.length > 0
-        ? baseAudit.reasoning
-        : [
-            `Secuencia ROI validada: ${sequenceText}.`,
-            `Track #${track.id} mantuvo identidad persistente durante la maniobra.`,
-            'La regla configurada establece que esta secuencia equivale a giro prohibido.',
-          ],
-    visualTimestamp: baseAudit?.visualTimestamp || new Date().toLocaleTimeString(),
-    videoTimeCode: baseAudit?.videoTimeCode || '',
-    localTime: baseAudit?.localTime || '',
-    telemetry: {
-      speedEstimated:
-        baseAudit?.telemetry?.speedEstimated || `${track.avgVelocity.toFixed(1)} km/h`,
-      behaviorAnomalies:
-        baseAudit?.telemetry?.behaviorAnomalies || `Secuencia ROI: ${sequenceText}`,
-    },
-  };
+  return Array.from(filtered);
 }

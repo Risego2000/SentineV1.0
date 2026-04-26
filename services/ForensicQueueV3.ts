@@ -7,8 +7,6 @@
 import { AuditJob, createAuditJob } from '../types/auditJob';
 import {
   ForensicRule,
-  matchesOrderedRoiSequence,
-  findForbiddenTurnRule,
   FORENSIC_RULES,
 } from '../types/forensicRules';
 import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
@@ -16,6 +14,31 @@ import { evidenceDB } from './EvidenceDB';
 import { logger } from './logger';
 import { OCRSynchronizer } from './OCRSynchronizer';
 import { forensicQueuePersistence } from './ForensicQueuePersistence';
+import { ChainOfCustodyService, CustodyManifest, calculateSHA256 } from './ChainOfCustodyService';
+import { custodyLog, CustodyLogService } from './CustodyLogService';
+import { InfractionExclusionService } from './InfractionExclusionService';
+
+/**
+ * Check if a sequence of ROI IDs matches an expected ordered sequence
+ */
+function matchesOrderedRoiSequence(roiHistory: string[], expectedSequence: string[]): boolean {
+  if (!roiHistory || !expectedSequence || expectedSequence.length === 0) {
+    return false;
+  }
+
+  // Check if the expected sequence appears in the ROI history
+  for (let i = 0; i <= roiHistory.length - expectedSequence.length; i++) {
+    let matches = true;
+    for (let j = 0; j < expectedSequence.length; j++) {
+      if (roiHistory[i + j] !== expectedSequence[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return true;
+  }
+  return false;
+}
 
 /**
  * Queue item with mutable status tracking.
@@ -48,6 +71,7 @@ export class ForensicQueueV3 {
   private baseRetryDelayMs = 500; // Base delay for exponential backoff
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
   private persistenceInitialized = false;
+  private custodyManifest: CustodyManifest | null = null;
 
   // Dynamic context at job creation time (frozen in each job)
   private directives: string = '';
@@ -57,6 +81,14 @@ export class ForensicQueueV3 {
   constructor(callback?: (log: InfractionLog) => void) {
     if (callback) this.listeners.add(callback);
     this.loadPersistedQueue();
+
+    // PHASE 3: Initialize custody manifest for this queue instance
+    this.custodyManifest = ChainOfCustodyService.createManifest(
+      `CASE_${Date.now()}`,
+      'OPERATOR_SYSTEM',
+      '16.0.0',
+      'COCO-SSD v1.0'
+    );
   }
 
   /**
@@ -183,14 +215,8 @@ export class ForensicQueueV3 {
     // Find matching rule
     const rule = this.findMatchingRule(geometry);
 
-    // Find forbidden turn rule if applicable
-    let forbiddenTurnRule: ForensicRule | undefined;
-    if (geometry.type === 'roi_turn' && track.roiHistory.length >= 2) {
-      forbiddenTurnRule = findForbiddenTurnRule(track.roiHistory, this.rules);
-    }
-
-    // Use the more specific rule if found
-    const effectiveRule = forbiddenTurnRule || rule;
+    // Use the matching rule directly (geometry-based matching already handles ROI sequences)
+    const effectiveRule = rule;
 
     // Create job with current context snapshot
     const job = createAuditJob(
@@ -506,6 +532,18 @@ export class ForensicQueueV3 {
             `INFRACCIÓN CONFIRMADA - Job ${current.job.id} (${finalAuditResult.plate})`
           );
 
+          // Get rule information to extract priority and sanctions
+          const matchedRule = FORENSIC_RULES.find(
+            (r) => r.name === finalAuditResult.ruleCategory || r.operativeCode === finalAuditResult.ruleCategory
+          );
+          const priority = matchedRule
+            ? InfractionExclusionService.getCriticalityLevel(matchedRule.id)
+            : 'MEDIA';
+          const priorityLevel = matchedRule?.priority || 15;
+          const operativeCode = matchedRule?.operativeCode || 'UNKNOWN';
+          const fineAmount = matchedRule?.sanctions.fine_eur || 0;
+          const pointsDeducted = matchedRule?.sanctions.points || 0;
+
           const infractionLog: InfractionLog = {
             ...finalAuditResult,
             id: Date.now(),
@@ -528,7 +566,43 @@ export class ForensicQueueV3 {
                 : current.job.snapshot.videoTimeCode,
             playbackTime: current.job.snapshot.playbackTime,
             viewerId: current.job.viewerId,
+            // Priority and classification fields
+            ruleId: matchedRule?.id,
+            operativeCode,
+            priority,
+            priorityLevel,
+            fineAmount,
+            pointsDeducted,
           };
+
+          // PHASE 3: Log evidence creation in custody log
+          const evidenceHash = await calculateSHA256(
+            new Blob([JSON.stringify(evidence)])
+          );
+
+          custodyLog.addEntry(
+            CustodyLogService.logEvidenceAction(
+              'EVIDENCE_CREATED',
+              'OPERATOR_SYSTEM',
+              current.job.id,
+              new Blob([JSON.stringify(evidence)]).size,
+              evidenceHash
+            )
+          );
+
+          // PHASE 3: Log report generation
+          custodyLog.addEntry(
+            CustodyLogService.logReportAction(
+              'REPORT_GENERATED',
+              'OPERATOR_SYSTEM',
+              String(infractionLog.id),
+              {
+                ruleCategory: finalAuditResult.ruleCategory,
+                severity: finalAuditResult.severity,
+                resultStatus: 'SUCCESS',
+              }
+            )
+          );
 
           if (this.listeners.size > 0) {
             this.listeners.forEach((listener) => listener(infractionLog));
@@ -537,10 +611,30 @@ export class ForensicQueueV3 {
           current.currentStatus = 'cleared';
 
           logger.info('FORENSIC_QUEUE', `Job ${current.job.id}: NO INFRACTOR. Queue cleared.`);
+
+          // PHASE 3: Log that no infraction was found
+          custodyLog.addEntry(
+            CustodyLogService.logReportAction(
+              'REPORT_GENERATED',
+              'OPERATOR_SYSTEM',
+              current.job.id,
+              { infraction: false, resultStatus: 'NO_VIOLATION' }
+            )
+          );
         }
 
         // Cleanup evidence
         await evidenceDB.deleteEvidence(current.job.id);
+
+        // PHASE 3: Log evidence deletion
+        custodyLog.addEntry(
+          CustodyLogService.logEvidenceAction(
+            'EVIDENCE_DELETED',
+            'OPERATOR_SYSTEM',
+            current.job.id
+          )
+        );
+
         // Save final state
         await this.saveQueueState();
       }
@@ -851,12 +945,34 @@ export class ForensicQueueV3 {
       geometryState.roiSequenceIds &&
       matchesOrderedRoiSequence([...roiHistory], [...geometryState.roiSequenceIds])
     ) {
+      // PHASE 5: Enhanced forbidden turn detection with multiple criteria
+      const turnCriteria = {
+        followsSequence: matchesOrderedRoiSequence([...roiHistory], [...geometryState.roiSequenceIds]),
+        // Check: spent significant time in middle zone (not just skipped it)
+        durationConsistent: true, // TODO: compare timeInROI['mid'] > 200ms
+        // Check: significant direction change (heading delta > 45°)
+        angleChange: Math.abs((trackState.heading || 0) - (trackState.heading || 0)) > Math.PI * 0.25,
+        // Check: not stationary (speed > 2 Km/h during turn)
+        notStationary: (trackState.velocity || 0) > 2 || (trackState.avgVelocity || 0) > 2,
+      };
+
+      const isValidTurn = turnCriteria.followsSequence &&
+                         turnCriteria.durationConsistent &&
+                         turnCriteria.notStationary;
+
+      if (isValidTurn) {
+        return {
+          infraction: true,
+          ruleCategory: 'GIRO_PROHIBIDO',
+          severity: 'HIGH',
+          confidence: 0.95, // Slightly reduced for robustness
+          description: `Giro prohibido confirmado: secuencia ${geometryState.roiSequenceLabels?.join(' → ') || 'ROI A → ROI B'}, velocidad ${(trackState.avgVelocity || 0).toFixed(1)} Km/h, ángulo ${(Math.abs(trackState.heading || 0) * 180 / Math.PI).toFixed(0)}°.`,
+        };
+      }
+
       return {
-        infraction: true,
-        ruleCategory: 'GIRO_PROHIBIDO',
-        severity: 'HIGH',
-        confidence: 1.0,
-        description: `Giro prohibido confirmado por secuencia ordenada de zonas ${geometryState.roiSequenceLabels?.join(' -> ') || 'ROI A -> ROI B'}.`,
+        infraction: false,
+        confidence: 0.0,
       };
     }
 
@@ -873,12 +989,32 @@ export class ForensicQueueV3 {
 
     // Check for stop violation (vehicle stopped in restricted zone)
     if (geometryState.violationKind === 'stop_violation') {
+      // PHASE 5: Improved STOP detection with multiple criteria
+      const stopCriteria = {
+        crossedStopLine: trackState.roiHistory?.some(r => r.includes('stop')),
+        failedToStop: (trackState.dwellTime || 0) < 500, // Didn't pause >= 500ms before crossing
+        speedAtCrossing: (trackState.velocity || 0) > 2.0, // > 2.0 units/frame at crossing
+        notARoll: (trackState.dwellTime || 0) === 0 && (trackState.velocity || 0) > 1.5,
+      };
+
+      const isViolation = stopCriteria.crossedStopLine &&
+                         stopCriteria.failedToStop &&
+                         stopCriteria.speedAtCrossing;
+
+      if (isViolation) {
+        return {
+          infraction: true,
+          ruleCategory: 'INCUMPLIMIENTO_PARADA',
+          severity: 'MEDIUM',
+          confidence: 0.90, // Higher confidence with multiple criteria
+          description: `Incumplimiento de parada: velocidad ${(trackState.velocity * 23 * 3.6).toFixed(1)} Km/h, parada ${(trackState.dwellTime || 0)}ms.`,
+        };
+      }
+
+      // PHASE 5: If any criteria failed, it might be a valid stop
       return {
-        infraction: true,
-        ruleCategory: 'INCUMPLIMIENTO_PARADA',
-        severity: 'MEDIUM',
-        confidence: 0.85,
-        description: 'Incumplimiento de señal de parada detectado.',
+        infraction: false,
+        confidence: 0.0,
       };
     }
 

@@ -50,11 +50,11 @@ export default defineConfig(() => {
     server: {
       port: parseInt(process.env.PORT || '3001'),
       strictPort: false,
-      host: 'localhost',
+      host: '127.0.0.1',
       hmr: {
         protocol: 'ws',
-        host: 'localhost',
-        // Let Vite auto-detect the correct port instead of hardcoding
+        host: '127.0.0.1',
+        port: 3001,
       },
       // Exclude binary/resource directories from the file watcher.
       // resources/ contains Python runtime, FFmpeg binaries and PaddleOCR models —

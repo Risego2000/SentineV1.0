@@ -15,8 +15,10 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
   const [activeTab, setActiveTab] = useState<'evidence' | 'gallery'>('evidence');
   const { validateInfraction } = useSentinel();
   const { helpProps } = useHelp();
+  const isValidated = log.validationStatus === 'validated';
 
   const generatePDF = async () => {
+    if (!isValidated) return;
     await ReportService.downloadInfractionPdf(
       log,
       `ACTA_PERICIAL_${log.plate || 'SENT'}_${log.id.toString().slice(0, 8)}.pdf`
@@ -40,10 +42,10 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
         <div className="px-8 py-6 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
           <div className="flex flex-col">
             <h2 className="text-xl font-bold text-white tracking-tight uppercase">
-              Acta de Peritaje Judicial IA
+              Preinforme de Revisión IA
             </h2>
             <p className="text-[10px] text-slate-500 font-medium tracking-[0.2em] uppercase mt-1">
-              Sentinel Horizon Protocol • Forensic Unit
+              Sentinel Horizon Protocol • Revisión Operativa
             </p>
           </div>
           <button
@@ -261,10 +263,15 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
               </div>
               <button
                 onClick={generatePDF}
-                className="w-full py-3 text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all"
-                {...helpProps('Descargar informe PDF certificado con evidencia fotográfica.')}
+                disabled={!isValidated}
+                className="w-full py-3 text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-500"
+                {...helpProps(
+                  isValidated
+                    ? 'Descargar informe PDF con evidencia fotográfica validada.'
+                    : 'Valide la infracción antes de generar el PDF.'
+                )}
               >
-                <FileDown size={14} /> Generar Expediente PDF Certificado
+                <FileDown size={14} /> Generar Expediente PDF Validado
               </button>
             </div>
           </div>

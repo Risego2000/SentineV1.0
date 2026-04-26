@@ -17,27 +17,34 @@ let expressServer: any = null;
  * Create the main application window
  */
 function createWindow(serverPort?: number) {
+  // Get app path for reliable path resolution in Electron
+  const appPath = app.getAppPath();
+
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
     minWidth: 1024,
     minHeight: 768,
     webPreferences: {
-      preload: path.join(__dirname, 'dist/electron/preload.cjs'),
+      preload: path.join(appPath, 'dist/electron/preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, '../assets/icon.png'),
+    icon: path.join(appPath, 'assets/icon.png'),
   });
 
   // Load renderer
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev) {
+  // Assume development unless explicitly in production mode
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (!isProd) {
     // In development, load from Vite dev server
-    mainWindow.loadURL('http://localhost:5173');
+    console.log('[Electron] Loading from Vite dev server on http://127.0.0.1:3001');
+    mainWindow.loadURL('http://127.0.0.1:3001');
     mainWindow.webContents.openDevTools();
   } else {
     // In production, load from bundled files
+    console.log('[Electron] Loading from bundled files');
     mainWindow.loadFile(path.join(app.getAppPath(), 'dist/renderer/index.html'));
   }
 
@@ -117,16 +124,29 @@ async function initializeServer() {
     // Configure resource paths before starting server
     configureResourcePaths();
 
+    // PHASE 4: Pass environment variables to backend
+    const appPath = app.getAppPath();
+    const isDev = !app.isPackaged; // Use Electron's isPackaged for dev/prod distinction
+    const resourcesPath = path.join(appPath, 'resources');
+
+    // Set environment variables for backend server
+    process.env.IS_ELECTRON = 'true';
+    process.env.NODE_ENV = isDev ? 'development' : 'production';
+    process.env.RESOURCES_PATH = resourcesPath;
+    process.env.PORT = process.env.PORT || '3002';
+
+    console.log(`[Electron] Environment: ${process.env.NODE_ENV}`);
+    console.log(`[Electron] isPackaged: ${app.isPackaged}`);
+    console.log(`[Electron] Resources path: ${resourcesPath}`);
+
     // Load server module using require (CommonJS)
-    // When compiled to dist/electron/main.cjs, __dirname is dist/electron/
-    // So we need to go up one level to reach dist/server.cjs
-    const serverPath = path.join(__dirname, '../server.cjs');
+    const serverPath = path.join(appPath, 'dist/server.cjs');
     const { initializeExpressServer } = require(serverPath);
 
     const config = {
       port: 0, // Let OS assign a free port
       appPath: app.getAppPath(),
-      isDev: process.env.NODE_ENV === 'development',
+      isDev: isDev,
     };
 
     expressServer = await initializeExpressServer(config);

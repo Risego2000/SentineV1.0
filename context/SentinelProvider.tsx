@@ -267,6 +267,48 @@ export const SentinelProvider = ({
     [addLog]
   );
 
+  const saveValidatedInfractionArtifacts = useCallback(
+    async (log: InfractionLog) => {
+      try {
+        const { filename, path } = await ReportService.generateAndSaveInfractionPdf(log);
+
+        if (log.videoClip) {
+          try {
+            const videoFilename = filename.replace('.pdf', '.mp4');
+            const videoBase64 = log.videoClip.split(',')[1];
+            const videoBuffer = Uint8Array.from(atob(videoBase64), (c) => c.charCodeAt(0)).buffer;
+
+            let dateStr;
+            if (log.localTime) {
+              const match = log.localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+              if (match) {
+                dateStr = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+              }
+            }
+
+            await ReportService.saveVideoToDisk(videoBuffer, videoFilename, dateStr);
+            addLog('SUCCESS', `Evidencia de video guardada: ${videoFilename}`);
+          } catch (videoError) {
+            logger.error('SENTINEL_CONTEXT', 'Error saving validated video evidence', videoError);
+            addLog('ERROR', 'No se pudo guardar la evidencia de video validada.');
+          }
+        }
+
+        setLogs((prev) =>
+          prev.map((entry) => (entry.id === log.id ? { ...entry, reportPath: path } : entry))
+        );
+        addLog('SUCCESS', `Expediente validado generado: ${filename}`);
+        addLog('SUCCESS', `PDF validado guardado en: ${path}`);
+      } catch (error) {
+        addLog(
+          'ERROR',
+          `No se pudo generar el expediente validado: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    },
+    [addLog, setLogs]
+  );
+
   const addInfraction = useCallback(
     (log: InfractionLog) => {
       // Wait, I need to pass viewerId to addInfraction so it's recorded correctly.
@@ -287,45 +329,12 @@ export const SentinelProvider = ({
 
       (async () => {
         try {
-          // Permanently save to EvidenceDB
           await evidenceDB.saveInfraction(infractionWithViewer);
-
-          // Give the UI a bit of breathing room before heavy PDF generation
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          const { filename, path } = await ReportService.generateAndSaveInfractionPdf(log);
-
-          // Permanently save Video Evidence to disk
-          if (log.videoClip) {
-            try {
-              const videoFilename = filename.replace('.pdf', '.mp4');
-              const videoBase64 = log.videoClip.split(',')[1];
-              const videoBuffer = Uint8Array.from(atob(videoBase64), (c) => c.charCodeAt(0)).buffer;
-
-              let dateStr;
-              if (log.localTime) {
-                const match = log.localTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                if (match) {
-                  dateStr = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
-                }
-              }
-
-              await ReportService.saveVideoToDisk(videoBuffer, videoFilename, dateStr);
-              addLog('SUCCESS', `Evidencia de video guardada: ${videoFilename}`);
-            } catch (vErr) {
-              console.error('Error saving video evidence:', vErr);
-            }
-          }
-
-          setLogs((prev) =>
-            prev.map((entry) => (entry.id === log.id ? { ...entry, reportPath: path } : entry))
-          );
-          addLog('SUCCESS', `Expediente individual generado: ${filename}`);
-          addLog('SUCCESS', `PDF individual guardado automáticamente en: ${path}`);
+          addLog('INFO', `Preinforme #${log.id} guardado. Pendiente de validación humana.`);
         } catch (error) {
           addLog(
             'ERROR',
-            `No se pudo guardar el expediente individual: ${error instanceof Error ? error.message : String(error)}`
+            `No se pudo guardar el preinforme: ${error instanceof Error ? error.message : String(error)}`
           );
         }
       })();
@@ -724,12 +733,19 @@ export const SentinelProvider = ({
       addLog('INFO', 'Esperando a que finalice la cola forense para consolidar denuncias...');
       await forensicQueue.waitForIdle();
 
-      if (logsRef.current.length === 0) {
-        addLog('WARN', 'El análisis finalizó sin infracciones confirmadas. No se genera PDF.');
+      const validatedLogs = logsRef.current.filter(
+        (log) => log.validationStatus === 'validated'
+      );
+
+      if (validatedLogs.length === 0) {
+        addLog(
+          'WARN',
+          'El análisis finalizó sin infracciones validadas por operador. No se genera PDF.'
+        );
         return;
       }
 
-      const { filename, path } = await ReportService.generateAndSaveBatchPdf(logsRef.current);
+      const { filename, path } = await ReportService.generateAndSaveBatchPdf(validatedLogs);
       addLog('SUCCESS', `Informe PDF consolidado generado: ${filename}`);
       addLog('SUCCESS', `PDF guardado automáticamente en: ${path}`);
     } catch (error) {
@@ -889,25 +905,32 @@ export const SentinelProvider = ({
 
   const validateInfraction = useCallback(
     (id: number, status: 'validated' | 'rejected') => {
-      setLogs((prev) => {
-        const next = prev.map((log) => {
-          if (log.id === id) {
-            const updated = { ...log, validationStatus: status, validatedAt: Date.now() };
-            // Persist change to DB
-            evidenceDB.saveInfraction(updated);
-            return updated;
-          }
-          return log;
-        });
-        return status === 'rejected' ? next.filter((l) => l.id !== id) : next;
-      });
+      const existing = logsRef.current.find((log) => log.id === id);
+      if (!existing) {
+        addLog('WARN', `No se encontró la infracción #${id} para validar.`);
+        return;
+      }
+
+      const updated = { ...existing, validationStatus: status, validatedAt: Date.now() };
+
+      setLogs((prev) =>
+        status === 'rejected'
+          ? prev.filter((log) => log.id !== id)
+          : prev.map((log) => (log.id === id ? updated : log))
+      );
+
+      void evidenceDB.saveInfraction(updated);
       addLog(
         status === 'validated' ? 'SUCCESS' : 'WARN',
         `Infracción #${id} marcada como ${status.toUpperCase()} por el operador.`
       );
+
+      if (status === 'validated') {
+        void saveValidatedInfractionArtifacts(updated);
+      }
     },
 
-    [setLogs, addLog]
+    [setLogs, addLog, saveValidatedInfractionArtifacts]
   );
 
   // Memoize the context value so consumers only re-render when relevant slices change
