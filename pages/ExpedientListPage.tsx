@@ -364,7 +364,11 @@ export const ExpedientListPage: React.FC = () => {
             </>
           ) : (
             <div className="empty-selection">
-              <p>Selecciona un expediente para revisar</p>
+              <div style={{ position: 'absolute', width: 280, height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(59, 130, 246, 0.2)', animation: 'spin 3s linear infinite' }} />
+                <img src="/ESCUDO.png?v=11" alt="Sentinel Logo" style={{ width: '65%', height: '65%', objectFit: 'contain', filter: 'drop-shadow(0 0 25px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6))', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 5 }} />
+              </div>
+              <p className="empty-text">Selecciona un expediente para revisar</p>
             </div>
           )}
         </div>
@@ -720,12 +724,67 @@ export const ExpedientListPage: React.FC = () => {
 
         .empty-selection {
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
           height: 100%;
           color: #64748b;
           font-size: 12px;
           letter-spacing: 0.05em;
+          position: relative;
+          gap: 32px;
+        }
+
+        .empty-selection::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 240px;
+          height: 240px;
+          background: url('/ESCUDO.png?v=11') center/contain no-repeat;
+          filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.4));
+          animation: escudo-glow-pulse 4s ease-in-out infinite;
+          z-index: 5;
+        }
+
+        .empty-selection::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 300px;
+          height: 300px;
+          border: 2px solid rgba(59, 130, 246, 0.2);
+          border-radius: 50%;
+          animation: escudo-ring-outer 3s linear infinite;
+          z-index: 2;
+          pointer-events: none;
+        }
+
+        .empty-selection .empty-text {
+          position: relative;
+          z-index: 10;
+          margin: 0;
+          text-align: center;
+        }
+
+        @keyframes escudo-ring-outer {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        @keyframes escudo-glow-pulse {
+          0%, 100% {
+            opacity: 0.9;
+            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.4));
+          }
+          50% {
+            opacity: 1;
+            filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6));
+          }
         }
 
         .expedient-workflow {
@@ -859,6 +918,20 @@ export const ExpedientListPage: React.FC = () => {
 
         .expedient-item.selected {
           animation: glow-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.4));
+          }
+          50% {
+            filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6));
+          }
         }
       `}</style>
     </div>
