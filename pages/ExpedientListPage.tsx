@@ -3,7 +3,7 @@
  * Displays pending expedients and allows review workflow
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Expedient } from '../domain/Expedient';
 import { ExpedientWorkflow } from '../components/ExpedientWorkflow';
 import { PDFExportService } from '../services/PDFExportService';
@@ -22,9 +22,6 @@ interface PageState {
   };
 }
 
-const isUserRole = (role: string | null): role is PageState['currentUser']['role'] =>
-  role === 'OPERATOR' || role === 'SUPERVISOR' || role === 'ADMIN';
-
 export const ExpedientListPage: React.FC = () => {
   const [state, setState] = useState<PageState>({
     expedients: [],
@@ -33,19 +30,19 @@ export const ExpedientListPage: React.FC = () => {
     error: null,
     currentUser: {
       name: sessionStorage.getItem('currentUserName') || 'Operador',
-      role: isUserRole(sessionStorage.getItem('currentUserRole'))
-        ? sessionStorage.getItem('currentUserRole')
-        : 'OPERATOR',
+      role: (sessionStorage.getItem('currentUserRole') as any) || 'OPERATOR',
     },
   });
 
   const expedientService = getExpedientService();
   const selectedExpedient = state.expedients.find((e) => e.id === state.selectedExpedientId);
-  const detectedCount = state.expedients.filter((e) => e.state === 'DETECTED').length;
-  const reviewCount = state.expedients.filter((e) => e.state === 'UNDER_REVIEW').length;
-  const validatedCount = state.expedients.filter((e) => e.state === 'VALIDATED').length;
 
-  const loadPendingExpedients = useCallback(async () => {
+  // Load pending expedients on mount
+  useEffect(() => {
+    loadPendingExpedients();
+  }, []);
+
+  const loadPendingExpedients = async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       // Load all active expedients (except ARCHIVED)
@@ -57,7 +54,9 @@ export const ExpedientListPage: React.FC = () => {
         allExpedients.push(...expedients);
       }
 
-      const all = allExpedients.sort((a, b) => b.createdAt - a.createdAt);
+      const all = allExpedients.sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
 
       setState((prev) => ({
         ...prev,
@@ -71,12 +70,7 @@ export const ExpedientListPage: React.FC = () => {
         loading: false,
       }));
     }
-  }, [expedientService]);
-
-  // Load pending expedients on mount
-  useEffect(() => {
-    loadPendingExpedients();
-  }, [loadPendingExpedients]);
+  };
 
   const handleStateChange = async (updatedExpedient: Expedient) => {
     // Recargar inmediatamente desde Supabase
@@ -103,8 +97,7 @@ export const ExpedientListPage: React.FC = () => {
     if (selectedExpedient.state !== 'SIGNED' && selectedExpedient.state !== 'EXPORTED') {
       setState((prev) => ({
         ...prev,
-        error:
-          'Solo se pueden exportar reportes OFICIALES después de la firma digital. Genera un PREINFORME para previsualizaciones.',
+        error: 'Solo se pueden exportar reportes OFICIALES después de la firma digital. Genera un PREINFORME para previsualizaciones.',
       }));
       return;
     }
@@ -134,8 +127,7 @@ export const ExpedientListPage: React.FC = () => {
   };
 
   // Helper to check if export button should be enabled
-  const canExportOfficialPDF =
-    selectedExpedient &&
+  const canExportOfficialPDF = selectedExpedient &&
     selectedExpedient.state === 'SIGNED' &&
     selectedExpedient.signature.isSigned;
 
@@ -150,11 +142,7 @@ export const ExpedientListPage: React.FC = () => {
       const photos: { name: string; base64: string }[] = [];
 
       // Add general context photos (if available)
-      if (
-        selectedExpedient &&
-        'extraSnapshots' in selectedExpedient &&
-        selectedExpedient.extraSnapshots
-      ) {
+      if (selectedExpedient && 'extraSnapshots' in selectedExpedient && selectedExpedient.extraSnapshots) {
         const extraSnapshots = selectedExpedient.extraSnapshots as string[];
         extraSnapshots.forEach((snapshot, idx) => {
           if (snapshot) {
@@ -167,11 +155,7 @@ export const ExpedientListPage: React.FC = () => {
       }
 
       // Add detail/zoom photos (if available)
-      if (
-        selectedExpedient &&
-        'zoomSnapshots' in selectedExpedient &&
-        selectedExpedient.zoomSnapshots
-      ) {
+      if (selectedExpedient && 'zoomSnapshots' in selectedExpedient && selectedExpedient.zoomSnapshots) {
         const zoomSnapshots = selectedExpedient.zoomSnapshots as string[];
         zoomSnapshots.forEach((snapshot, idx) => {
           if (snapshot) {
@@ -245,31 +229,17 @@ export const ExpedientListPage: React.FC = () => {
 
   return (
     <div className="expedient-list-page">
+      {/* Animated Background */}
+      <div className="absolute inset-0 hud-grid opacity-20 pointer-events-none" />
+      <div className="scanline" />
+      <div className="shield-glow-bg" />
+
       {/* Header */}
       <div className="page-header">
-        <div className="header-left">
-          <h1>Expedientes de Infracción</h1>
-          <p className="header-subtitle">Unidad Forense | Cadena de Custodia Digital</p>
-        </div>
-        <div className="header-right">
-          <div className="hud-kpis">
-            <div className="hud-kpi">
-              <span className="kpi-label">Detectadas</span>
-              <span className="kpi-value">{detectedCount}</span>
-            </div>
-            <div className="hud-kpi">
-              <span className="kpi-label">Revisión</span>
-              <span className="kpi-value">{reviewCount}</span>
-            </div>
-            <div className="hud-kpi">
-              <span className="kpi-label">Validadas</span>
-              <span className="kpi-value">{validatedCount}</span>
-            </div>
-          </div>
-          <div className="user-info">
-            <span>{state.currentUser.name}</span>
-            <span className="role-badge">{state.currentUser.role}</span>
-          </div>
+        <h1>Expedientes de Infracción</h1>
+        <div className="user-info">
+          <span>{state.currentUser.name}</span>
+          <span className="role-badge">{state.currentUser.role}</span>
         </div>
       </div>
 
@@ -277,13 +247,17 @@ export const ExpedientListPage: React.FC = () => {
       {state.error && (
         <div className="alert alert-error">
           <p>{state.error}</p>
-          <button onClick={() => setState((prev) => ({ ...prev, error: null }))}>✕</button>
+          <button onClick={() => setState((prev) => ({ ...prev, error: null }))}>
+            ✕
+          </button>
         </div>
       )}
       {state.success && (
         <div className="alert alert-success">
           <p>✓ {state.success}</p>
-          <button onClick={() => setState((prev) => ({ ...prev, success: null }))}>✕</button>
+          <button onClick={() => setState((prev) => ({ ...prev, success: null }))}>
+            ✕
+          </button>
         </div>
       )}
 
@@ -296,11 +270,7 @@ export const ExpedientListPage: React.FC = () => {
               Pendientes
               {!state.loading && <span className="count">{state.expedients.length}</span>}
             </h2>
-            <button
-              onClick={loadPendingExpedients}
-              disabled={state.loading}
-              className="btn-refresh"
-            >
+            <button onClick={loadPendingExpedients} disabled={state.loading} className="btn-refresh">
               {state.loading ? '⟳ Cargando...' : '⟳ Actualizar'}
             </button>
           </div>
@@ -321,22 +291,20 @@ export const ExpedientListPage: React.FC = () => {
                   className={`expedient-item ${
                     state.selectedExpedientId === expedient.id ? 'selected' : ''
                   }`}
-                  onClick={() =>
-                    setState((prev) => ({ ...prev, selectedExpedientId: expedient.id }))
-                  }
+                  onClick={() => setState((prev) => ({ ...prev, selectedExpedientId: expedient.id }))}
                 >
                   <div className="expedient-header">
                     <span className="plate">{expedient.licensePlate}</span>
-                    <span
-                      className={`expedient-state-badge state-${expedient.state.toLowerCase()}`}
-                    >
+                    <span className={`state-badge state-${expedient.state.toLowerCase()}`}>
                       {getStateLabel(expedient.state)}
                     </span>
                   </div>
                   <div className="expedient-details">
                     <p className="violation">{expedient.violationType}</p>
                     <p className="location">{expedient.location}</p>
-                    <p className="time">{new Date(expedient.timestamp).toLocaleString()}</p>
+                    <p className="time">
+                      {new Date(expedient.timestamp).toLocaleString()}
+                    </p>
                   </div>
                 </div>
               ))
@@ -363,7 +331,7 @@ export const ExpedientListPage: React.FC = () => {
                   className="btn-export btn-preinforme"
                   title="Descargar preinforme para revisión"
                 >
-                  Descargar Preinforme (PDF)
+                  📄 Descargar Preinforme (PDF)
                 </button>
 
                 {/* OFICIAL: Only available after signature */}
@@ -371,13 +339,9 @@ export const ExpedientListPage: React.FC = () => {
                   onClick={handleExportPDF}
                   disabled={!canExportOfficialPDF || state.loading}
                   className="btn-export"
-                  title={
-                    !canExportOfficialPDF
-                      ? 'Reporte oficial disponible solo después de firma digital'
-                      : 'Descargar reporte OFICIAL'
-                  }
+                  title={!canExportOfficialPDF ? 'Reporte oficial disponible solo después de firma digital' : 'Descargar reporte OFICIAL'}
                 >
-                  Descargar Reporte Oficial (PDF)
+                  📥 Descargar Reporte Oficial (PDF)
                 </button>
 
                 {/* EXCEL: All data with embedded images */}
@@ -387,12 +351,12 @@ export const ExpedientListPage: React.FC = () => {
                   className="btn-export btn-excel"
                   title="Descargar todos los datos en Excel con imágenes incrustadas"
                 >
-                  Descargar Excel (Datos + Imágenes)
+                  📊 Descargar Excel (Datos + Imágenes)
                 </button>
 
                 {!canExportOfficialPDF && (
                   <p className="export-help">
-                    Reporte oficial disponible solo después de:
+                    ⓘ Reporte oficial disponible solo después de:
                     <strong> Validación → Firma Digital</strong>
                   </p>
                 )}
@@ -409,139 +373,78 @@ export const ExpedientListPage: React.FC = () => {
       <style>{`
         /* DARK THEME - Consistent with SENTINEL.AI Detection Screen */
         .expedient-list-page {
+          position: relative;
           width: 100%;
           height: 100%;
           display: flex;
           flex-direction: column;
-          background:
-            radial-gradient(circle at 50% 46%, rgba(14, 165, 233, 0.12), transparent 28%),
-            linear-gradient(180deg, #01030d 0%, #050811 100%);
-          border: 1px solid rgba(59, 130, 246, 0.42);
-          border-radius: 8px;
+          background: #0f1419;
+          font-family: 'Share Tech Mono', 'Courier New', monospace;
+          color: #ecf0f1;
           overflow: hidden;
-          font-family: 'Inter', system-ui, sans-serif;
-          color: #cbd5e1;
-          box-shadow:
-            inset 0 0 0 1px rgba(255, 255, 255, 0.015),
-            0 0 34px rgba(59, 130, 246, 0.08);
         }
 
         .page-header {
+          position: relative;
+          z-index: 10;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          min-height: 66px;
-          padding: 12px 18px;
-          background: rgba(2, 6, 23, 0.78);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          padding: 20px 30px;
+          background: linear-gradient(135deg, #1a2332 0%, #0f1419 100%);
+          border-bottom: 2px solid #00d9ff;
+          box-shadow: 0 4px 20px rgba(0, 217, 255, 0.15);
         }
 
         .page-header h1 {
           margin: 0;
-          font-size: 12px;
-          font-weight: 900;
-          color: #e2e8f0;
-          text-transform: uppercase;
-          letter-spacing: 0.16em;
-        }
-
-        .header-left {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .header-subtitle {
-          margin: 0;
-          font-size: 9px;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.18em;
-        }
-
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+          font-size: 28px;
+          font-weight: bold;
+          color: #00d9ff;
+          text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
         }
 
         .user-info {
           display: flex;
           align-items: center;
-          gap: 10px;
-          font-size: 10px;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-        }
-
-        .hud-kpis {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .hud-kpi {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          min-width: 66px;
-          padding: 7px 9px;
-          border-radius: 6px;
-          border: 1px solid rgba(59, 130, 246, 0.28);
-          background: rgba(15, 23, 42, 0.48);
-        }
-
-        .kpi-label {
-          font-size: 9px;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.09em;
-        }
-
-        .kpi-value {
-          font-size: 14px;
-          font-weight: 900;
-          color: #3b82f6;
-          line-height: 1;
+          gap: 15px;
+          font-size: 13px;
+          color: #b0bec5;
         }
 
         .role-badge {
-          background: rgba(59, 130, 246, 0.18);
-          color: #93c5fd;
-          border: 1px solid rgba(59, 130, 246, 0.45);
-          padding: 5px 10px;
-          border-radius: 6px;
-          font-weight: 900;
-          font-size: 10px;
+          background: linear-gradient(135deg, #00d9ff, #0099cc);
+          color: #0f1419;
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-weight: bold;
+          font-size: 11px;
           text-transform: uppercase;
-          box-shadow: 0 0 14px rgba(59, 130, 246, 0.18);
+          box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
         }
 
-
         .alert {
-          padding: 10px 12px;
-          border-radius: 8px;
-          margin: 8px 16px;
+          position: relative;
+          z-index: 15;
+          padding: 14px 18px;
+          border-radius: 6px;
+          margin: 12px 15px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border: 1px solid;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0.02em;
+          border-left: 4px solid;
         }
 
         .alert-error {
-          background: rgba(239, 68, 68, 0.12);
-          color: #fb7185;
-          border-color: rgba(239, 68, 68, 0.35);
+          background: rgba(220, 53, 69, 0.15);
+          color: #ff6b6b;
+          border-left-color: #ff6b6b;
         }
 
         .alert-success {
-          background: rgba(16, 185, 129, 0.12);
-          color: #34d399;
-          border-color: rgba(16, 185, 129, 0.35);
+          background: rgba(40, 167, 69, 0.15);
+          color: #51cf66;
+          border-left-color: #51cf66;
         }
 
         .alert button {
@@ -558,72 +461,72 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .page-content {
+          position: relative;
+          z-index: 10;
           display: flex;
           flex: 1;
           overflow: hidden;
-          gap: 8px;
-          padding: 8px;
+          gap: 15px;
+          padding: 15px;
         }
 
         .left-panel {
-          flex: 0 0 300px;
+          flex: 0 0 350px;
           display: flex;
           flex-direction: column;
-          background: #0d0d0f;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
+          background: rgba(26, 35, 50, 0.8);
+          border: 1px solid rgba(0, 217, 255, 0.2);
+          border-radius: 8px;
           overflow: hidden;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+          backdrop-filter: blur(10px);
         }
 
         .panel-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 14px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-          background: rgba(255, 255, 255, 0.02);
+          padding: 16px;
+          border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+          background: rgba(0, 217, 255, 0.05);
         }
 
         .panel-header h2 {
           margin: 0;
-          font-size: 11px;
-          color: #e2e8f0;
+          font-size: 16px;
+          color: #00d9ff;
           display: flex;
           align-items: center;
           gap: 8px;
           text-transform: uppercase;
-          letter-spacing: 0.14em;
+          letter-spacing: 1px;
         }
 
         .count {
-          background: #3b82f6;
-          color: #020617;
-          padding: 3px 9px;
+          background: linear-gradient(135deg, #00d9ff, #0099cc);
+          color: #0f1419;
+          padding: 4px 10px;
           border-radius: 12px;
-          font-size: 9px;
-          font-weight: 900;
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+          font-size: 11px;
+          font-weight: bold;
+          box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
         }
 
         .btn-refresh {
-          padding: 8px 11px;
-          background: rgba(59, 130, 246, 0.1);
-          border: 1px solid rgba(59, 130, 246, 0.45);
-          border-radius: 7px;
+          padding: 8px 12px;
+          background: rgba(0, 217, 255, 0.1);
+          border: 1px solid #00d9ff;
+          border-radius: 4px;
           cursor: pointer;
-          font-size: 10px;
-          color: #3b82f6;
+          font-size: 12px;
+          color: #00d9ff;
           transition: all 0.3s;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          font-weight: bold;
         }
 
         .btn-refresh:hover:not(:disabled) {
-          background: rgba(59, 130, 246, 0.18);
-          color: #60a5fa;
-          box-shadow: 0 0 16px rgba(59, 130, 246, 0.22);
+          background: rgba(0, 217, 255, 0.2);
+          box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
         }
 
         .btn-refresh:disabled {
@@ -635,12 +538,12 @@ export const ExpedientListPage: React.FC = () => {
           flex: 1;
           overflow-y: auto;
           padding: 12px;
-          scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+          scrollbar-color: rgba(0, 217, 255, 0.3) transparent;
           scrollbar-width: thin;
         }
 
         .expedient-list::-webkit-scrollbar {
-          width: 4px;
+          width: 8px;
         }
 
         .expedient-list::-webkit-scrollbar-track {
@@ -648,12 +551,12 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-list::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.2);
-          border-radius: 10px;
+          background: rgba(0, 217, 255, 0.3);
+          border-radius: 4px;
         }
 
         .expedient-list::-webkit-scrollbar-thumb:hover {
-          background: rgba(148, 163, 184, 0.4);
+          background: rgba(0, 217, 255, 0.6);
         }
 
         .loading-state,
@@ -662,33 +565,31 @@ export const ExpedientListPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #64748b;
+          color: #7a8fa6;
           text-align: center;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
+          font-size: 13px;
         }
 
         .expedient-item {
           padding: 12px;
-          margin-bottom: 10px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 10px;
+          margin-bottom: 8px;
+          background: rgba(0, 217, 255, 0.05);
+          border: 2px solid rgba(0, 217, 255, 0.15);
+          border-radius: 6px;
           cursor: pointer;
           transition: all 0.3s;
         }
 
         .expedient-item:hover {
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(59, 130, 246, 0.35);
-          box-shadow: 0 0 18px rgba(59, 130, 246, 0.12);
+          background: rgba(0, 217, 255, 0.1);
+          border-color: rgba(0, 217, 255, 0.4);
+          box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
         }
 
         .expedient-item.selected {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: #3b82f6;
-          box-shadow: 0 0 20px rgba(59, 130, 246, 0.22);
+          background: rgba(0, 217, 255, 0.15);
+          border-color: #00d9ff;
+          box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
         }
 
         .expedient-header {
@@ -699,64 +600,62 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .plate {
-          font-weight: 900;
-          font-family: 'Share Tech Mono', 'Courier New', monospace;
-          font-size: 13px;
-          color: #3b82f6;
-          letter-spacing: 0.08em;
+          font-weight: bold;
+          font-family: 'OCR A', monospace;
+          font-size: 14px;
+          color: #00d9ff;
+          letter-spacing: 1px;
         }
 
-        .expedient-state-badge {
-          font-size: 9px;
+        .state-badge {
+          font-size: 10px;
           padding: 4px 9px;
-          border-radius: 4px;
-          font-weight: 900;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 3px;
+          color: #0f1419;
+          font-weight: bold;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.5px;
         }
 
-        .state-detected { color: #f59e0b; background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); }
-        .state-under_review { color: #38bdf8; background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.38); }
-        .state-validated { color: #34d399; background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); }
-        .state-signed { color: #c4b5fd; background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.35); }
-        .state-exported { color: #2dd4bf; background: rgba(20, 184, 166, 0.12); border-color: rgba(20, 184, 166, 0.35); }
-        .state-rejected { color: #fb7185; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35); }
+        .state-detected { background: #ffc107; box-shadow: 0 0 8px rgba(255, 193, 7, 0.5); }
+        .state-under_review { background: #17a2b8; box-shadow: 0 0 8px rgba(23, 162, 184, 0.5); }
+        .state-validated { background: #28a745; box-shadow: 0 0 8px rgba(40, 167, 69, 0.5); }
+        .state-signed { background: #6610f2; box-shadow: 0 0 8px rgba(102, 16, 242, 0.5); }
+        .state-exported { background: #20c997; box-shadow: 0 0 8px rgba(32, 201, 151, 0.5); }
 
         .expedient-details {
-          font-size: 9px;
-          color: #94a3b8;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          font-size: 11px;
+          color: #b0bec5;
         }
 
         .violation {
           margin: 3px 0;
-          font-weight: 800;
-          color: #e2e8f0;
+          font-weight: 500;
+          color: #ecf0f1;
         }
 
         .location {
           margin: 3px 0;
-          color: #64748b;
-          font-size: 9px;
+          color: #7a8fa6;
+          font-size: 10px;
         }
 
         .time {
           margin: 5px 0 0 0;
-          color: #475569;
-          font-size: 9px;
+          color: #546e7a;
+          font-size: 10px;
         }
 
         .right-panel {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background: #0d0d0f;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
+          background: rgba(26, 35, 50, 0.8);
+          border: 1px solid rgba(0, 217, 255, 0.2);
+          border-radius: 8px;
           overflow: hidden;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+          backdrop-filter: blur(10px);
         }
 
         .empty-selection {
@@ -764,25 +663,19 @@ export const ExpedientListPage: React.FC = () => {
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #64748b;
-          font-size: 11px;
-          font-family: 'Share Tech Mono', 'Courier New', monospace;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          background:
-            radial-gradient(circle at 50% 42%, rgba(59, 130, 246, 0.1), transparent 24%),
-            #01030d;
+          color: #546e7a;
+          font-size: 14px;
         }
 
         .expedient-workflow {
           flex: 1;
           overflow-y: auto;
-          scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+          scrollbar-color: rgba(0, 217, 255, 0.3) transparent;
           scrollbar-width: thin;
         }
 
         .expedient-workflow::-webkit-scrollbar {
-          width: 4px;
+          width: 8px;
         }
 
         .expedient-workflow::-webkit-scrollbar-track {
@@ -790,92 +683,76 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-workflow::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.2);
-          border-radius: 10px;
+          background: rgba(0, 217, 255, 0.3);
+          border-radius: 4px;
         }
 
         .expedient-workflow::-webkit-scrollbar-thumb:hover {
-          background: rgba(148, 163, 184, 0.4);
+          background: rgba(0, 217, 255, 0.6);
         }
 
         .export-section {
-          padding: 12px 14px;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-          background: rgba(255, 255, 255, 0.02);
+          padding: 16px;
+          border-top: 1px solid rgba(0, 217, 255, 0.2);
+          background: rgba(0, 217, 255, 0.05);
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
         }
 
         .btn-export {
           width: 100%;
-          padding: 11px 12px;
-          background: rgba(255, 255, 255, 0.02);
-          color: #94a3b8;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
+          padding: 12px;
+          background: #28a745;
+          color: white;
+          border: none;
+          border-radius: 6px;
           cursor: pointer;
-          font-weight: 900;
-          font-size: 10px;
-          transition: all 0.25s;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          font-weight: bold;
+          font-size: 14px;
+          transition: all 0.2s;
         }
 
         .btn-export:hover:not(:disabled) {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: rgba(59, 130, 246, 0.5);
-          color: #60a5fa;
-          box-shadow: 0 0 16px rgba(59, 130, 246, 0.2);
+          background: #218838;
         }
 
         .btn-export:disabled {
-          background: rgba(71, 85, 105, 0.22);
-          border-color: rgba(148, 163, 184, 0.12);
-          color: #64748b;
+          background: #ccc;
           cursor: not-allowed;
-          opacity: 0.68;
+          opacity: 0.6;
         }
 
         .btn-preinforme {
-          background: rgba(14, 165, 233, 0.1);
-          border-color: rgba(14, 165, 233, 0.42);
-          color: #38bdf8;
+          background: #17a2b8;
+          font-size: 13px;
         }
 
         .btn-preinforme:hover:not(:disabled) {
-          background: rgba(14, 165, 233, 0.18);
-          border-color: rgba(14, 165, 233, 0.65);
-          box-shadow: 0 0 16px rgba(14, 165, 233, 0.2);
+          background: #138496;
         }
 
         .btn-excel {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: rgba(59, 130, 246, 0.45);
-          color: #93c5fd;
+          background: #27ae60;
+          font-size: 13px;
         }
 
         .btn-excel:hover:not(:disabled) {
-          background: rgba(59, 130, 246, 0.28);
-          border-color: rgba(59, 130, 246, 0.75);
-          box-shadow: 0 0 14px rgba(59, 130, 246, 0.28);
+          background: #229954;
         }
 
         .export-help {
-          margin: 2px 0 0;
-          padding: 9px 10px;
-          background: rgba(15, 23, 42, 0.5);
-          color: #64748b;
-          font-size: 9px;
-          border-radius: 7px;
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+          margin-top: 5px;
+          padding: 10px;
+          background: #e3f2fd;
+          border-left: 4px solid #2196f3;
+          color: #1565c0;
+          font-size: 12px;
+          border-radius: 4px;
         }
 
         .export-help strong {
           font-weight: bold;
-          color: #93c5fd;
         }
 
         @media (max-width: 1024px) {
