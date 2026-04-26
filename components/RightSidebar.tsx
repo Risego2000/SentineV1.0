@@ -41,7 +41,7 @@ export const RightSidebar = memo(() => {
             isRightSidebarCollapsed ? 'Expandir panel derecho' : 'Colapsar panel derecho'
           )}
         >
-          {isRightSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {isRightSidebarCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </button>
         {!isRightSidebarCollapsed && (
           <div className="flex items-center flex-1 ml-4 gap-3">
