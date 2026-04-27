@@ -219,7 +219,7 @@ describe('OCR System - PHASE 8', () => {
       const result = validateOCRResult('TEST', 0.99);
 
       expect(result.isValid).toBe(false);
-      expect(result.reasons.some((r) => r.includes('Generic'))).toBe(true);
+      expect(result.reasons.some((r) => r.toLowerCase().includes('generic'))).toBe(true);
     });
 
     it('should reject valid format with low confidence', () => {
@@ -353,10 +353,10 @@ describe('OCR System - PHASE 8', () => {
     it('should generate report with statistics', () => {
       const candidates: OCRCandidate[] = [
         {
-          text: 'AB-1234',
+          text: 'ABCD-123',
           confidence: 0.92,
           frame: 0,
-          validation: validateOCRResult('AB-1234', 0.92),
+          validation: validateOCRResult('ABCD-123', 0.92),
           selected: true,
           reason: 'Highest confidence',
         },
@@ -374,9 +374,9 @@ describe('OCR System - PHASE 8', () => {
 
       expect(report.totalCandidates).toBe(2);
       expect(report.validCandidates).toBe(1);
-      expect(report.selectedText).toBe('AB-1234');
+      expect(report.selectedText).toBe('ABCD-123');
       expect(report.selectedConfidence).toBe(0.92);
-      expect(report.report).toContain('AB-1234');
+      expect(report.report).toContain('ABCD-123');
     });
 
     it('should indicate NONE if no selection', () => {

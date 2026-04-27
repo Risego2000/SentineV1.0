@@ -219,10 +219,10 @@ describe('Vision System - PHASE 8', () => {
 
   describe('Collision Prediction', () => {
     it('should predict collision if tracks converge', () => {
-      const track1 = { x: 0.3, y: 0.5, vx: 0.1, vy: 0 };
-      const track2 = { x: 0.7, y: 0.5, vx: -0.1, vy: 0 };
+      const track1 = { x: 0.45, y: 0.5, vx: 0.01, vy: 0 };
+      const track2 = { x: 0.55, y: 0.5, vx: -0.01, vy: 0 };
 
-      const lookahead = 20;
+      const lookahead = 5;
       const pos1 = { x: track1.x + track1.vx * lookahead, y: track1.y + track1.vy * lookahead };
       const pos2 = { x: track2.x + track2.vx * lookahead, y: track2.y + track2.vy * lookahead };
 

@@ -39,8 +39,8 @@ function createWindow(serverPort?: number) {
 
   if (!isProd) {
     // In development, load from Vite dev server
-    console.log('[Electron] Loading from Vite dev server on http://127.0.0.1:3001');
-    mainWindow.loadURL('http://127.0.0.1:3001');
+    console.log('[Electron] Loading from Vite dev server on http://127.0.0.1:5173');
+    mainWindow.loadURL('http://127.0.0.1:5173');
     mainWindow.webContents.openDevTools();
   } else {
     // In production, load from bundled files

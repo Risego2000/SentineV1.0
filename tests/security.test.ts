@@ -7,9 +7,8 @@ describe('Security - PHASE 8', () => {
   describe('Input Validation', () => {
     it('should reject invalid base64 images', () => {
       const invalidBase64 = 'NOT_VALID_BASE64!!!';
-      expect(() => {
-        Buffer.from(invalidBase64, 'base64');
-      }).toThrow();
+      const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(invalidBase64);
+      expect(isValidBase64).toBe(false);
     });
 
     it('should reject oversized payloads', () => {

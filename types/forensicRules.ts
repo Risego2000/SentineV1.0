@@ -604,3 +604,88 @@ export function applyExclusionRules(detectedRuleIds: string[]): string[] {
 
   return Array.from(filtered);
 }
+
+export function buildForbiddenTurnAudit(
+  track: any,
+  line: any
+): {
+  infraction: boolean;
+  ruleCategory: string;
+  description: string;
+  severity: string;
+  plate: string;
+} {
+  const roiLabels = line.roiSequenceLabels || [];
+  const description = `Giro prohibido en secuencia: ${roiLabels.join(' → ') || 'desconocida'}`;
+
+  return {
+    infraction: true,
+    ruleCategory: line.label || 'GIRO_PROHIBIDO',
+    description,
+    severity: 'HIGH',
+    plate: 'DESCONOCIDO',
+  };
+}
+
+export function matchesOrderedRoiSequence(actual: string[], expected: string[]): boolean {
+  if (expected.length === 0) return false;
+  if (actual.length === 0) return false;
+
+  let expectedIdx = 0;
+  for (const item of actual) {
+    if (item === expected[expectedIdx]) {
+      expectedIdx++;
+      if (expectedIdx === expected.length) return true;
+    }
+  }
+  return false;
+}
+
+export function getRulesForGeometry(geometryId: string): ForensicRule[] {
+  return FORENSIC_RULES.filter((rule) => rule.geometryIds.includes(geometryId));
+}
+
+export function findForbiddenTurnRule(sequence: ROISequence): ForensicRule | undefined {
+  return FORENSIC_RULES.find(
+    (rule) =>
+      rule.type === 'forbidden_turn' &&
+      rule.sequence &&
+      JSON.stringify(rule.sequence) === JSON.stringify(sequence)
+  );
+}
+
+export function createForbiddenTurnRule(name: string, sequence: ROISequence): ForensicRule {
+  const id = `rule_forbidden_turn_${name.toLowerCase().replace(/\s+/g, '-')}`;
+  return {
+    id,
+    operativeCode: 'FORBIDDEN_TURN',
+    name: `🔴 GIRO PROHIBIDO - ${name.toUpperCase()}`,
+    type: 'forbidden_turn',
+    category: 'TRAFFIC_VIOLATION',
+    severity: 'HIGH',
+    legalBase: ['Art. 61 RGC'],
+    conduct: 'Realizar giro prohibido',
+    citation: `Giro prohibido en ${name}`,
+    sanctions: {
+      priority: 13,
+      points: 3,
+      baseAmount: 100,
+      maxAmount: 500,
+      increments: 50,
+    },
+    aiRule: {
+      type: 'sequence_match',
+      confidence: 0.85,
+      roiSequence: sequence,
+    },
+    requiredEvidence: {
+      videoFrames: 3,
+      minDuration: 500,
+    },
+    geometryIds: [],
+    sequence,
+    analysisPrompt: `Detectar si el vehículo realizó un giro prohibido siguiendo la secuencia de ROIs: ${JSON.stringify(sequence)}`,
+    enabled: true,
+    priority: 13,
+  };
+}

@@ -270,8 +270,8 @@ export function selectBestPlate(candidates: OCRCandidate[]): OCRCandidate | null
     return validFormat.sort((a, b) => b.validation.confidence - a.validation.confidence)[0];
   }
 
-  // Fallback: highest confidence overall
-  return candidates.sort((a, b) => a.confidence - b.confidence)[0] || null;
+  // Return null if no valid candidates (don't fallback to invalid ones)
+  return null;
 }
 
 /**
