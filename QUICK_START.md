@@ -1,128 +1,202 @@
-# SentinelV16 Electron - Guía de Inicio Rápido
+# 🚀 Quick Start - Sentinel AI v1.0.0
 
-## ✅ Estado
-- Configuración Electron: COMPLETADA
-- Sistema de construcción: COMPLETADO  
-- Integración React: COMPLETADA
-- Integración del backend: COMPLETADA
-- Suite de pruebas: COMPLETADA
+## Inicio Rápido (5 minutos)
 
-## ⏳ Qué Falta
-- Binario FFmpeg (~150 MB) - **Descarga manual requerida**
-- Runtime de Python (~100 MB) - **Descarga manual requerida**
-- Paquete PaddleOCR - **Auto-instalable una vez Python esté listo**
-
-## 🚀 Comienza Aquí (5 minutos)
-
-### Opción A: Instalación Automática (Recomendada)
-```bash
-# Esto te guiará a través de las descargas
-npm run install:all
+### 1️⃣ Abrir la aplicación
+```
+Doble-click en el acceso directo "Sentinel.AI" en tu Escritorio
 ```
 
-### Opción B: Instalación Manual
-
-**Paso 1: Descargar FFmpeg (5 min)**
-```
-1. https://github.com/BtbN/FFmpeg-Builds/releases
-2. Descarga: ffmpeg-master-latest-win64-gpl.zip
-3. Extrae a: resources/ffmpeg/
-4. Conserva: ffmpeg.exe, ffprobe.exe
-5. Elimina: Todo lo demás
-```
-
-**Paso 2: Descargar Python (5 min)**
-```
-1. https://www.python.org/downloads/windows/
-2. Encuentra Python 3.10.13
-3. Descarga: Windows embeddable package (64-bit)
-4. Extrae a: resources/python/
-```
-
-**Paso 3: Instalar PaddleOCR (10 min)**
-```bash
-resources\python\python.exe -m pip install paddleocr paddlepaddle pillow
-```
-
-## ✔️ Verificar Instalación
-```bash
-npm run test:electron
-```
-
-Salida esperada:
-```
-✓ FFmpeg found
-✓ Python found
-✓ PaddleOCR installed
-```
-
-## 🎮 Ejecutar Aplicación
-
-**Desarrollo:**
-```bash
-npm run electron
-```
-
-**Compilación de Producción:**
-```bash
-npm run build
-# Salida: build/SentinelV16-Setup.exe
-```
-
-## 📋 Lista de Verificación de Testing
-
-Una vez en ejecución, verifica:
-- [ ] La ventana se abre sin errores
-- [ ] La aplicación React carga (sin errores rojos en consola)
-- [ ] DevTools funciona (F12)
-- [ ] Puedes cargar un video
-- [ ] MediaPipe detecta vehículos
-- [ ] OCR extrae placas correctamente
-- [ ] El análisis de IA genera infracciones
-- [ ] Se generan informes PDF
-
-## 🐛 Solución de Problemas
-
-### "FFmpeg not found"
-```bash
-npm run download:ffmpeg
-# O coloca manualmente ffmpeg.exe, ffprobe.exe en resources/ffmpeg/
-```
-
-### "Python not found"
-```bash
-npm run download:python
-# O extrae manualmente Python a resources/python/
-```
-
-### "PaddleOCR not installed"
-```bash
-resources\python\python.exe -m pip install paddleocr paddlepaddle pillow
-```
-
-### "window.electron is undefined"
-```bash
-npm run build:electron
-npm run electron
-```
-
-## 📚 Más Documentación
-
-- `README_ELECTRON.md` - Guía completa
-- `NEXT_STEPS.md` - Recorrido detallado
-- `PHASE6_TESTING.md` - Estrategia de testing
-
-## ⏱️ Tiempo Estimado
-
-| Tarea | Tiempo |
-|------|--------|
-| Descargar FFmpeg | 5-10 min |
-| Descargar Python | 5-10 min |
-| Instalar PaddleOCR | 10-15 min |
-| Probar aplicación | 5 min |
-| Compilar producción | 5 min |
-| **Total** | **30-50 min** |
+### 2️⃣ Login
+- **Email**: demo@sentinel.ai (o tu email)
+- **Contraseña**: demo (o tu contraseña)
+- Click "Entrar"
 
 ---
 
-**¡Ya estás al ~95%! Solo necesitas descargar los archivos e instalar PaddleOCR!**
+## 📹 Modo Detección (Análisis de Videos)
+
+### Paso a paso:
+
+1. **Cargar video**
+   - Click botón "📁 Cargar Video"
+   - Selecciona un archivo MP4/MOV/AVI
+   - Espera que aparezca en la pantalla
+
+2. **Dibujar línea de detección**
+   - Click y arrastra para dibujar una línea roja
+   - Esta línea define la zona monitoreada
+   - Ejemplo: cruce de calle, semáforo, giro prohibido
+
+3. **Configurar parámetros (opcional)**
+   ```
+   - Velocidad máxima: 60 km/h
+   - Modo: Detección automática
+   - Confianza mínima: 85%
+   ```
+
+4. **Iniciar análisis**
+   - Click "▶️ Detectar"
+   - El sistema procesará el video
+   - Barra de progreso indicará estado (0-100%)
+
+5. **Ver resultados**
+   - Se detectarán automáticamente:
+     - ✅ Rebase de línea
+     - ✅ Giro prohibido
+     - ✅ Exceso de velocidad
+   - Aparecerán en la lista con:
+     - Placa extraída (OCR)
+     - Tipo de infracción
+     - Timestamp del evento
+     - Video de la infracción
+
+---
+
+## 📋 Modo Expedientes (Validación & Firma)
+
+### Cambiar a Expedientes:
+```
+Click en pestaña "Expedientes" o presiona Ctrl+E
+```
+
+### Flujo de validación:
+
+```
+DETECTED (Detectado por IA)
+    ↓
+    → Click "Validar" → VALIDATED (Validado por operador)
+    → Click "Rechazar" → REJECTED (Rechazado)
+```
+
+### Validar infracción:
+
+1. **Seleccionar expediente** de la lista
+2. **Revisar detalles**:
+   - Placa del vehículo
+   - Tipo de infracción
+   - Velocidad/ángulo
+   - Video de prueba
+3. **Decidir**:
+   - ✅ **Validar**: Infracción confirmada
+   - ❌ **Rechazar**: Falso positivo
+
+### Después de validar:
+
+4. **Firmar digitalmente** (si necesario)
+   - Click "🔐 Firmar"
+   - Ingresa PIN o biometría
+   - Estado cambia a SIGNED
+
+5. **Exportar PDF**
+   - Click "📄 Generar PDF"
+   - Se crea PDF oficial con:
+     - Datos del vehículo
+     - Foto infracción
+     - Firma digital
+     - Audit trail completo
+
+---
+
+## 💾 Gestión de Datos
+
+### Ver expedientes guardados:
+```
+Expedientes → Filtros:
+- Por estado (DETECTED, VALIDATED, SIGNED, EXPORTED)
+- Por placa (búsqueda)
+- Por fecha
+```
+
+### Exportar múltiples:
+```
+1. Seleccionar varios expedientes (checkbox)
+2. Click "📊 Exportar Excel"
+3. Se genera archivo con todos los datos
+```
+
+---
+
+## ⌨️ Atajos de Teclado
+
+| Atajo | Función |
+|-------|---------|
+| **Ctrl+E** | Cambiar a Expedientes |
+| **Ctrl+V** | Cargar Video |
+| **Ctrl+D** | Iniciar Detección |
+| **Ctrl+S** | Guardar/Exportar |
+| **Ctrl+P** | Generar PDF |
+| **Escape** | Cancelar acción |
+
+---
+
+## 🔧 Configuración Recomendada
+
+### Para máxima precisión:
+```json
+{
+  "velocidad_maxima": 60,
+  "confianza_minima": 0.90,
+  "modo_deteccion": "strict",
+  "almacenamiento": "cloud"
+}
+```
+
+### Para máxima velocidad:
+```json
+{
+  "velocidad_maxima": 60,
+  "confianza_minima": 0.75,
+  "modo_deteccion": "auto",
+  "almacenamiento": "local"
+}
+```
+
+---
+
+## 🎯 Casos de Uso Típicos
+
+### Caso 1: Control de tráfico en semáforo
+1. Cargar video del semáforo
+2. Dibujar línea en cruce
+3. Detectar rebase sin detenerse
+4. Validar y generar PDF
+
+### Caso 2: Giro prohibido
+1. Cargar video de intersección
+2. Dibujar línea en entrada a calle
+3. Detectar giro hacia dirección prohibida
+4. Comparar con expedientes anteriores
+
+### Caso 3: Exceso de velocidad
+1. Cargar video de calle
+2. Calibrar puntos de referencia
+3. Medir velocidad de vehículos
+4. Detectar exceso y generar infracción
+
+---
+
+## 📞 Ayuda Rápida
+
+**¿Cómo calibro la velocidad?**
+- Ver sección "Calibración" en Configuración
+- Necesitas 2+ puntos de referencia conocidos
+- Sistema calcula automáticamente km/h
+
+**¿Dónde se guardan los datos?**
+- Cloud: Supabase (automático, encriptado)
+- Local: Caché de navegador para offline
+
+**¿Puedo editar expedientes después?**
+- Sí, mientras no estén EXPORTED
+- Cambios se registran en audit trail
+
+**¿Cómo exporto los datos?**
+- PDF individual: Click en expediente → "Generar PDF"
+- Excel masivo: Seleccionar varios → "Exportar Excel"
+
+---
+
+**Versión**: 1.0.0  
+**Última actualización**: 2026-04-28  
+**Siguiente paso**: Ver FAQ.md para preguntas frecuentes
