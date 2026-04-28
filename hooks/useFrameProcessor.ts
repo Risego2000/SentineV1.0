@@ -496,10 +496,10 @@ export const useFrameProcessor = () => {
     async (v: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> => {
       if (!v || v.paused || v.ended || isProcessingRef.current) return;
 
-      // Throttle to ~5fps max for detection processing with ROI/geometry heavy ops
+      // Throttle to ~2fps max for detection processing with ROI/geometry heavy ops
       // (allows 60fps rendering separately, reduces frame drops on ROI triggers)
       const now = Date.now();
-      if (now - lastProcessTimeRef.current < 200) return;
+      if (now - lastProcessTimeRef.current < 500) return;
       lastProcessTimeRef.current = now;
 
       isProcessingRef.current = true;
