@@ -41,6 +41,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingFrameRef = useRef(false);
   const [showIpModal, setShowIpModal] = React.useState(false);
   const [aspectRatio, setAspectRatio] = React.useState<number>(16 / 9);
 
@@ -57,8 +58,9 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     if (v.readyState < 1) return;
 
     try {
-      if (isPlaying) {
-        await processFrame(v, canvas);
+      if (v.videoWidth === 0 || v.videoHeight === 0) {
+        console.warn('[RENDER] Video dimensions not ready:', { videoWidth: v.videoWidth, videoHeight: v.videoHeight, readyState: v.readyState });
+        return;
       }
       renderScene(
         ctx,
@@ -67,8 +69,16 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         geometry,
         isMeshRenderEnabled,
         showDetections,
-        showROIs
+        showROIs,
+        true
       );
+
+      if (isPlaying && !processingFrameRef.current) {
+        processingFrameRef.current = true;
+        void processFrame(v, canvas).finally(() => {
+          processingFrameRef.current = false;
+        });
+      }
     } catch (err) {
       addLog(
         'ERROR',
@@ -238,15 +248,6 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
 
       {showIpModal && <IpCameraModal onClose={() => setShowIpModal(false)} />}
 
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        style={{ opacity: 0 }}
-      />
-
       <NeuralStatusHUD />
 
       <ForensicAnalysisOverlay isAnalyzing={isAnalyzing} />
@@ -271,13 +272,20 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
             aspectRatio: `${aspectRatio}`,
             maxWidth: '100%',
             maxHeight: '100%',
-            width: 'auto',
+            width: '100%',
             height: 'auto',
           }}
         >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-black"
+          />
           <canvas
             ref={canvasRef}
-            className="w-full h-full object-contain pointer-events-none transition-transform duration-700 group-hover:scale-[1.01]"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
           />
           <GeometryEditor canvasRef={canvasRef} />
 
