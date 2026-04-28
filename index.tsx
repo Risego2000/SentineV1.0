@@ -38,5 +38,15 @@ const AuthenticatedApp = () => {
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
-  root.render(<AuthenticatedApp />);
+  // Disable StrictMode in development to avoid double-rendering effects
+  // which causes Supabase lock contention in Electron
+  root.render(
+    import.meta.env.DEV ? (
+      <AuthenticatedApp />
+    ) : (
+      <React.StrictMode>
+        <AuthenticatedApp />
+      </React.StrictMode>
+    )
+  );
 }
