@@ -71,7 +71,9 @@ async function createWindow(serverPort?: number) {
   mainWindow.webContents.on('did-finish-load', () => {
     // Show window after content loads
     mainWindow!.show();
-    console.log('[Electron] Window shown after content loaded');
+    mainWindow!.focus();
+    console.log('[Electron] Window shown and focused after content loaded');
+    console.log(`[Electron] Window bounds: ${JSON.stringify(mainWindow!.getBounds())}`);
 
     if (serverPort) {
       mainWindow!.webContents.send('server-port', serverPort);
