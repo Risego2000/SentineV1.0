@@ -124,9 +124,9 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       }
     };
 
-    const frameLoop = async () => {
+    const frameLoop = () => {
       if (isPageVisible) {
-        await loop();
+        loop();
         anim = requestAnimationFrame(frameLoop);
       }
     };
