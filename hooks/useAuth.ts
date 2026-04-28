@@ -38,7 +38,26 @@ export function useAuth() {
     }
 
     try {
-      const session = await getSession();
+      let session = null;
+      let retries = 3;
+
+      // Retry logic for lock conflicts in Electron IndexedDB
+      while (retries > 0) {
+        try {
+          session = await getSession();
+          break;
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'NotAllowedError' && err.message.includes('steal')) {
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 100 * (4 - retries)));
+              continue;
+            }
+          }
+          throw err;
+        }
+      }
+
       if (session) {
         const {
           data: { user: authUser },
