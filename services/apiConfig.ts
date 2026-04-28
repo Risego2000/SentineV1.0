@@ -4,7 +4,7 @@
  */
 
 // Detect API base URL based on environment
-const getApiBaseUrl = (): string => {
+export const getApiBaseUrl = (): string => {
   // In development with Vite proxy, relative URLs work fine
   // In production or when proxy isn't available, use absolute URL
 
@@ -27,15 +27,32 @@ const getApiBaseUrl = (): string => {
   // This is populated by the port discovery mechanism
   if (typeof window !== 'undefined') {
     const detectedPort = sessionStorage.getItem('sentinel_api_port');
-    if (detectedPort && hostname === 'localhost') {
+    if (
+      detectedPort &&
+      (hostname === 'localhost' || hostname === '127.0.0.1')
+    ) {
       return `${protocol}//${hostname}:${detectedPort}`;
     }
+  }
+
+  // In browser dev mode, let Vite proxy /api requests to the backend.
+  // Electron sets sentinel_api_port before the app mounts, so this branch is
+  // only for plain browser tabs such as http://127.0.0.1:3001.
+  if (
+    (hostname === 'localhost' || hostname === '127.0.0.1') &&
+    currentPort &&
+    currentPort !== '3002'
+  ) {
+    return '';
   }
 
   // In development, if running on any port except 3002,
   // assume backend is on 3002 (standard Sentinel port configuration)
   // This handles all dev server ports: 3001, 3003, 3004, etc.
-  if (hostname === 'localhost' && currentPort !== '3002') {
+  if (
+    (hostname === 'localhost' || hostname === '127.0.0.1') &&
+    currentPort !== '3002'
+  ) {
     return `${protocol}//${hostname}:3002`;
   }
 
@@ -51,8 +68,9 @@ export const API_BASE_URL = getApiBaseUrl();
  * @returns Full URL or relative path
  */
 export const getApiUrl = (endpoint: string): string => {
-  if (API_BASE_URL) {
-    return `${API_BASE_URL}${endpoint}`;
+  const apiBaseUrl = getApiBaseUrl();
+  if (apiBaseUrl) {
+    return `${apiBaseUrl}${endpoint}`;
   }
   return endpoint;
 };

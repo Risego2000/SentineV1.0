@@ -54,6 +54,16 @@ async function runPaddleOcr(request) {
       stderr += data.toString();
     });
 
+    process.stdin.on('error', (error) => {
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeoutHandle);
+        console.error('[PaddleOCR] Failed to write request to Python stdin:', error);
+        process.kill('SIGTERM');
+        reject(error);
+      }
+    });
+
     process.on('error', (error) => {
       if (!isResolved) {
         isResolved = true;
@@ -85,9 +95,15 @@ async function runPaddleOcr(request) {
       }
     });
 
-    // Send request as JSON to stdin
-    process.stdin.write(JSON.stringify(request));
-    process.stdin.end();
+    // Send request as JSON to stdin. Python may exit early on startup errors,
+    // so handle EPIPE/EOF through the stdin error listener above.
+    process.stdin.write(JSON.stringify(request), (error) => {
+      if (error) {
+        process.stdin.emit('error', error);
+        return;
+      }
+      process.stdin.end();
+    });
   });
 }
 

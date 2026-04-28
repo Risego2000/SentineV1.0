@@ -457,7 +457,6 @@ let instance: ExpedientService | null = null;
 export function initializeExpedientService(): ExpedientService {
   if (!instance) {
     instance = new ExpedientService();
-    logger.info('EXPEDIENT_SERVICE', 'Expedient service initialized');
   }
   return instance;
 }

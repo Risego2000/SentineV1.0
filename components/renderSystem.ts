@@ -8,7 +8,8 @@ export const renderScene = (
   geometry: GeometryLine[],
   isMeshRenderEnabled: boolean = false,
   showDetections: boolean = true,
-  showROIs: boolean = true
+  showROIs: boolean = true,
+  drawVideo: boolean = true
 ) => {
   if (!ctx || !video) return;
 
@@ -23,8 +24,11 @@ export const renderScene = (
 
   ctx.save();
   try {
-    // Dibujar imagen del video
-    ctx.drawImage(video, 0, 0, width, height);
+    if (drawVideo) {
+      ctx.drawImage(video, 0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
 
     // 2. Draw Geometry
     if (showROIs) {

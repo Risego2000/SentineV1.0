@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   // API health and ready checks
   api: {
+    getServerPort: () =>
+      ipcRenderer.invoke('server:getPort'),
     health: () =>
       ipcRenderer.invoke('api:health'),
     ready: () =>

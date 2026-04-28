@@ -420,7 +420,6 @@ let instance: ExpedientRepository | null = null;
 export function initializeExpedientRepository(supabase: SupabaseClient): ExpedientRepository {
   if (!instance) {
     instance = new ExpedientRepository(supabase);
-    logger.info('EXPEDIENT_REPO', 'Repository initialized');
   }
   return instance;
 }

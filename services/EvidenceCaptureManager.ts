@@ -14,6 +14,7 @@ import { Track, GeometryLine } from '../types';
 import { ForensicRule } from '../types/forensicRules';
 import { custodyLog, CustodyLogService } from './CustodyLogService';
 import { calculateSHA256 } from './ChainOfCustodyService';
+import { getApiUrl } from './apiConfig';
 
 export interface EvidenceCaptureTarget {
   trackId: number;
@@ -238,7 +239,7 @@ export class EvidenceCaptureManager {
       // Use GENERAL frame (1920x1080) instead of detail frame for better OSD visibility
       if (generalFrames.length > 0) {
         try {
-          const response = await fetch('/api/ocr/timestamp', {
+          const response = await fetch(getApiUrl('/api/ocr/timestamp'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image: generalFrames[0] }),

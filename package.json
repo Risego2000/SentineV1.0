@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npx tsx server.js",
-    "dev:electron": "electron .",
+    "dev:electron": "node build-electron.js && electron .",
     "start": "npx tsx server.js",
     "start:all": "npm-run-all --parallel start dev",
     "build": "node build-electron.js && vite build && electron-builder",

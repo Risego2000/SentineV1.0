@@ -19,6 +19,22 @@ export interface GeometryResponse {
   suggestedDirectives: string;
 }
 
+const normalizeBackendAuditPreset = (
+  preset: AuditPresetType
+): 'standard' | 'strict' | 'permissive' => {
+  switch (preset) {
+    case 'flash':
+      return 'permissive';
+    case 'tactical':
+    case 'full':
+    case 'neural':
+    case 'senior':
+      return 'strict';
+    default:
+      return 'standard';
+  }
+};
+
 const postJson = async <T>(endpoint: string, payload: unknown): Promise<T> => {
   // Use IPC if running in Electron
   if (isElectron()) {
@@ -85,7 +101,7 @@ export const AIService = {
       track,
       line,
       directives,
-      auditPreset,
+      auditPreset: normalizeBackendAuditPreset(auditPreset),
     });
   },
 };

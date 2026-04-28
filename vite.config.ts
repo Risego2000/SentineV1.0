@@ -76,6 +76,7 @@ export default defineConfig(() => {
       proxy: {
         '/api': {
           target: `http://localhost:${apiPort}`,
+          router: () => `http://localhost:${getApiPort()}`,
           changeOrigin: true,
           secure: false,
         },

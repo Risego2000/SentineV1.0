@@ -50,10 +50,13 @@ async function createWindow(serverPort?: number) {
   const appPath = app.getAppPath();
 
   mainWindow = new BrowserWindow({
+    x: 0,
+    y: 0,
     width: 1920,
     height: 1080,
     minWidth: 1024,
     minHeight: 768,
+    show: false, // Don't show yet - we'll show after content loads
     webPreferences: {
       preload: path.join(appPath, 'dist/electron/preload.cjs'),
       nodeIntegration: false,
@@ -66,6 +69,10 @@ async function createWindow(serverPort?: number) {
 
   // Send port after renderer is ready (not after loadURL)
   mainWindow.webContents.on('did-finish-load', () => {
+    // Show window after content loads
+    mainWindow!.show();
+    console.log('[Electron] Window shown after content loaded');
+
     if (serverPort) {
       mainWindow!.webContents.send('server-port', serverPort);
       console.log(`[Electron] Sent server-port ${serverPort} to renderer`);
@@ -83,7 +90,7 @@ async function createWindow(serverPort?: number) {
     await waitForRenderer(rendererUrl);
     console.log(`[Electron] Loading from Vite dev server on ${rendererUrl}`);
     await mainWindow.loadURL(rendererUrl);
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools(); // Open with F12 when needed
   } else {
     // In production, load from bundled files
     console.log('[Electron] Loading from bundled files');
@@ -175,6 +182,12 @@ async function initializeServer() {
 
     // Load server module using require (CommonJS)
     const serverPath = path.join(appPath, 'dist/server.cjs');
+
+    if (!fs.existsSync(serverPath)) {
+      console.warn(`[Electron] Server bundle not found at ${serverPath}, continuing without backend`);
+      return 3002; // Return default port
+    }
+
     const { initializeExpressServer } = require(serverPath);
 
     const config = {
@@ -202,7 +215,9 @@ async function initializeServer() {
     return serverPort;
   } catch (error) {
     console.error('[Electron] Failed to initialize Express server:', error);
-    throw error;
+    // Continue anyway - the window should still show
+    console.log('[Electron] Continuing without backend server');
+    return 3002; // Return default port as fallback
   }
 }
 

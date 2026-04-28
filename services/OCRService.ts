@@ -14,6 +14,7 @@ import {
 } from '../domain/validation';
 import { calculateSHA256 } from './ChainOfCustodyService';
 import { custodyLog, CustodyLogService } from './CustodyLogService';
+import { getApiUrl } from './apiConfig';
 
 export interface OCRExtractionResult {
   plate: string | null;
@@ -213,7 +214,7 @@ export class OCRService {
     imageBase64: string
   ): Promise<{ candidates: Array<{ text: string; confidence: number }> }> {
     try {
-      const response = await fetch('/api/ocr/extract-plate', {
+      const response = await fetch(getApiUrl('/api/ocr/plate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageBase64 }),
@@ -260,7 +261,7 @@ export class OCRService {
    */
   async detectPlateRegion(imageBase64: string): Promise<PlateDetectionRegion | null> {
     try {
-      const response = await fetch('/api/ocr/detect-plate-region', {
+      const response = await fetch(getApiUrl('/api/ocr/detect-plate-region'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageBase64 }),
