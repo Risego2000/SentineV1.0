@@ -3,12 +3,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
 import { SharedBottomBar } from './components/SharedBar/SharedBottomBar';
 import { ExpedientListPage } from './pages/ExpedientListPage';
-import { SentinelProvider } from './context/SentinelProvider';
 import { isElectron, getServerPortFromElectron } from './utils/electronDetect';
 import './index.css';
 
 // Auto-discover backend API port on startup
-// RELOAD_SIGNAL: 20260428_001
 const discoverBackendPort = async () => {
   // If running in Electron, use IPC to get the port
   if (isElectron()) {
@@ -85,116 +83,100 @@ export const App = () => {
   }, []);
 
   return (
-    <SentinelProvider viewerId="global">
-      <div className="h-screen w-screen bg-[#0a0a0c] text-slate-100 flex overflow-hidden font-sans select-none relative">
-        <div id="sidebar-root" className="h-full z-40 shrink-0" />
+    <div className="h-screen w-screen bg-[#0a0a0c] text-slate-100 flex overflow-hidden font-sans select-none relative">
+      <div id="sidebar-root" className="h-full z-40 shrink-0" />
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
-          {/* View Mode Toggle - Traffic Sign Icons */}
-          <div className="view-mode-toggle" style={{
-            display: 'flex',
-            gap: '5px',
-            padding: '8px 12px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            alignItems: 'center',
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
+        {/* View Mode Toggle */}
+        <div className="view-mode-toggle" style={{
+          display: 'flex',
+          gap: '5px',
+          padding: '8px 12px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+          <button
+            onClick={() => setViewMode('detection')}
+            style={{
+              padding: '6px 12px',
+              background: viewMode === 'detection' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
+            }}
+          >
+            🎥 Detección
+          </button>
+          <button
+            onClick={() => setViewMode('expedients')}
+            style={{
+              padding: '6px 12px',
+              background: viewMode === 'expedients' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
+            }}
+          >
+            📋 Expedientes
+          </button>
+          <span style={{
+            marginLeft: 'auto',
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.6)',
+            padding: '6px 0',
           }}>
-            {/* Detection Button - Traffic Camera Icon */}
-            <button
-              onClick={() => setViewMode('detection')}
-              style={{
-                padding: '10px 16px',
-                background: viewMode === 'detection' ? '#ff6b35' : 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                border: '2px solid #ff6b35',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {/* Traffic Camera Icon - SVG */}
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <circle cx="12" cy="12" r="4"/>
-                <circle cx="12" cy="12" r="9"/>
-                <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
-              </svg>
-              <span>Detección</span>
-            </button>
-
-            {/* Expedients Button - Document Icon */}
-            <button
-              onClick={() => setViewMode('expedients')}
-              style={{
-                padding: '10px 16px',
-                background: viewMode === 'expedients' ? '#4ecdc4' : 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                border: '2px solid #4ecdc4',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {/* Document Icon - SVG */}
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-                <polyline points="13 2 13 9 20 9"/>
-              </svg>
-              <span>Expedientes</span>
-            </button>
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-
-            {/* Keyboard Shortcut Hint */}
-            <span style={{
-              fontSize: '11px',
-              color: 'rgba(255, 255, 255, 0.6)',
-              padding: '6px 0',
-              whiteSpace: 'nowrap',
-            }}>
-              Ctrl+E para cambiar
-            </span>
-          </div>
-
-          {/* View Content - Detection Mode */}
-          {viewMode === 'detection' && (
-            <>
-              <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
-                <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-                  <MultiViewerGrid />
-                </ErrorBoundary>
-              </div>
-              <SharedBottomBar />
-            </>
-          )}
-
-          {/* View Content - Expedients Mode */}
-          {viewMode === 'expedients' && (
-            <div className="flex-1 relative z-10 min-h-0 overflow-hidden">
-              <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-                <ExpedientListPage />
-              </ErrorBoundary>
-            </div>
-          )}
+            Ctrl+E para cambiar vista
+          </span>
         </div>
 
-        <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
+        {/* View Content - Detection Mode */}
+        <div
+          style={{
+            display: viewMode === 'detection' ? 'flex' : 'none',
+            flexDirection: 'column',
+            flex: 1,
+            position: 'relative',
+            zIndex: 10,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
+            <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+              <MultiViewerGrid />
+            </ErrorBoundary>
+          </div>
+          <SharedBottomBar />
+        </div>
 
-        <div id="modal-root" />
+        {/* View Content - Expedients Mode */}
+        <div
+          style={{
+            display: viewMode === 'expedients' ? 'flex' : 'none',
+            flexDirection: 'column',
+            flex: 1,
+            position: 'relative',
+            zIndex: 10,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+            <ExpedientListPage />
+          </ErrorBoundary>
+        </div>
       </div>
-    </SentinelProvider>
+
+      <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
+
+      <div id="modal-root" />
+    </div>
   );
 };
