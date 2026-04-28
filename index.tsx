@@ -1,9 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { SentinelProvider } from './context/SentinelProvider';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
+import { SentinelProvider } from './context/SentinelProvider';
 import './index.css';
 
 const AuthenticatedApp = () => {
@@ -28,15 +28,15 @@ const AuthenticatedApp = () => {
     return <LoginScreen />;
   }
 
-  return <App />;
+  return (
+    <SentinelProvider viewerId="global">
+      <App />
+    </SentinelProvider>
+  );
 };
 
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
-  root.render(
-    <SentinelProvider>
-      <AuthenticatedApp />
-    </SentinelProvider>
-  );
+  root.render(<AuthenticatedApp />);
 }

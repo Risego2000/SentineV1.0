@@ -22,6 +22,7 @@ import { CacheService } from '../services/cacheService';
 import { forensicQueue } from '../services/ForensicQueue';
 import { evidenceDB } from '../services/EvidenceDB';
 import { ReportService } from '../services/ReportService';
+import { getExpedientService } from '../services/ExpedientService';
 import { getApiUrl } from '../services/apiConfig';
 import {
   createIpCameraSession,
@@ -330,7 +331,49 @@ export const SentinelProvider = ({
       (async () => {
         try {
           await evidenceDB.saveInfraction(infractionWithViewer);
-          addLog('INFO', `Preinforme #${log.id} guardado. Pendiente de validación humana.`);
+          const rule = `${infractionWithViewer.operativeCode || ''} ${infractionWithViewer.ruleCategory || ''}`.toUpperCase();
+          const violationType = rule.includes('GIRO')
+            ? 'FORBIDDEN_TURN'
+            : rule.includes('STOP')
+              ? 'STOP'
+              : 'OTHER';
+          const expedientService = getExpedientService();
+          console.log('[EXPEDIENT] Creating from infraction:', {
+            infractionId: infractionWithViewer.id,
+            plate: infractionWithViewer.plate,
+            violationType,
+          });
+
+          const expedient = await expedientService.createExpedient({
+            infractionId: String(infractionWithViewer.id),
+            violationType,
+            location: 'Daganzo de Arriba',
+            timestamp: infractionWithViewer.validatedAt || Date.now(),
+            evidenceId: String(infractionWithViewer.id),
+            licensePlate:
+              infractionWithViewer.plate ||
+              infractionWithViewer.plateOcr ||
+              'DESCONOCIDO',
+          });
+
+          console.log('[EXPEDIENT] Created successfully:', expedient.id);
+
+          expedient.vehicleDescription = infractionWithViewer.makeModel || '';
+          expedient.color = infractionWithViewer.color || '';
+          expedient.descripcionDetalladaHechos = infractionWithViewer.description;
+          expedient.gravedad =
+            infractionWithViewer.severity === 'CRITICAL'
+              ? 'Muy Grave'
+              : infractionWithViewer.severity === 'LOW'
+                ? 'Leve'
+                : 'Grave';
+          expedient.photosCount =
+            1 +
+            (infractionWithViewer.extraSnapshots?.length || 0) +
+            (infractionWithViewer.zoomSnapshots?.length || 0);
+          await expedientService.updateExpedient(expedient);
+          console.log('[EXPEDIENT] Updated successfully:', expedient.id);
+          addLog('INFO', `Expediente #${expedient.id} creado desde infracción #${log.id}`);
         } catch (error) {
           addLog(
             'ERROR',
