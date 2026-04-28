@@ -1,4 +1,5 @@
 import { InfractionLog } from '../types';
+import { supabase } from './supabase';
 
 /**
  * EvidenceDB - Persistent Local Storage for Tactical Evidence
@@ -258,7 +259,6 @@ export class EvidenceDB {
 
       for (const infraction of unsynced) {
         try {
-          const { supabase } = await import('./supabase');
           const { error } = await supabase.from('incidents').insert({
             plate: infraction.plate,
             make_model: infraction.makeModel,
