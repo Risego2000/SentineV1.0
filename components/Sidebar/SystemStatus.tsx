@@ -30,7 +30,7 @@ export const SystemStatus = () => {
         <Cpu size={14} className="text-blue-500" /> Estado de Subsistemas
       </h3>
       <div className="horizon-card rounded-xl p-5 space-y-3">
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-3">
           {/* VISIÓN ARTIFICIAL - COCO-SSD */}
           <div
             className="p-3 bg-white/[0.02] rounded-lg border border-white/5 space-y-2 relative overflow-hidden group transition-all hover:bg-white/[0.04]"
