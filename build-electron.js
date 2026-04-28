@@ -24,10 +24,11 @@ try {
   esbuild.buildSync({
     entryPoints: ['electron/main.ts'],
     outfile: 'dist/electron/main.cjs', // Use .cjs extension for CommonJS with "type": "module"
-    bundle: false, // Don't bundle - rely on node_modules resolution
+    bundle: true, // Bundle local code but exclude electron
     platform: 'node',
     target: 'node18',
     format: 'cjs', // Use CommonJS for Electron main process compatibility
+    external: ['electron'], // Don't bundle electron itself
   });
 
   // Build preload.ts
@@ -35,10 +36,11 @@ try {
   esbuild.buildSync({
     entryPoints: ['electron/preload.ts'],
     outfile: 'dist/electron/preload.cjs', // Use .cjs extension for CommonJS with "type": "module"
-    bundle: false, // Don't bundle - rely on node_modules resolution
+    bundle: true, // Bundle local code but exclude electron
     platform: 'node',
     target: 'node18',
     format: 'cjs', // Use CommonJS for Electron preload compatibility
+    external: ['electron'], // Don't bundle electron itself
   });
 
   // Build server.js (convert ESM + TS imports to CommonJS with bundling)
