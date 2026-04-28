@@ -3,6 +3,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MultiViewerGrid } from './components/MainViewer/MultiViewerGrid';
 import { SharedBottomBar } from './components/SharedBar/SharedBottomBar';
 import { ExpedientListPage } from './pages/ExpedientListPage';
+import { SentinelProvider } from './context/SentinelProvider';
 import { isElectron, getServerPortFromElectron } from './utils/electronDetect';
 import './index.css';
 
@@ -83,84 +84,86 @@ export const App = () => {
   }, []);
 
   return (
-    <div className="h-screen w-screen bg-[#0a0a0c] text-slate-100 flex overflow-hidden font-sans select-none relative">
-      <div id="sidebar-root" className="h-full z-40 shrink-0" />
+    <SentinelProvider viewerId="global">
+      <div className="h-screen w-screen bg-[#0a0a0c] text-slate-100 flex overflow-hidden font-sans select-none relative">
+        <div id="sidebar-root" className="h-full z-40 shrink-0" />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
-        {/* View Mode Toggle */}
-        <div className="view-mode-toggle" style={{
-          display: 'flex',
-          gap: '5px',
-          padding: '8px 12px',
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        }}>
-          <button
-            onClick={() => setViewMode('detection')}
-            style={{
-              padding: '6px 12px',
-              background: viewMode === 'detection' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
-            }}
-          >
-            🎥 Detección
-          </button>
-          <button
-            onClick={() => setViewMode('expedients')}
-            style={{
-              padding: '6px 12px',
-              background: viewMode === 'expedients' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
-            }}
-          >
-            📋 Expedientes
-          </button>
-          <span style={{
-            marginLeft: 'auto',
-            fontSize: '11px',
-            color: 'rgba(255, 255, 255, 0.6)',
-            padding: '6px 0',
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
+          {/* View Mode Toggle */}
+          <div className="view-mode-toggle" style={{
+            display: 'flex',
+            gap: '5px',
+            padding: '8px 12px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           }}>
-            Ctrl+E para cambiar vista
-          </span>
-        </div>
+            <button
+              onClick={() => setViewMode('detection')}
+              style={{
+                padding: '6px 12px',
+                background: viewMode === 'detection' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
+              }}
+            >
+              🎥 Detección
+            </button>
+            <button
+              onClick={() => setViewMode('expedients')}
+              style={{
+                padding: '6px 12px',
+                background: viewMode === 'expedients' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
+              }}
+            >
+              📋 Expedientes
+            </button>
+            <span style={{
+              marginLeft: 'auto',
+              fontSize: '11px',
+              color: 'rgba(255, 255, 255, 0.6)',
+              padding: '6px 0',
+            }}>
+              Ctrl+E para cambiar vista
+            </span>
+          </div>
 
-        {/* View Content - Detection Mode */}
-        {viewMode === 'detection' && (
-          <>
-            <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
+          {/* View Content - Detection Mode */}
+          {viewMode === 'detection' && (
+            <>
+              <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
+                <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+                  <MultiViewerGrid />
+                </ErrorBoundary>
+              </div>
+              <SharedBottomBar />
+            </>
+          )}
+
+          {/* View Content - Expedients Mode */}
+          {viewMode === 'expedients' && (
+            <div className="flex-1 relative z-10 min-h-0 overflow-hidden">
               <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-                <MultiViewerGrid />
+                <ExpedientListPage />
               </ErrorBoundary>
             </div>
-            <SharedBottomBar />
-          </>
-        )}
+          )}
+        </div>
 
-        {/* View Content - Expedients Mode */}
-        {viewMode === 'expedients' && (
-          <div className="flex-1 relative z-10 min-h-0 overflow-hidden">
-            <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-              <ExpedientListPage />
-            </ErrorBoundary>
-          </div>
-        )}
+        <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
+
+        <div id="modal-root" />
       </div>
-
-      <div id="right-sidebar-root" className="h-full z-40 shrink-0" />
-
-      <div id="modal-root" />
-    </div>
+    </SentinelProvider>
   );
 };

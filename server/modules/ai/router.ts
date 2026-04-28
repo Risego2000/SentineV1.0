@@ -6,19 +6,22 @@
 
 import { Router } from 'express';
 import type { ServerConfig } from '../../config/env.js';
+import { AIController } from './controller';
 
 export function createAIRouter(config: ServerConfig): Router {
   const router = Router();
 
-  // TODO: Implement POST /api/ai/audit endpoint
-  router.post('/api/ai/audit', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
+  /**
+   * POST /api/ai/audit
+   * Analyze an infraction and return assessment
+   */
+  router.post('/api/ai/audit', AIController.analyzeInfraction);
 
-  // TODO: Implement POST /api/ai/geometry endpoint
-  router.post('/api/ai/geometry', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
+  /**
+   * POST /api/ai/geometry
+   * Analyze trajectory geometry and calculate metrics
+   */
+  router.post('/api/ai/geometry', AIController.analyzeGeometry);
 
   return router;
 }

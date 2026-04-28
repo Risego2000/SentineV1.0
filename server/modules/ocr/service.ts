@@ -3,6 +3,8 @@
  * Interface to PaddleOCR and timestamp extraction backend
  */
 
+import { spawnSync } from 'child_process';
+import path from 'path';
 import { logger } from '../../../services/logger';
 
 export interface PlateExtractionResult {
@@ -30,22 +32,30 @@ export interface PlateRegionResult {
  * OCR Service that wraps backend OCR engines (PaddleOCR, YOLO, etc.)
  */
 export class OCRServiceBackend {
-  private paddlePythonPath: string;
-  private isAvailable: boolean = false;
+  private pythonExePath: string;
+  private ocrScriptPath: string;
 
-  constructor(paddleExePath?: string) {
-    this.paddlePythonPath = paddleExePath || 'paddleocr';
-    // Check availability on init
-    this.checkAvailability();
+  constructor(pythonExePath?: string) {
+    // Use provided path or resolve to bundled Python
+    this.pythonExePath = pythonExePath || this.getDefaultPythonPath();
+    this.ocrScriptPath = path.join(process.cwd(), 'resources', 'paddle_ocr_extractor.py');
+
+    logger.info('OCR_BACKEND', `Python path: ${this.pythonExePath}`);
+    logger.info('OCR_BACKEND', `OCR script path: ${this.ocrScriptPath}`);
   }
 
   /**
-   * Check if PaddleOCR is available
+   * Get default Python executable path
    */
-  private checkAvailability(): void {
-    // In a real implementation, would check if PaddleOCR is installed
-    // For now, assume it's available in production
-    this.isAvailable = true;
+  private getDefaultPythonPath(): string {
+    // Try bundled Python first
+    const bundledPython = path.join(process.cwd(), 'resources', 'python', 'python.exe');
+    const fs = require('fs');
+    if (fs.existsSync(bundledPython)) {
+      return bundledPython;
+    }
+    // Fallback to system Python
+    return 'python';
   }
 
   /**
@@ -62,10 +72,51 @@ export class OCRServiceBackend {
         };
       }
 
-      // In production: call PaddleOCR Python service
-      // For now: return mock with proper structure
-      const mockResult = this.mockPlateExtraction(imageBase64);
-      return mockResult;
+      // Call Python OCR script
+      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath, 'extract-plate', imageBase64], {
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        timeout: 30000, // 30 seconds timeout
+      });
+
+      if (result.error) {
+        logger.error('OCR_BACKEND', 'Failed to spawn Python process', result.error);
+        return {
+          plate: null,
+          candidates: [],
+          confidence: 0,
+          method: 'error',
+        };
+      }
+
+      if (result.status !== 0) {
+        logger.error('OCR_BACKEND', `Python script exited with code ${result.status}`, result.stderr);
+        return {
+          plate: null,
+          candidates: [],
+          confidence: 0,
+          method: 'error',
+        };
+      }
+
+      try {
+        const ocrResult = JSON.parse(result.stdout);
+        logger.info('OCR_BACKEND', `Extracted plate: ${ocrResult.plate || 'none'}`);
+        return {
+          plate: ocrResult.plate || null,
+          candidates: ocrResult.candidates || [],
+          confidence: ocrResult.confidence || 0,
+          method: ocrResult.method || 'paddleocr',
+        };
+      } catch (parseError) {
+        logger.error('OCR_BACKEND', 'Failed to parse Python output', parseError, result.stdout);
+        return {
+          plate: null,
+          candidates: [],
+          confidence: 0,
+          method: 'error',
+        };
+      }
     } catch (error) {
       logger.error('OCR_BACKEND', 'Plate extraction failed', error);
       return {
@@ -84,15 +135,28 @@ export class OCRServiceBackend {
     try {
       if (!imageBase64) return null;
 
-      // In production: call plate detection model (YOLO or similar)
-      // For now: return mock region
-      return {
-        x: 0.1,
-        y: 0.4,
-        width: 0.8,
-        height: 0.3,
-        confidence: 0.75,
-      };
+      // Call Python OCR script
+      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath, 'detect-region', imageBase64], {
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 30000,
+      });
+
+      if (result.error || result.status !== 0) {
+        logger.warn('OCR_BACKEND', 'Plate region detection failed');
+        return null;
+      }
+
+      try {
+        const regionResult = JSON.parse(result.stdout);
+        if (regionResult.x !== undefined && regionResult.y !== undefined) {
+          return regionResult as PlateRegionResult;
+        }
+        return null;
+      } catch (parseError) {
+        logger.warn('OCR_BACKEND', 'Failed to parse plate region result', parseError);
+        return null;
+      }
     } catch (error) {
       logger.warn('OCR_BACKEND', 'Plate region detection failed', error);
       return null;
@@ -112,8 +176,8 @@ export class OCRServiceBackend {
         };
       }
 
-      // In production: call Gemini API or similar for timestamp OCR
-      // For now: return null (fallback to client-side)
+      // Timestamp extraction via Gemini API would go here
+      // For now, return null (fallback to client-side)
       return {
         timestamp: null,
         osdText: null,
@@ -127,21 +191,6 @@ export class OCRServiceBackend {
         confidence: 0,
       };
     }
-  }
-
-  /**
-   * Mock plate extraction for development/testing
-   * In production: would call actual PaddleOCR
-   */
-  private mockPlateExtraction(imageBase64: string): PlateExtractionResult {
-    // This is a mock for development
-    // In production, integrate with actual PaddleOCR
-    return {
-      plate: null, // Return null for unknown plates
-      candidates: [],
-      confidence: 0,
-      method: 'mock',
-    };
   }
 }
 
