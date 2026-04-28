@@ -33,7 +33,7 @@ def extract_plate(image_base64: str):
         image = Image.open(io.BytesIO(image_data))
 
         # Initialize PaddleOCR (downloads models on first run)
-        ocr = PaddleOCR(use_angle_cls=True, lang='en')
+        ocr = PaddleOCR(use_textline_orientation=True, lang='en')
 
         # Perform OCR
         result = ocr.ocr(image, cls=True)
@@ -90,7 +90,7 @@ def detect_plate_region(image_base64: str):
         image_width, image_height = image.size
 
         # Initialize PaddleOCR
-        ocr = PaddleOCR(use_angle_cls=True, lang='en')
+        ocr = PaddleOCR(use_textline_orientation=True, lang='en')
 
         # Perform OCR with bounding boxes
         result = ocr.ocr(image, cls=True)

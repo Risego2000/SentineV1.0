@@ -8,6 +8,7 @@ import { isElectron, getServerPortFromElectron } from './utils/electronDetect';
 import './index.css';
 
 // Auto-discover backend API port on startup
+// RELOAD_SIGNAL: 20260428_001
 const discoverBackendPort = async () => {
   // If running in Electron, use IPC to get the port
   if (isElectron()) {
@@ -99,58 +100,57 @@ export const App = () => {
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             alignItems: 'center',
           }}>
-            {/* Detection Button */}
+            {/* Detection Button - Traffic Camera Icon */}
             <button
               onClick={() => setViewMode('detection')}
               style={{
-                padding: '6px 12px',
-                background: viewMode === 'detection' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+                padding: '10px 16px',
+                background: viewMode === 'detection' ? '#ff6b35' : 'rgba(255, 255, 255, 0.1)',
                 color: 'white',
-                border: 'none',
-                borderRadius: '4px',
+                border: '2px solid #ff6b35',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 fontWeight: viewMode === 'detection' ? 'bold' : 'normal',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '6px',
                 transition: 'all 0.2s ease',
               }}
             >
-              {/* Traffic Camera / Detection Icon */}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
-                <circle cx="12" cy="12" r="5"/>
+              {/* Traffic Camera Icon - SVG */}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <circle cx="12" cy="12" r="4"/>
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
               </svg>
               <span>Detección</span>
             </button>
 
-            {/* Expedients Button */}
+            {/* Expedients Button - Document Icon */}
             <button
               onClick={() => setViewMode('expedients')}
               style={{
-                padding: '6px 12px',
-                background: viewMode === 'expedients' ? '#007bff' : 'rgba(255, 255, 255, 0.1)',
+                padding: '10px 16px',
+                background: viewMode === 'expedients' ? '#4ecdc4' : 'rgba(255, 255, 255, 0.1)',
                 color: 'white',
-                border: 'none',
-                borderRadius: '4px',
+                border: '2px solid #4ecdc4',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 fontWeight: viewMode === 'expedients' ? 'bold' : 'normal',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '6px',
                 transition: 'all 0.2s ease',
               }}
             >
-              {/* Document / Records Icon */}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="11" x2="12" y2="17"/>
-                <line x1="9" y1="14" x2="15" y2="14"/>
+              {/* Document Icon - SVG */}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                <polyline points="13 2 13 9 20 9"/>
               </svg>
               <span>Expedientes</span>
             </button>

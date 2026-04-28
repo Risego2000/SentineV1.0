@@ -390,7 +390,7 @@ export const ROAD_MENU_GROUPS = [
     ],
   },
   {
-    label: '🔴 INTERSECCIONES Y SEGURIDAD VIAL',
+    label: 'INTERSECCIONES Y SEGURIDAD VIAL',
     icon: '🚨',
     items: [
       {
@@ -401,91 +401,91 @@ export const ROAD_MENU_GROUPS = [
       },
       {
         id: 'seguridad-ceda-paso',
-        label: '⚠️ CEDA EL PASO',
+        label: 'CEDA EL PASO',
         icon: '⚪',
         desc: 'Art. 57 RGC | 200€ | -4 pts | No cede prioridad a vehículo o peatón.',
       },
       {
         id: 'seguridad-paso-peatones',
-        label: '🚶 PRIORIDAD PEATONAL',
+        label: 'PRIORIDAD PEATONAL',
         icon: '🚶',
         desc: 'Art. 146 RGC | 200€ | -6 pts | No respeta paso de peatones.',
       },
       {
         id: 'seguridad-semaforo-rojo',
-        label: '🚥 SEMÁFORO EN ROJO',
+        label: 'SEMÁFORO EN ROJO',
         icon: '🚦',
         desc: 'Art. 150 RGC | 200€ | -4 pts | Rebasar línea en luz roja.',
       },
     ],
   },
   {
-    label: '🔁 MANIOBRAS',
+    label: 'MANIOBRAS',
     icon: '🔄',
     items: [
       {
         id: 'seguridad-giro-prohibido',
-        label: '🔄 GIRO PROHIBIDO',
+        label: 'GIRO PROHIBIDO',
         icon: '↩️',
         desc: 'Art. 36.2 RGC | 200€ | -3 pts | Realizar giro no permitido.',
       },
       {
         id: 'seguridad-direccion-obligatoria',
-        label: '➡️ DIRECCIÓN OBLIGATORIA',
+        label: 'DIRECCIÓN OBLIGATORIA',
         icon: '➡️',
         desc: 'Art. 36.1 RGC | 200€ | 0 pts | No seguir dirección obligatoria.',
       },
     ],
   },
   {
-    label: '🚫 CIRCULACIÓN PELIGROSA',
+    label: 'CIRCULACIÓN PELIGROSA',
     icon: '⛔',
     items: [
       {
         id: 'seguridad-sentido-contrario',
-        label: '⛔ SENTIDO CONTRARIO',
+        label: 'SENTIDO CONTRARIO',
         icon: '⛔',
         desc: 'Art. 31 RGC | 500€ | -6 pts | CRÍTICA | Circular en dirección opuesta.',
       },
     ],
   },
   {
-    label: '🚗 PARADA Y OBSTRUCCIÓN',
+    label: 'PARADA Y OBSTRUCCIÓN',
     icon: '🚧',
     items: [
       {
         id: 'infraccion-doble-fila',
-        label: '🚧 DOBLE FILA',
+        label: 'DOBLE FILA',
         icon: '🚗',
         desc: 'Art. 87.1 RGC | 200€ | 0 pts | Estacionar obstaculizando circulación.',
       },
       {
         id: 'infraccion-bloqueo-cruce',
-        label: '🚫 BLOQUEO DE INTERSECCIÓN',
+        label: 'BLOQUEO DE INTERSECCIÓN',
         icon: '🔲',
         desc: 'Art. 142 RGC | 200€ | 0 pts | Quedar detenido en cruce sin poder salir.',
       },
     ],
   },
   {
-    label: '🛣️ USO DE CARRILES',
+    label: 'USO DE CARRILES',
     icon: '🛣️',
     items: [
       {
         id: 'infraccion-carril-bus',
-        label: '🚌 CARRIL BUS / TAXI',
+        label: 'CARRIL BUS / TAXI',
         icon: '🚌',
         desc: 'Art. 48 RGC | 200€ | 0 pts | Circular por carril reservado.',
       },
       {
         id: 'arcen-emergencia',
-        label: '🪵 INVASIÓN DE ARCÉN',
+        label: 'INVASIÓN DE ARCÉN',
         icon: '⚠️',
         desc: 'Art. 49 RGC | 200€ | 0 pts | Circular por arcén sin causa.',
       },
       {
         id: 'daganzo-m100-autovia',
-        label: '➖ LÍNEA CONTINUA',
+        label: 'LÍNEA CONTINUA',
         icon: '➖',
         desc: 'Art. 43 RGC | 200€ | -4 pts | Rebasar línea continua.',
       },
