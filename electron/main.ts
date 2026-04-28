@@ -12,11 +12,40 @@ import fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 let expressServer: any = null;
+let activeServerPort: number | null = null;
+
+function getDevRendererUrl(): string {
+  const explicitUrl = process.env.VITE_DEV_SERVER_URL || process.env.ELECTRON_RENDERER_URL;
+  if (explicitUrl) return explicitUrl;
+
+  const port = process.env.VITE_DEV_SERVER_PORT || process.env.FRONTEND_PORT || '3001';
+  return `http://127.0.0.1:${port}`;
+}
+
+async function waitForRenderer(url: string, timeoutMs = 30000): Promise<void> {
+  const startedAt = Date.now();
+  let lastError: unknown;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  const message = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`Timed out waiting for Vite dev server at ${url}: ${message}`);
+}
 
 /**
  * Create the main application window
  */
-function createWindow(serverPort?: number) {
+async function createWindow(serverPort?: number) {
   // Get app path for reliable path resolution in Electron
   const appPath = app.getAppPath();
 
@@ -29,24 +58,11 @@ function createWindow(serverPort?: number) {
       preload: path.join(appPath, 'dist/electron/preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,  // Enable IndexedDB and persistent storage
+      partition: 'persist:sentinel',  // Use persistent partition for session data
     },
     icon: path.join(appPath, 'assets/icon.png'),
   });
-
-  // Load renderer
-  // Assume development unless explicitly in production mode
-  const isProd = process.env.NODE_ENV === 'production';
-
-  if (!isProd) {
-    // In development, load from Vite dev server
-    console.log('[Electron] Loading from Vite dev server on http://127.0.0.1:5173');
-    mainWindow.loadURL('http://127.0.0.1:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    // In production, load from bundled files
-    console.log('[Electron] Loading from bundled files');
-    mainWindow.loadFile(path.join(app.getAppPath(), 'dist/renderer/index.html'));
-  }
 
   // Send port after renderer is ready (not after loadURL)
   mainWindow.webContents.on('did-finish-load', () => {
@@ -55,6 +71,24 @@ function createWindow(serverPort?: number) {
       console.log(`[Electron] Sent server-port ${serverPort} to renderer`);
     }
   });
+
+  // Load renderer
+  // Assume development unless explicitly in production mode
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (!isProd) {
+    // In development, load from Vite dev server
+    const rendererUrl = getDevRendererUrl();
+    console.log(`[Electron] Waiting for Vite dev server on ${rendererUrl}`);
+    await waitForRenderer(rendererUrl);
+    console.log(`[Electron] Loading from Vite dev server on ${rendererUrl}`);
+    await mainWindow.loadURL(rendererUrl);
+    mainWindow.webContents.openDevTools();
+  } else {
+    // In production, load from bundled files
+    console.log('[Electron] Loading from bundled files');
+    await mainWindow.loadFile(path.join(app.getAppPath(), 'dist/renderer/index.html'));
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -156,6 +190,7 @@ async function initializeServer() {
     const serverPort = typeof serverAddress === 'string'
       ? 3002
       : (serverAddress?.port || 3002);
+    activeServerPort = serverPort;
 
     console.log(`[Electron] Express server started on port ${serverPort}`);
 
@@ -181,7 +216,7 @@ app.on('ready', async () => {
     console.log(`[Electron] Server initialized on port ${serverPort}`);
 
     // Then create window with server port
-    createWindow(serverPort);
+    await createWindow(serverPort);
   } catch (error) {
     console.error('[Electron] Fatal error during app startup:', error);
     app.quit();
@@ -208,7 +243,9 @@ app.on('window-all-closed', () => {
  */
 app.on('activate', () => {
   if (mainWindow === null) {
-    createWindow();
+    createWindow().catch((error) => {
+      console.error('[Electron] Failed to create window:', error);
+    });
   }
 });
 
@@ -291,9 +328,12 @@ ipcMain.handle('window:close', () => {
  * Helper: Get actual server port
  */
 function getServerPort(): number {
+  if (activeServerPort) return activeServerPort;
   const port = parseInt(process.env.SENTINEL_SERVER_PORT || '3002');
   return isNaN(port) ? 3002 : port;
 }
+
+ipcMain.handle('server:getPort', () => getServerPort());
 
 /**
  * Helper: Fetch with timeout
