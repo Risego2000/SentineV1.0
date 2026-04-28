@@ -2,14 +2,10 @@ import React, { useState } from 'react';
 import {
   Octagon,
   Accessibility,
-  MinusCircle,
   RotateCcw,
   Car,
-  Square,
-  Box,
   Bus,
   TriangleAlert,
-  Minus,
   Link,
   ArrowLeftRight,
   Waves,
@@ -18,15 +14,17 @@ import {
   Signpost,
   Truck,
   IterationCcw,
-  Type,
   Plus,
   Zap,
   Code2,
   Target,
-  Circle,
   AlertCircle,
   LucideProps,
   LucideIcon,
+  ArrowLeft,
+  Hand,
+  Package,
+  MapPin,
 } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
@@ -40,34 +38,34 @@ function Signal(props: LucideProps) {
 const ICON_MAP: Record<string, LucideIcon | React.ComponentType<LucideProps>> = {
   'seguridad-stop-falso': Octagon,
   'seguridad-paso-peatones': Accessibility,
-  'seguridad-sentido-contrario': MinusCircle,
+  'seguridad-sentido-contrario': ArrowLeft,
   'seguridad-giro-u': RotateCcw,
-  'seguridad-ceda-paso': Circle,
+  'seguridad-ceda-paso': Hand,
   'seguridad-semaforo-rojo': AlertCircle,
   'infraccion-doble-fila': Car,
-  'infraccion-bloqueo-cruce': Square,
-  'zona-carga-descarga': Box,
+  'infraccion-bloqueo-cruce': Truck,
+  'zona-carga-descarga': Package,
   'infraccion-carril-bus': Bus,
   'arcen-emergencia': TriangleAlert,
-  'daganzo-m100-autovia': Minus,
+  'daganzo-m100-autovia': Signpost,
   'daganzo-a2': Link,
-  'daganzo-m100-convencional': Square,
+  'daganzo-m100-convencional': Signpost,
   'daganzo-m113-paracuellos': ArrowLeftRight,
   'daganzo-m113-curvas': Waves,
-  'daganzo-m103-cobena': RotateCw,
+  'daganzo-m103-cobena': Signpost,
   'daganzo-m106-algete': ArrowUpRight,
   'daganzo-r2': Signpost,
   'daganzo-pesados': Truck,
   'int-semaforo': Signal,
   'int-rotonda': RotateCw,
-  'int-t': Type,
+  'int-t': Signpost,
   'int-cruce': Plus,
   'int-inc-izq': IterationCcw,
   'int-inc-der': IterationCcw,
   'loc-plaza': Plus,
-  'loc-constitucion': Waves,
-  'loc-base': Square,
-  'loc-poligono': Square,
+  'loc-constitucion': MapPin,
+  'loc-base': MapPin,
+  'loc-poligono': MapPin,
 };
 
 export const ProtocolSelector = () => {
@@ -146,6 +144,8 @@ export const ProtocolSelector = () => {
             <div className="grid grid-cols-3 gap-1.5">
               {group.items.map((item) => {
                 const isActive = selectedProtocolIds.includes(item.id);
+                const iconColor = isActive ? 'text-blue-500' : 'text-slate-500';
+                const IconComponent = ICON_MAP[item.id];
                 return (
                   <button
                     key={item.id}
@@ -157,10 +157,11 @@ export const ProtocolSelector = () => {
                     }`}
                     {...helpProps(item.desc)}
                   >
+                    {IconComponent && (
+                      <IconComponent size={18} className={iconColor} strokeWidth={2} />
+                    )}
                     <span
-                      className={`text-[7px] font-black uppercase tracking-tight text-center leading-[1.1] ${
-                        isActive ? 'text-blue-500' : 'text-slate-500'
-                      }`}
+                      className={`text-[7px] font-black uppercase tracking-tight text-center leading-[1.1] ${iconColor}`}
                     >
                       {item.label}
                     </span>
