@@ -46,6 +46,9 @@ interface InfractionSchemaRow {
   extra_data: any;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (value: string): boolean => UUID_RE.test(value);
+
 const mapIncidentToInfractionRow = (row: any): InfractionSchemaRow => ({
   id: String(row.id),
   created_at: row.created_at || null,
@@ -101,6 +104,7 @@ interface PageState {
 export const ExpedientListPage: React.FC = () => {
   const { user } = useAuth();
   const infractionsTableUnavailableRef = useRef(false);
+  const supabaseReadUnavailableRef = useRef(false);
   const infractionLoadInFlightRef = useRef(false);
   const [state, setState] = useState<PageState>({
     expedients: [],
@@ -216,10 +220,12 @@ export const ExpedientListPage: React.FC = () => {
         manualRefreshing: false,
       }));
 
-      if (!infractionsTableUnavailableRef.current) {
+      if (!infractionsTableUnavailableRef.current && !supabaseReadUnavailableRef.current) {
         await loadInfractionRowsForExpedients(all);
       }
-      await loadExpedientImages(all);
+      if (!supabaseReadUnavailableRef.current) {
+        await loadExpedientImages(all);
+      }
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -445,8 +451,15 @@ export const ExpedientListPage: React.FC = () => {
   };
 
   const loadExpedientImages = async (expedients: Expedient[]) => {
+    if (supabaseReadUnavailableRef.current) return;
     try {
-      const expedientIds = [...new Set(expedients.map((e) => String(e.id || '')).filter(Boolean))];
+      const expedientIds = [
+        ...new Set(
+          expedients
+            .map((e) => String(e.id || '').trim())
+            .filter((id) => id.length > 0 && isUuid(id))
+        ),
+      ];
       if (!expedientIds.length) return;
 
       const { data, error } = await supabase
@@ -455,6 +468,18 @@ export const ExpedientListPage: React.FC = () => {
         .in('expedient_id', expedientIds);
 
       if (error) {
+        const status = Number((error as any)?.status || 0);
+        const code = String((error as any)?.code || '');
+        const message = String((error as any)?.message || '').toLowerCase();
+        const forbidden =
+          status === 403 ||
+          code === '42501' ||
+          message.includes('permission denied') ||
+          message.includes('forbidden');
+        if (forbidden) {
+          supabaseReadUnavailableRef.current = true;
+          return;
+        }
         console.warn('[EXPEDIENT_PAGE] Failed to load expedient_images:', error.message);
         return;
       }
@@ -547,9 +572,7 @@ export const ExpedientListPage: React.FC = () => {
 
       let { data, error } = await supabase
         .from(SUPABASE_TABLES.INFRACTIONS)
-        .select(
-          'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image_url, extra_snapshots, zoom_snapshots, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
-        )
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(400);
 
@@ -572,22 +595,30 @@ export const ExpedientListPage: React.FC = () => {
 
           const incidentResult = await supabase
             .from('incidents')
-            .select(
-              'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image, image_url, extra_snapshots, zoom_snapshots, video_clip, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
-            )
+            .select('*')
             .order('created_at', { ascending: false })
             .limit(400);
           if (incidentResult.error) {
-            console.warn(
-              '[EXPEDIENT_PAGE] Failed to load incidents fallback rows:',
-              incidentResult.error.message
-            );
+            const incidentStatus = Number((incidentResult.error as any)?.status || 0);
+            const incidentCode = String((incidentResult.error as any)?.code || '');
+            const incidentMessage = String((incidentResult.error as any)?.message || '').toLowerCase();
+            const forbiddenIncidents =
+              incidentStatus === 403 ||
+              incidentCode === '42501' ||
+              incidentMessage.includes('permission denied') ||
+              incidentMessage.includes('forbidden');
+            const missingIncidents = incidentMessage.includes("could not find the table 'public.incidents'");
+
+            console.warn('[EXPEDIENT_PAGE] Failed to load incidents fallback rows:', incidentResult.error.message);
+
+            if (forbiddenIncidents || missingIncidents) {
+              supabaseReadUnavailableRef.current = true;
+            }
+
             setState((prev) => ({
               ...prev,
               infractionsTableUnavailable: true,
-              error:
-                prev.error ||
-                'No hay permisos para leer "infractions/incidents" en Supabase (403). Revisa RLS/políticas.',
+              error: prev.error,
             }));
             return;
           }

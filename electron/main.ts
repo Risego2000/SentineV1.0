@@ -797,10 +797,21 @@ ipcMain.handle('file:select', async (event, options = {}) => {
  */
 ipcMain.handle('file:download', async (event, url, filename) => {
   try {
+    const parsed = new URL(String(url));
+    const allowedHosts = new Set([
+      'localhost',
+      '127.0.0.1',
+      'storage.googleapis.com',
+      'cdn.jsdelivr.net',
+    ]);
+    if (!allowedHosts.has(parsed.hostname)) {
+      throw new Error(`Download host not allowed: ${parsed.hostname}`);
+    }
+
     const downloadsPath = app.getPath('downloads');
     const filePath = path.join(downloadsPath, filename);
 
-    const response = await fetch(url);
+    const response = await fetch(parsed.toString());
     if (!response.ok) {
       throw new Error(`Download failed: ${response.status}`);
     }

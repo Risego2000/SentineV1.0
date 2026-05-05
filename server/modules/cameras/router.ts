@@ -6,20 +6,18 @@
 
 import { Router } from 'express';
 import type { ServerConfig } from '../../config/env.js';
+import { proxyToLegacy } from '../../utils/legacyProxy.js';
 
 export function createCamerasRouter(config: ServerConfig): Router {
   const router = Router();
 
-  // TODO: Implement POST /api/cameras/validate endpoint
-  // Validate IP camera connection and RTSP stream
-  router.post('/api/cameras/validate', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
-
-  // TODO: Implement GET /api/cameras endpoint (list)
-  router.get('/api/cameras', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
+  // Temporary controlled proxy to legacy server.js endpoints.
+  router.post('/api/cameras/validate', proxyToLegacy);
+  router.get('/api/cameras', proxyToLegacy);
+  router.post('/api/ip-camera/session', proxyToLegacy);
+  router.get('/api/ip-camera/sessions', proxyToLegacy);
+  router.delete('/api/ip-camera/session/:sessionId', proxyToLegacy);
+  router.get('/api/ip-camera/stream/:sessionId', proxyToLegacy);
 
   return router;
 }

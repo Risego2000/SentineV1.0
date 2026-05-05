@@ -6,6 +6,9 @@ import { Request, Response } from 'express';
 import { getAIService, InfractionAnalysisRequest, GeometryAnalysisRequest } from './service';
 import { logger } from '../../../services/logger';
 
+const MAX_DIRECTIVES_CHARS = 20_000;
+const MAX_TRAJECTORY_POINTS = 2_000;
+
 export class AIController {
   /**
    * POST /api/ai/audit
@@ -43,6 +46,10 @@ export class AIController {
 
       if (!request.infractionType) {
         res.status(400).json({ error: 'Missing infractionType or compatible track/line payload' });
+        return;
+      }
+      if ((request.directives || '').length > MAX_DIRECTIVES_CHARS) {
+        res.status(413).json({ error: 'Directives payload too large' });
         return;
       }
 
@@ -92,6 +99,10 @@ export class AIController {
         res
           .status(400)
           .json({ error: 'Missing required fields: infractionType, trajectoryPoints' });
+        return;
+      }
+      if ((request.trajectoryPoints || []).length > MAX_TRAJECTORY_POINTS) {
+        res.status(413).json({ error: 'trajectoryPoints payload too large' });
         return;
       }
 

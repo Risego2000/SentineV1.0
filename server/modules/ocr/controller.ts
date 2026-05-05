@@ -7,6 +7,8 @@ import { Request, Response } from 'express';
 import { getOCRBackend } from './service';
 import { logger } from '../../../services/logger';
 
+const MAX_IMAGE_CHARS = 8 * 1024 * 1024;
+
 export class OCRController {
   /**
    * POST /api/ocr/extract-plate
@@ -22,6 +24,11 @@ export class OCRController {
 
       if (!singleImage && normalizedImages.length === 0) {
         res.status(400).json({ error: 'Missing or invalid image/images parameter' });
+        return;
+      }
+      const payloadItems = singleImage ? [singleImage] : normalizedImages;
+      if (payloadItems.some((item) => item.length > MAX_IMAGE_CHARS)) {
+        res.status(413).json({ error: 'Image payload too large' });
         return;
       }
 
@@ -55,6 +62,10 @@ export class OCRController {
         res.status(400).json({ error: 'Missing or invalid image parameter' });
         return;
       }
+      if (image.length > MAX_IMAGE_CHARS) {
+        res.status(413).json({ error: 'Image payload too large' });
+        return;
+      }
 
       const ocrBackend = getOCRBackend();
       const region = await ocrBackend.detectPlateRegion(image);
@@ -84,6 +95,10 @@ export class OCRController {
 
       if (!image || typeof image !== 'string') {
         res.status(400).json({ error: 'Missing or invalid image parameter' });
+        return;
+      }
+      if (image.length > MAX_IMAGE_CHARS) {
+        res.status(413).json({ error: 'Image payload too large' });
         return;
       }
 
