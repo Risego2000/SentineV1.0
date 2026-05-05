@@ -4,7 +4,7 @@
  * PHASE 4: Modular health check implementation
  */
 
-import { spawn, spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import { logger } from '../../../services/logger.js';
 import type { ServerConfig } from '../../config/env.js';
 
@@ -110,12 +110,17 @@ export class HealthService {
   private async checkPaddleOCR(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        const result = spawnSync('python', ['-c', 'import paddleocr'], {
-          timeout: 10000,
+        const proc = spawn('python', ['-c', 'import paddleocr'], {
+          timeout: 3000,
           stdio: 'pipe',
         });
 
-        resolve(result.status === 0);
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+        setTimeout(() => {
+          proc.kill();
+          resolve(false);
+        }, 3000);
       } catch {
         resolve(false);
       }

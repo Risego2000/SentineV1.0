@@ -26,11 +26,19 @@ export async function proxyToLegacy(req: Request, res: Response): Promise<void> 
   try {
     const method = req.method.toUpperCase();
     const hasBody = method !== 'GET' && method !== 'HEAD';
+    const body =
+      hasBody && req.body !== undefined
+        ? typeof req.body === 'string' || Buffer.isBuffer(req.body)
+          ? (req.body as any)
+          : JSON.stringify(req.body)
+        : undefined;
+    if (hasBody && body !== undefined && !headers.has('content-type')) {
+      headers.set('content-type', 'application/json');
+    }
     const upstream = await fetch(targetUrl, {
       method,
       headers,
-      body: hasBody ? (req as any) : undefined,
-      duplex: hasBody ? ('half' as any) : undefined,
+      body: body as any,
     });
 
     res.status(upstream.status);
@@ -49,4 +57,3 @@ export async function proxyToLegacy(req: Request, res: Response): Promise<void> 
     });
   }
 }
-
