@@ -105,7 +105,14 @@ export function useAuth() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setState({ isLoading: false, isAuthenticated: false, error: 'Supabase no configurado' });
+      setState((prev) => ({
+        ...prev,
+        user: null,
+        session: null,
+        isLoading: false,
+        isAuthenticated: false,
+        error: 'Supabase no configurado',
+      }));
       return;
     }
 

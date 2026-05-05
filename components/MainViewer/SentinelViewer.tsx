@@ -1059,6 +1059,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </div>
                 <button
                   type="button"
+                  aria-label="Expandir buffer forense"
                   onClick={() => setPausedBufferExpanded(true)}
                   className="h-8 w-8 text-[12px] font-black rounded border border-blue-500/40 text-blue-300 bg-blue-500/10 hover:bg-blue-500/20"
                   {...helpProps('Expandir buffer forense en pausa a vista completa.')}
@@ -1067,6 +1068,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={pausedOcrBusy ? 'Análisis en curso' : 'Reanalizar escena'}
                   disabled={pausedOcrBusy}
                   onClick={() => void runPausedFrameOCR()}
                   className="h-8 w-8 text-[12px] font-black rounded border border-blue-500/40 text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-50"
@@ -1076,6 +1078,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={showEnhancedOnViewport ? 'Ocultar mejora forense' : 'Mostrar mejora forense'}
                   onClick={() => setShowEnhancedOnViewport((v) => !v)}
                   className="h-8 w-8 text-[12px] font-black rounded border border-white/20 text-slate-300 hover:bg-white/10"
                   {...helpProps(
@@ -1088,6 +1091,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={zoneSelectionEnabled ? 'Desactivar selección de zona' : 'Activar selección de zona'}
                   disabled={pausedOcrBusy}
                   onClick={() => {
                     setZoneSelectionEnabled((v) => !v);
@@ -1114,6 +1118,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label="Limpiar zona seleccionada"
                   disabled={pausedOcrBusy || !zoneSelected}
                   onClick={() => {
                     setZoneSelected(null);
@@ -1127,6 +1132,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label="Ejecutar análisis en zona"
                   disabled={pausedOcrBusy || !zoneSelected}
                   onClick={() => void runZoneAnalysis()}
                   className="h-8 w-8 text-[12px] font-black rounded border border-emerald-500/50 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50"
@@ -1341,6 +1347,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
             <div className="flex items-center gap-2 bg-[#020617]/88 border border-white/10 rounded-xl p-2 backdrop-blur-md shadow-[0_0_18px_rgba(0,0,0,0.45)]">
               <button
                 type="button"
+                aria-label="Aumentar zoom"
                 onClick={() => stepZoom('in')}
                 onMouseEnter={() => setViewerHint('Aumenta el nivel de zoom del visor.')}
                 onMouseLeave={() => setViewerHint(null)}
@@ -1356,6 +1363,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label="Reducir zoom"
                 onClick={() => stepZoom('out')}
                 onMouseEnter={() => setViewerHint('Reduce el nivel de zoom del visor.')}
                 onMouseLeave={() => setViewerHint(null)}
@@ -1371,6 +1379,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label="Aplicar zoom a región"
                 onClick={zoomToRegion}
                 onMouseEnter={() =>
                   setViewerHint('Dibuja un rectángulo y aplica zoom preciso a esa zona.')
@@ -1388,6 +1397,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label={panEnabled ? 'Desactivar paneo' : 'Activar paneo'}
                 onClick={() => setPanEnabled((v) => !v)}
                 onMouseEnter={() =>
                   setViewerHint(panEnabled ? 'Desactiva el arrastre para paneo.' : 'Activa el arrastre para paneo.')
