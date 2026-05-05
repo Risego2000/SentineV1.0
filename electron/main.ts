@@ -7,6 +7,7 @@ import { app, BrowserWindow, ipcMain, Menu, dialog, session, desktopCapturer } f
 import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
+import { autoUpdater } from 'electron-updater';
 
 // Note: __dirname is automatically available in CommonJS (when compiled to .cjs)
 // In Electron context, it will point to the app's directory
@@ -16,6 +17,7 @@ let expressServer: any = null;
 let activeServerPort: number | null = null;
 let isShuttingDown = false;
 let cspConfigured = false;
+let updaterEventsBound = false;
 const isDev = process.env.NODE_ENV !== 'production';
 const SESSION_PARTITION = isDev ? 'persist:sentinel-dev' : 'persist:sentinel';
 
@@ -54,6 +56,30 @@ function ignoreBrokenPipeErrors() {
 }
 
 ignoreBrokenPipeErrors();
+
+function emitUpdaterStatus(status: string, payload: Record<string, unknown> = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('updater:status', { status, ...payload });
+}
+
+function bindAutoUpdaterEvents() {
+  if (updaterEventsBound) return;
+  updaterEventsBound = true;
+  autoUpdater.autoDownload = false;
+
+  autoUpdater.on('checking-for-update', () => emitUpdaterStatus('checking'));
+  autoUpdater.on('update-available', (info) =>
+    emitUpdaterStatus('available', { version: (info as any)?.version || '' })
+  );
+  autoUpdater.on('update-not-available', () => emitUpdaterStatus('not-available'));
+  autoUpdater.on('download-progress', (progressObj) =>
+    emitUpdaterStatus('downloading', { percent: progressObj?.percent || 0 })
+  );
+  autoUpdater.on('update-downloaded', () => emitUpdaterStatus('downloaded'));
+  autoUpdater.on('error', (err) =>
+    emitUpdaterStatus('error', { message: err instanceof Error ? err.message : String(err || '') })
+  );
+}
 
 
 function configureContentSecurityPolicy() {
@@ -473,6 +499,53 @@ ipcMain.handle('app:openDevTools', () => {
       throw new Error('DevTools are disabled outside development');
     }
     mainWindow.webContents.openDevTools();
+  }
+});
+
+ipcMain.handle('app:checkUpdates', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    bindAutoUpdaterEvents();
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
+  }
+});
+
+ipcMain.handle('app:downloadUpdate', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    bindAutoUpdaterEvents();
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
+  }
+});
+
+ipcMain.handle('app:installUpdate', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
   }
 });
 

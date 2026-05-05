@@ -5,7 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-const EVENT_CHANNEL_ALLOWLIST = new Set(['server-port']);
+const EVENT_CHANNEL_ALLOWLIST = new Set(['server-port', 'updater:status']);
 
 /**
  * Expose safe API to renderer
@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('electron', {
     getAppPath: (pathName: string) => ipcRenderer.invoke('app:getPath', pathName),
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     openDevTools: () => ipcRenderer.invoke('app:openDevTools'),
+    checkUpdates: () => ipcRenderer.invoke('app:checkUpdates'),
+    downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
+    installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
   },
 
   // Window control APIs
