@@ -22,3 +22,38 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local environments and caches
+.venv/
+.npm-cache/
+__pycache__/
+*.pyc
+
+# Build and deps
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+
+# Embedded runtimes and heavy resources
+resources/python/
+*.pt
+*.onnx
+*.bin
+*.exe
+*.dll
+
+# Media artifacts
+public/*.mp4
+public/*.mov
+public/*.avi
+public/*.mkv
+
+# Temp/runtime artifacts
+tmp_*
+*.tmp
+.tmp_*
+app.log
+server.log
+server.err
