@@ -6,6 +6,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const EVENT_CHANNEL_ALLOWLIST = new Set(['server-port', 'updater:status']);
+const INVOKE_CHANNEL_ALLOWLIST = new Set([
+  'api:ai:geometry',
+  'api:ai:trajectory',
+  'api:ai:audit',
+]);
 
 /**
  * Expose safe API to renderer
@@ -19,6 +24,12 @@ contextBridge.exposeInMainWorld('electron', {
       }
       ipcRenderer.on(channel, callback);
       return () => ipcRenderer.off(channel, callback);
+    },
+    invoke: (channel: string, payload?: any) => {
+      if (!INVOKE_CHANNEL_ALLOWLIST.has(channel)) {
+        throw new Error(`IPC invoke channel not allowed: ${channel}`);
+      }
+      return ipcRenderer.invoke(channel, payload);
     },
   },
 

@@ -8,6 +8,7 @@ declare global {
     electron?: {
       ipc: {
         on: (channel: string, callback: (event: any, ...args: any[]) => void) => () => void;
+        invoke: (channel: string, payload?: any) => Promise<any>;
       };
       app: {
         getAppPath: (pathName: string) => Promise<string>;
