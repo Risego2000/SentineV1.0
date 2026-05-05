@@ -66,7 +66,7 @@ export class ForensicQueueV3 {
   private maxQueueSize = 50;
   private maxRetries = 1; // Reduced from 2 to 1 since OCR is now fixed
   private baseRetryDelayMs = 100; // Reduced from 300ms for faster retries
-  private maxOcrFrames = 4;
+  private maxOcrFrames = 12; // Increased from 4 to 12 for better OCR accuracy with voting
   private analysisTimeoutMs = 15000; // Reduced from 30s to 15s for faster analysis
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
   private persistenceInitialized = false;

@@ -54,7 +54,7 @@ export class EvidenceCaptureManager {
   private readonly enableLiveRoiClip = true;
   private readonly enableMidSnapshots = true;
   private readonly targetGeneralSnapshots = 3;
-  private readonly targetDetailSnapshots = 6;
+  private readonly targetDetailSnapshots = 12; // Increased from 6 for better OCR accuracy
   private readonly maxSnapshotsPerTrack = 36;
   private readonly droppedTrackGraceMs = 60000; // Increased from 20s to 60s for slower systems
   private readonly midCaptureIntervalMs = 3200;
