@@ -107,42 +107,42 @@ export const App = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#0a0a0c]">
-        {viewMode === 'detection' ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1,
-              position: 'relative',
-              zIndex: 10,
-              minHeight: 0,
-              overflow: 'hidden',
-            }}
-          >
-            <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
-              <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-                <MultiViewerGrid />
-              </ErrorBoundary>
-            </div>
-            <SharedBottomBar />
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1,
-              position: 'relative',
-              zIndex: 10,
-              minHeight: 0,
-              overflow: 'hidden',
-            }}
-          >
+        {/* View Content - Detection Mode */}
+        <div
+          style={{
+            display: viewMode === 'detection' ? 'flex' : 'none',
+            flexDirection: 'column',
+            flex: 1,
+            position: 'relative',
+            zIndex: 10,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div className="flex-1 relative z-10 min-h-0 overflow-hidden p-2">
             <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
-              <ExpedientListPage />
+              <MultiViewerGrid />
             </ErrorBoundary>
           </div>
-        )}
+          <SharedBottomBar />
+        </div>
+
+        {/* View Content - Expedients Mode */}
+        <div
+          style={{
+            display: viewMode === 'expedients' ? 'flex' : 'none',
+            flexDirection: 'column',
+            flex: 1,
+            position: 'relative',
+            zIndex: 10,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <ErrorBoundary onError={(err) => console.error('UI crash: ' + err.message)}>
+            <ExpedientListPage />
+          </ErrorBoundary>
+        </div>
       </div>
 
       <div

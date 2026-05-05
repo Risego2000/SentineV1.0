@@ -64,8 +64,10 @@ export class ForensicQueueV3 {
   private onEvent?: (event: ForensicQueueEvent) => void;
   private idleResolvers: Array<() => void> = [];
   private maxQueueSize = 50;
-  private maxRetries = 5;
-  private baseRetryDelayMs = 500; // Base delay for exponential backoff
+  private maxRetries = 2;
+  private baseRetryDelayMs = 300; // Base delay for exponential backoff
+  private maxOcrFrames = 4;
+  private analysisTimeoutMs = 30000; // Increased to 30s for Gemini API responsiveness
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
   private persistenceInitialized = false;
   private custodyManifest: CustodyManifest | null = null;
@@ -86,6 +88,18 @@ export class ForensicQueueV3 {
       '16.0.0',
       'COCO-SSD v1.0'
     );
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**
@@ -446,16 +460,24 @@ export class ForensicQueueV3 {
         };
 
         // Run OCR and AI analysis in parallel for faster processing
-        const ocrFrames = allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots;
-        const [ocrResult, auditResult] = await Promise.all([
-          OCRSynchronizer.extractLicensePlate(ocrFrames),
-          AIService.analyzeTrajectory(
-            compatibleTrack,
-            compatibleGeometry,
-            current.job.directives,
-            current.job.auditPreset
-          ),
-        ]);
+        const rawOcrFrames = allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots;
+        const ocrFrames =
+          rawOcrFrames.length > this.maxOcrFrames
+            ? rawOcrFrames.slice(-this.maxOcrFrames)
+            : rawOcrFrames;
+        const [ocrResult, auditResult] = await this.withTimeout(
+          Promise.all([
+            OCRSynchronizer.extractLicensePlate(ocrFrames),
+            AIService.analyzeTrajectory(
+              compatibleTrack,
+              compatibleGeometry,
+              current.job.directives,
+              current.job.auditPreset
+            ),
+          ]),
+          this.analysisTimeoutMs,
+          'forensic_analysis'
+        );
 
         plateOCR = ocrResult;
 

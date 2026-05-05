@@ -623,7 +623,7 @@ export class EvidenceCaptureManager {
       const [ocrResult, timecode] = await Promise.all([
         (async () => {
           try {
-            return await OCRSynchronizer.extractLicensePlate(generalFrames[0]);
+            return await OCRSynchronizer.extractLicensePlate([generalFrames[0]]);
           } catch (err) {
             console.warn('[PARALLEL_OCR] Failed:', err);
             return null;

@@ -1183,34 +1183,73 @@ app.post('/api/images/enhance', async (req, res) => {
 
     let result;
 
-    if (images && images.length > 1) {
-      // Batch enhance
-      result = await enhanceImagesForOCR(images, target_height, profile);
-      logger.info(
-        'API_IMAGES_ENHANCE',
-        `Batch complete: ${result.success_count}/${result.total} enhanced`
-      );
-    } else {
-      // Single enhance
-      const singleImage = image || (images && images[0]);
-      if (dual_output) {
-        result = await enhanceImageDualForOCR(singleImage, target_height);
+    try {
+      if (images && images.length > 1) {
+        // Batch enhance
+        result = await enhanceImagesForOCR(images, target_height, profile);
+        logger.info(
+          'API_IMAGES_ENHANCE',
+          `Batch complete: ${result.success_count}/${result.total} enhanced`
+        );
       } else {
-        result = await enhanceImageForOCR(singleImage, target_height, profile);
+        // Single enhance
+        const singleImage = image || (images && images[0]);
+        if (dual_output) {
+          result = await enhanceImageDualForOCR(singleImage, target_height);
+        } else {
+          result = await enhanceImageForOCR(singleImage, target_height, profile);
+        }
+
+        if (!dual_output && result.error) {
+          logger.warn('API_IMAGES_ENHANCE', `Enhancement warning: ${result.error}`);
+          // Don't fail on enhancement warning - return raw image instead
+          return res.json({
+            enhanced: image || (images && images[0]),
+            metadata: { method: 'raw_fallback', reason: 'enhancement_failed' },
+            error: result.error,
+          });
+        }
       }
 
-      if (!dual_output && result.error) {
-        logger.warn('API_IMAGES_ENHANCE', `Enhancement warning: ${result.error}`);
-        return res.status(400).json({
-          error: result.error,
-          enhanced: null,
+      res.json(result);
+    } catch (enhanceError) {
+      // Enhancement service failed - return raw images as fallback
+      logger.warn(
+        'API_IMAGES_ENHANCE',
+        `Enhancement service unavailable, returning raw images: ${enhanceError.message}`
+      );
+
+      if (images && images.length > 1) {
+        res.json({
+          enhanced_images: images,
+          metadata: images.map(() => ({
+            method: 'raw_fallback',
+            reason: 'enhancement_unavailable'
+          })),
+          success_count: images.length,
+          total: images.length,
+          warning: 'Enhancement service unavailable, returning raw images',
+        });
+      } else {
+        res.json({
+          enhanced: image || (images && images[0]),
+          metadata: { method: 'raw_fallback', reason: 'enhancement_unavailable' },
+          warning: 'Enhancement service unavailable, returning raw image',
         });
       }
     }
-
-    res.json(result);
   } catch (error) {
     logger.errorWithContext('API_IMAGES_ENHANCE', error);
+    // Even on total failure, try to return raw image instead of 500 error
+    const rawImage = req.body?.image || (Array.isArray(req.body?.images) ? req.body.images[0] : null);
+    if (rawImage) {
+      return res.json({
+        enhanced: rawImage,
+        metadata: { method: 'raw_fallback', reason: 'service_error' },
+        warning: 'Enhancement service error, returning raw image',
+      });
+    }
+
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Error enhancing images',
       enhanced: null,
