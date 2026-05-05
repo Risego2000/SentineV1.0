@@ -15,10 +15,10 @@
     "start": "npx tsx server.js",
     "start:modular": "npx tsx server/index.ts",
     "start:all": "npm-run-all --parallel start dev",
-    "build": "node build-electron.js && vite build && electron-builder",
+    "build": "node build-electron.js && vite build && electron-builder --config electron-builder.config.js",
     "build:vite": "vite build",
     "build:electron": "node build-electron.js",
-    "build:dist": "electron-builder",
+    "build:dist": "electron-builder --config electron-builder.config.js",
     "download:ffmpeg": "node download-ffmpeg.js",
     "download:python": "node download-python.js",
     "install:all": "node install-all.js",
@@ -85,34 +85,5 @@
     "typescript-eslint": "^8.58.1",
     "vite": "^6.2.0",
     "vitest": "^4.0.17"
-  },
-  "build": {
-    "appId": "sentinel.ai.v15",
-    "productName": "Sentinel AI",
-    "files": [
-      "dist/**/*",
-      "node_modules/**/*",
-      "resources/**/*"
-    ],
-    "directories": {
-      "buildResources": "resources"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "sign": null,
-      "certificateFile": null,
-      "certificatePassword": null
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
   }
 }
