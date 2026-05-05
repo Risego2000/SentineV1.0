@@ -64,10 +64,10 @@ export class ForensicQueueV3 {
   private onEvent?: (event: ForensicQueueEvent) => void;
   private idleResolvers: Array<() => void> = [];
   private maxQueueSize = 50;
-  private maxRetries = 2;
-  private baseRetryDelayMs = 300; // Base delay for exponential backoff
+  private maxRetries = 1; // Reduced from 2 to 1 since OCR is now fixed
+  private baseRetryDelayMs = 100; // Reduced from 300ms for faster retries
   private maxOcrFrames = 4;
-  private analysisTimeoutMs = 30000; // Increased to 30s for Gemini API responsiveness
+  private analysisTimeoutMs = 15000; // Reduced from 30s to 15s for faster analysis
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
   private persistenceInitialized = false;
   private custodyManifest: CustodyManifest | null = null;
