@@ -56,7 +56,7 @@ export class EvidenceCaptureManager {
   private readonly targetGeneralSnapshots = 3;
   private readonly targetDetailSnapshots = 6;
   private readonly maxSnapshotsPerTrack = 36;
-  private readonly droppedTrackGraceMs = 20000;
+  private readonly droppedTrackGraceMs = 60000; // Increased from 20s to 60s for slower systems
   private readonly midCaptureIntervalMs = 3200;
   private readonly finalizeMidEnsureTimeoutMs = 2800;
   private targets: Map<string, EvidenceCaptureTarget> = new Map();
