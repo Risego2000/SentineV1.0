@@ -128,6 +128,7 @@ export const ExpedientListPage: React.FC = () => {
   });
 
   const expedientService = getExpedientService();
+  const wsRef = useRef<WebSocket | null>(null);
   const selectedExpedient = state.expedients.find((e) => e.id === state.selectedExpedientId);
   const selectedInfraction = state.infractions.find((i) => i.id === state.selectedInfractionId);
   const selectedInfractionRow = selectedExpedient
@@ -140,6 +141,100 @@ export const ExpedientListPage: React.FC = () => {
   // Load pending expedients on mount
   useEffect(() => {
     loadPendingExpedients({ silent: false });
+  }, []);
+
+  // Connect to WebSocket for real-time infraction updates
+  useEffect(() => {
+    const connectWebSocket = async () => {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.addEventListener('open', () => {
+          console.log('[ExpedientList] WebSocket connected to realtime updates');
+        });
+
+        ws.addEventListener('message', async (event) => {
+          try {
+            const { type, payload } = JSON.parse(event.data);
+
+            // When a new infraction is synced, refresh the infraction list immediately
+            if (type === 'infraction:synced') {
+              console.log('[ExpedientList] Received infraction:synced notification:', payload);
+
+              // Fetch infractions from the API
+              const response = await fetch(getApiUrl('/api/infractions'), {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (response.ok) {
+                const result = await response.json();
+                const infractions = (result.infractions || []).map((row: any) => ({
+                  id: row.id,
+                  plate: row.plate || row.license_plate,
+                  makeModel: row.make_model || row.makeModel,
+                  color: row.color,
+                  description: row.description,
+                  severity: row.severity,
+                  ruleCategory: row.rule_category || row.ruleCategory,
+                  legalBase: row.legal_base || row.legalBase,
+                  image: row.image_url || row.image,
+                  extraSnapshots: row.extra_snapshots || row.extraSnapshots || [],
+                  zoomSnapshots: row.zoom_snapshots || row.zoomSnapshots || [],
+                  videoClip: row.video_clip_url || row.videoClip,
+                  time: row.time,
+                  playbackTime: row.playback_time || row.playbackTime,
+                  validationStatus: row.validation_status || row.validationStatus,
+                  validatedAt: row.validated_at ? new Date(row.validated_at).getTime() : undefined,
+                  operatorId: row.operator_id || row.operatorId,
+                  fineAmount: row.fine_amount || row.fineAmount,
+                  pointsDeducted: row.points_deducted || row.pointsDeducted,
+                  localTime: row.local_time || row.localTime,
+                  videoTimeCode: row.video_time_code || row.videoTimeCode,
+                }));
+
+                setState((prev) => ({
+                  ...prev,
+                  infractions: infractions,
+                }));
+              }
+            }
+          } catch (err) {
+            console.warn('[ExpedientList] Error processing WebSocket message:', err);
+          }
+        });
+
+        ws.addEventListener('error', (error) => {
+          console.warn('[ExpedientList] WebSocket error:', error);
+        });
+
+        ws.addEventListener('close', () => {
+          console.log('[ExpedientList] WebSocket disconnected, reconnecting in 5s');
+          // Auto-reconnect after 5 seconds
+          setTimeout(() => {
+            if (wsRef.current?.readyState !== WebSocket.OPEN) {
+              connectWebSocket();
+            }
+          }, 5000);
+        });
+
+        wsRef.current = ws;
+      } catch (error) {
+        console.error('[ExpedientList] Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
   }, []);
 
   // Auto-refresh expedients to keep dossier data updated in real time.

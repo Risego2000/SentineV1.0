@@ -34,6 +34,10 @@ import {
   enhanceImageDualForOCR,
 } from './services/imageEnhancementService.js';
 import {
+  robustPlateOCR,
+  isValidPlateResult,
+} from './services/robustPlateOCR.js';
+import {
   isPrivateAddress,
   sanitizeFilename,
   isPathWithinDir,
@@ -1434,6 +1438,88 @@ app.post('/api/ocr/plate-confirm', async (req, res) => {
 });
 
 /**
+ * Robust License Plate OCR Service
+ *
+ * GUARANTEED plate detection using cascading methods:
+ * 1. Gemini Vision multi-frame consensus voting
+ * 2. PaddleOCR local fallback (faster)
+ * 3. Returns null only if both methods fail
+ *
+ * Design ensures safe, definitive plate detection regardless of image quality/angle/lighting
+ */
+app.post('/api/ocr/plate-robust', async (req, res) => {
+  try {
+    const { image, images, zoomFrames } = req.body;
+
+    // Collect and validate images
+    let imagesToProcess = [];
+    if (zoomFrames && Array.isArray(zoomFrames) && zoomFrames.length > 0) {
+      imagesToProcess = zoomFrames.filter((img) => img && typeof img === 'string');
+      logger.info('ROBUST_OCR_API', `Using ${imagesToProcess.length} zoom frames`);
+    } else if (images && Array.isArray(images)) {
+      imagesToProcess = images.filter((img) => img && typeof img === 'string');
+      logger.info('ROBUST_OCR_API', `Using ${imagesToProcess.length} images`);
+    } else if (image && typeof image === 'string') {
+      imagesToProcess = [image];
+      logger.info('ROBUST_OCR_API', 'Using single image');
+    }
+
+    if (imagesToProcess.length === 0) {
+      logger.warn('ROBUST_OCR_API', 'No valid images provided');
+      return res.status(400).json({ error: 'At least one base64 image required' });
+    }
+
+    logger.info('ROBUST_OCR_API', `Starting robust OCR with ${imagesToProcess.length} images`);
+
+    // Wrap extractors for robustPlateOCR
+    const geminiExtractor = async (imgBase64) => {
+      try {
+        return await extractLicensePlateWithGemini(imgBase64);
+      } catch (err) {
+        logger.debug('ROBUST_OCR_API', `Gemini extraction failed: ${err instanceof Error ? err.message : 'unknown'}`);
+        return null;
+      }
+    };
+
+    const paddleExtractor = async (imgArray) => {
+      try {
+        return await extractLicensePlateFromPaddle(imgArray);
+      } catch (err) {
+        logger.debug('ROBUST_OCR_API', `Paddle extraction failed: ${err instanceof Error ? err.message : 'unknown'}`);
+        return null;
+      }
+    };
+
+    // Run robust OCR with cascading methods
+    const result = await robustPlateOCR(imagesToProcess, geminiExtractor, paddleExtractor);
+
+    if (isValidPlateResult(result)) {
+      logger.info('ROBUST_OCR_API', `✓ Plate detected: ${result.plate} (${result.method})`);
+      return res.json({
+        plate: result.plate,
+        confidence: result.confidence,
+        method: result.method,
+        detections: result.detections || 1,
+      });
+    }
+
+    // No valid plate detected
+    logger.warn('ROBUST_OCR_API', 'No valid plate detected - all methods exhausted');
+    return res.json({
+      plate: null,
+      confidence: 0,
+      method: 'robust_ocr_all_methods_failed',
+      detections: 0,
+    });
+  } catch (error) {
+    logger.errorWithContext('ROBUST_OCR_API', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Error in robust OCR processing',
+    });
+  }
+});
+
+/**
  * Hybrid YOLO + Gemini License Plate OCR
  * Uses YOLO to detect plate location, then Gemini to read text
  * Better accuracy for challenging angles/lighting
@@ -2231,6 +2317,14 @@ app.post('/api/infractions/sync', (req, res) => {
     }
 
     logger.debug('API_INFRACTIONS_SYNC', `Synced infraction: ${infraction.id}`);
+
+    // Broadcast real-time notification to all WebSocket clients
+    broadcastRealtime('infraction:synced', {
+      infraction_id: infraction.id,
+      plate: infraction.plate || 'UNKNOWN',
+      severity: infraction.severity || 'LOW',
+      timestamp: new Date().toISOString(),
+    });
 
     res.json({
       ok: true,

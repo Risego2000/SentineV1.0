@@ -47,6 +47,10 @@ interface SnapshotEntry {
   label: SnapshotLabel;
   kind: 'general' | 'detail';
   data: string; // base64 JPEG
+  heading?: number; // Vehicle heading angle in radians (0-2π)
+  velocityX?: number; // Velocity vector X component
+  velocityY?: number; // Velocity vector Y component
+  rearViewScore?: number; // Score (0-1) indicating rear-view alignment: 1 = perfect rear, 0 = perfect side
 }
 
 export class EvidenceCaptureManager {
@@ -84,6 +88,72 @@ export class EvidenceCaptureManager {
       out.push(items[idx]);
     }
     return out;
+  }
+
+  /**
+   * Calculate rear-view score for a snapshot (0-1)
+   * 1 = vehicle oriented to show rear/license plate
+   * 0 = vehicle in pure side view
+   *
+   * Rear-view prioritization uses heading and velocity to detect when
+   * the vehicle is oriented away from or toward the camera (showing rear)
+   * versus perpendicular to the camera (side view).
+   */
+  private calculateRearViewScore(heading: number, velocityX: number, velocityY: number): number {
+    // Normalize heading to 0-2π
+    let h = heading % (2 * Math.PI);
+    if (h < 0) h += 2 * Math.PI;
+
+    // Calculate velocity angle (direction vehicle is moving)
+    const velocityAngle = Math.atan2(velocityY, velocityX);
+
+    // We want heading to align with velocity (vehicle moving in direction it faces)
+    // Perfect alignment = 0 rad difference
+    const angleDiff = Math.abs(h - velocityAngle);
+
+    // Normalize angle difference to 0-π
+    const normalizedDiff = angleDiff > Math.PI ? 2 * Math.PI - angleDiff : angleDiff;
+
+    // Pure side view is at π/2 radians (90 degrees)
+    // Pure rear/front view is at 0 or π radians
+    // We want to score: 0 at π/2 (side), 1 at 0 or π (rear/front)
+    const sideViewThreshold = Math.PI / 2;
+
+    // Calculate distance from side view (π/2)
+    // Ranges from 0 (at π/2) to π/2 (at 0 or π)
+    const distanceFromSide = Math.abs(normalizedDiff - sideViewThreshold);
+
+    // Normalize to 0-1, where 1 is furthest from side view (best rear/front)
+    const rearScore = distanceFromSide / sideViewThreshold;
+
+    return Math.min(1, Math.max(0, rearScore));
+  }
+
+  /**
+   * Sort and filter frames by rear-view score, prioritizing frames where
+   * the vehicle shows its rear/front (license plate visibility).
+   *
+   * Returns frames sorted by rear-view quality, with highest scores first.
+   */
+  private prioritizeRearViewFrames(frames: SnapshotEntry[]): SnapshotEntry[] {
+    // Calculate rear-view scores for all frames
+    const scored = frames.map((frame) => ({
+      frame,
+      score: this.calculateRearViewScore(
+        frame.heading ?? 0,
+        frame.velocityX ?? 0,
+        frame.velocityY ?? 0
+      ),
+    }));
+
+    // Sort by rear-view score descending (best first)
+    scored.sort((a, b) => b.score - a.score);
+
+    // Return sorted frames
+    return scored.map((s) => ({
+      ...s.frame,
+      rearViewScore: s.score,
+    }));
   }
 
   constructor(policy: Partial<CapturePolicy> = {}) {
@@ -317,12 +387,17 @@ export class EvidenceCaptureManager {
       const snapshots = this.snapshotStorage.get(key) || [];
 
       // PHASE 6: Run robust OCR with adaptive high-resolution frame collection.
-      const detailFrames = snapshots.filter((s) => s.kind === 'detail').map((s) => s.data);
-      const generalFrames = snapshots.filter((s) => s.kind === 'general').map((s) => s.data);
+      // Prioritize rear-view frames for better license plate detection
+      const detailSnapshots = snapshots.filter((s) => s.kind === 'detail');
+      const generalSnapshots = snapshots.filter((s) => s.kind === 'general');
 
-      // Feed OCR with all captured frames (detail + context).
-      const sampledDetail = this.pickSpreadFrames(detailFrames, 10);
-      const sampledGeneral = this.pickSpreadFrames(generalFrames, 3);
+      // Sort by rear-view score to prioritize license plate visibility
+      const rearPrioritizedDetail = this.prioritizeRearViewFrames(detailSnapshots);
+      const rearPrioritizedGeneral = this.prioritizeRearViewFrames(generalSnapshots);
+
+      // Sample from rear-prioritized frames (best rear-view scores first)
+      const sampledDetail = this.pickSpreadFrames(rearPrioritizedDetail, 10).map((s) => s.data);
+      const sampledGeneral = this.pickSpreadFrames(rearPrioritizedGeneral, 3).map((s) => s.data);
       const ocrInputFrames = [...sampledDetail, ...sampledGeneral];
 
       let ocrResults: string[] = [];
@@ -725,7 +800,20 @@ export class EvidenceCaptureManager {
         ctx.drawImage(video, 0, 0, gW, gH);
         const generalData = await this.canvasToBase64Jpeg(canvas, 0.86, 220_000);
         generalMs = performance.now() - generalStart;
-        storage.push({ label, kind: 'general', data: generalData });
+
+        // Extract heading and velocity from track for rear-view scoring
+        const heading = track.kf?.getHeading() ?? track.heading ?? 0;
+        const vx = track.kf?.vx ?? 0;
+        const vy = track.kf?.vy ?? 0;
+
+        storage.push({
+          label,
+          kind: 'general',
+          data: generalData,
+          heading,
+          velocityX: vx,
+          velocityY: vy,
+        });
       }
 
       // Detail frame — vehicle crop focused on the entire vehicle
@@ -783,7 +871,20 @@ export class EvidenceCaptureManager {
           );
         }
         detailMs = performance.now() - detailStart;
-        storage.push({ label, kind: 'detail', data: detailData });
+
+        // Extract heading and velocity from track for rear-view scoring
+        const heading = track.kf?.getHeading() ?? track.heading ?? 0;
+        const vx = track.kf?.vx ?? 0;
+        const vy = track.kf?.vy ?? 0;
+
+        storage.push({
+          label,
+          kind: 'detail',
+          data: detailData,
+          heading,
+          velocityX: vx,
+          velocityY: vy,
+        });
       }
       this.snapshotStorage.set(targetKey, storage);
       this.onProgressUpdate?.(targetKey, { capturedPhotos: storage.length });
