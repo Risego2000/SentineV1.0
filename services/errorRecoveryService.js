@@ -14,7 +14,16 @@ const RETRY_CONFIG = {
     baseDelayMs: 500,
     backoffMultiplier: 2,
     timeoutMs: 15000,
-    retryableErrors: ['TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND'],
+    retryableErrors: [
+      'TIMEOUT',
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'EOF',
+      'EPIPE',
+      'ECONNRESET',
+      'BROKEN PIPE',
+      'stdin',
+    ],
   },
   gemini: {
     maxRetries: 3,
@@ -47,11 +56,7 @@ const RETRY_CONFIG = {
  * @param {object} options - Override config
  * @returns {Promise<any>} Operation result
  */
-export async function retryWithBackoff(
-  operation,
-  operationType = 'express',
-  options = {}
-) {
+export async function retryWithBackoff(operation, operationType = 'express', options = {}) {
   const config = { ...RETRY_CONFIG[operationType], ...options };
   let lastError;
 
@@ -111,10 +116,7 @@ async function executeWithTimeout(operation, timeoutMs) {
     const result = await Promise.race([
       operation(controller.signal),
       new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Timeout after ${timeoutMs}ms`)),
-          timeoutMs + 100
-        )
+        setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs + 100)
       ),
     ]);
     return result;
@@ -131,9 +133,7 @@ function isRetryableError(error, retryableErrors = []) {
   const errorCode = error.code?.toString() || '';
 
   return retryableErrors.some(
-    (pattern) =>
-      errorStr.includes(pattern.toLowerCase()) ||
-      errorCode.includes(pattern)
+    (pattern) => errorStr.includes(pattern.toLowerCase()) || errorCode.includes(pattern)
   );
 }
 
@@ -235,11 +235,9 @@ export async function healthCheckWithRecovery(checkFn, maxAttempts = 5) {
       }
     } catch (error) {
       consecutiveFailures++;
-      logger.warn(
-        'HEALTH_CHECK',
-        `Health check failed (${consecutiveFailures}/${maxAttempts})`,
-        { error: error.message }
-      );
+      logger.warn('HEALTH_CHECK', `Health check failed (${consecutiveFailures}/${maxAttempts})`, {
+        error: error.message,
+      });
 
       if (consecutiveFailures >= maxAttempts) {
         logger.error('HEALTH_CHECK', 'Service declared unhealthy');
@@ -354,10 +352,7 @@ export class CircuitBreaker {
       if (this.failureCount >= this.failureThreshold) {
         this.state = 'OPEN';
         this.openedAt = Date.now();
-        logger.error(
-          'CIRCUIT_BREAKER',
-          `Service failed ${this.failureCount} times, circuit OPEN`
-        );
+        logger.error('CIRCUIT_BREAKER', `Service failed ${this.failureCount} times, circuit OPEN`);
       }
 
       throw error;

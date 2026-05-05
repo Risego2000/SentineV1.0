@@ -7,16 +7,15 @@ declare global {
   interface Window {
     electron?: {
       ipc: {
-        invoke: (channel: string, ...args: any[]) => Promise<any>;
         on: (channel: string, callback: (event: any, ...args: any[]) => void) => () => void;
-        once: (channel: string, callback: (event: any, ...args: any[]) => void) => void;
-        send: (channel: string, ...args: any[]) => void;
-        removeAllListeners: (channel: string) => void;
       };
       app: {
         getAppPath: (pathName: string) => Promise<string>;
         getVersion: () => Promise<string>;
         openDevTools: () => Promise<void>;
+        checkUpdates: () => Promise<any>;
+        downloadUpdate: () => Promise<any>;
+        installUpdate: () => Promise<any>;
       };
       window: {
         minimize: () => Promise<void>;
@@ -74,7 +73,8 @@ export const getServerPortFromElectron = (): Promise<number> => {
     if (isElectron()) {
       const api = getElectronAPI();
 
-      api.api.getServerPort()
+      api.api
+        .getServerPort()
         .then((port) => {
           if (Number.isFinite(port)) {
             console.log(`[Electron] ✓ Server port received via IPC: ${port}`);

@@ -25,7 +25,7 @@ export async function calculateSHA256(data: Blob | ArrayBuffer | string): Promis
 
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   } catch (error) {
     console.error('[CHAIN_OF_CUSTODY] SHA-256 calculation failed:', error);
     throw error;
@@ -236,7 +236,7 @@ export class ChainOfCustodyService {
       if (!isValid) {
         console.warn(
           `[CHAIN_OF_CUSTODY] Hash mismatch for ${fileName}: ` +
-          `expected ${expectedHash}, got ${calculatedHash}`
+            `expected ${expectedHash}, got ${calculatedHash}`
         );
       }
 
@@ -330,7 +330,7 @@ export class ChainOfCustodyService {
       }
     }
 
-    const allValid = results.every(r => r.isValid);
+    const allValid = results.every((r) => r.isValid);
 
     return {
       isValid: allValid,
@@ -350,7 +350,7 @@ export class ChainOfCustodyService {
     }>
   ): string {
     const timestamp = new Date().toISOString();
-    const allValid = verificationResults.every(r => r.isValid);
+    const allValid = verificationResults.every((r) => r.isValid);
     const status = allValid ? 'PASS ✅' : 'FAIL ❌';
 
     let report = `
@@ -388,10 +388,10 @@ FILE MANIFEST:
 ──────────────────────────────────────────────────────────────────
 
 ORIGINAL FILES (${manifest.files.original.length}):
-${manifest.files.original.map(f => `  • ${f.fileName} (${f.size} bytes, SHA256: ${f.hash.substring(0, 16)}...)`).join('\n')}
+${manifest.files.original.map((f) => `  • ${f.fileName} (${f.size} bytes, SHA256: ${f.hash.substring(0, 16)}...)`).join('\n')}
 
 PROCESSED FILES (${manifest.files.processed.length}):
-${manifest.files.processed.map(f => `  • ${f.fileName} (${f.size} bytes, SHA256: ${f.hash.substring(0, 16)}...)`).join('\n')}
+${manifest.files.processed.map((f) => `  • ${f.fileName} (${f.size} bytes, SHA256: ${f.hash.substring(0, 16)}...)`).join('\n')}
 
 ${manifest.reportHash ? `\nREPORT HASH: ${manifest.reportHash.substring(0, 32)}...` : ''}
 

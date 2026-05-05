@@ -1,11 +1,12 @@
 import React from 'react';
-import { Monitor, Globe, Upload, Video, Wifi } from 'lucide-react';
+import { Monitor, Globe, Upload, Video, Wifi, Square } from 'lucide-react';
 import { useFocusedViewerStore } from '../../stores/focusedViewerStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useHelp } from '../../hooks/useHelp';
 
 export const SidebarSourceActions = () => {
-  const { source, onScreenShareFn, onIpCameraFn, onUploadFn, viewerId } = useFocusedViewerStore();
+  const { source, onScreenShareFn, onStopScreenShareFn, onIpCameraFn, onUploadFn, viewerId } =
+    useFocusedViewerStore();
   const { gridSize } = useLayoutStore();
   const { helpProps } = useHelp();
   const activeMode = source === 'upload' ? 'video' : source;
@@ -29,7 +30,7 @@ export const SidebarSourceActions = () => {
 
       <div className="space-y-3">
         {/* NETWORK & IP SECTION */}
-        <div className="horizon-card rounded-xl p-3 space-y-2">
+        <div className="horizon-card rounded-[20px] p-3 space-y-2">
           <div className="flex items-center gap-2 px-1 mb-2">
             <Wifi size={12} className="text-blue-500" />
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
@@ -42,7 +43,7 @@ export const SidebarSourceActions = () => {
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border ${
               activeMode === 'ip'
                 ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
+                : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
             }`}
             {...helpProps('Conectar a una cámara IP de red para vigilancia en vivo.')}
           >
@@ -53,32 +54,48 @@ export const SidebarSourceActions = () => {
             )}
           </button>
 
-          <button
-            onClick={() => onScreenShareFn?.()}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border ${
-              activeMode === 'live'
-                ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
-            }`}
-            {...helpProps('Compartir pantalla o ventana de aplicación como fuente de video.')}
-          >
-            <Monitor size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-wider flex-1">
-              Compartir Ventana
-            </span>
-            {activeMode === 'live' && (
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            )}
-          </button>
+          <div className="flex items-stretch gap-2">
+            <button
+              onClick={() => onScreenShareFn?.()}
+              className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border ${
+                activeMode === 'live'
+                  ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                  : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+              }`}
+              {...helpProps('Compartir pantalla o ventana de aplicación como fuente de video.')}
+            >
+              <Monitor size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider flex-1">
+                Compartir Ventana
+              </span>
+              {activeMode === 'live' && (
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              onClick={() => onStopScreenShareFn?.()}
+              disabled={activeMode !== 'live'}
+              className={`px-3 py-2.5 rounded-lg border transition-all flex items-center gap-2 ${
+                activeMode === 'live'
+                  ? 'bg-red-500/10 border-red-500 text-red-400 hover:bg-red-500/20'
+                  : 'bg-slate-900/40 border-white/5 text-slate-600 cursor-not-allowed'
+              }`}
+              {...helpProps('Detener la captura de pantalla o ventana activa.')}
+            >
+              <Square size={12} />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Detener</span>
+            </button>
+          </div>
         </div>
 
         {/* LOCAL UPLOAD SECTION */}
         <button
           onClick={() => onUploadFn?.()}
-          className={`w-full horizon-card rounded-xl p-4 flex items-center gap-4 transition-all text-left border group ${
+          className={`w-full horizon-card rounded-[20px] p-4 flex items-center gap-4 transition-all text-left border group ${
             activeMode === 'video'
               ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-              : 'bg-white/[0.01] border-white/5 text-slate-500 hover:bg-white/[0.03] hover:text-slate-300'
+              : 'bg-slate-900/40 border-white/5 text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
           }`}
           {...helpProps('Cargar archivo de video local (MP4, MKV) para análisis forense.')}
         >

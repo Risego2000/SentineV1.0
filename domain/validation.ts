@@ -23,9 +23,13 @@ export interface OCRCandidate {
  * Regular expressions for Spanish and European plate formats
  */
 const PLATE_PATTERNS = {
-  // Spain: LLLL-NNN (4 letters - 3 numbers) - Current format
+  // Spain (modern): NNNNLLL (4 numbers + 3 consonants)
+  // Example: 1234-BCD
+  spain: /^\d{4}-?[BCDFGHJKLMNPRSTVWXYZ]{3}$/,
+
+  // Spain (legacy exported variants occasionally seen in OCR datasets)
   // Example: ABCD-123
-  spain: /^[A-Z]{4}-?\d{3}$/,
+  spain_legacy_alpha_num: /^[A-Z]{4}-?\d{3}$/,
 
   // Spain: Historic format NNN-LLL (3 numbers - 3 letters)
   // Example: 123-ABC
@@ -66,9 +70,7 @@ export function validatePlateFormat(text: string): PlateValidationResult {
 
   // Check length (Spanish plates: 8 chars with hyphen, European: 6-11)
   if (cleaned.length < 6 || cleaned.length > 11) {
-    reasons.push(
-      `Plate length out of bounds: ${cleaned.length} (expected 6-11 for Spain/Europe)`
-    );
+    reasons.push(`Plate length out of bounds: ${cleaned.length} (expected 6-11 for Spain/Europe)`);
   }
 
   // Check for common invalid patterns
@@ -90,6 +92,10 @@ export function validatePlateFormat(text: string): PlateValidationResult {
     format = 'spain';
     isValid = true;
     detectedCountry = 'Spain (current)';
+  } else if (PLATE_PATTERNS.spain_legacy_alpha_num.test(cleaned)) {
+    format = 'spain_historic';
+    isValid = true;
+    detectedCountry = 'Spain (legacy alpha-numeric)';
   } else if (PLATE_PATTERNS.spain_historic.test(cleaned)) {
     format = 'spain_historic';
     isValid = true;
@@ -201,7 +207,7 @@ export function hasValidCharacters(text: string): boolean {
   }
 
   // Allow only alphanumeric + common separators
-  const validCharsOnly = /^[A-Z0-9\s\-\.]+$/.test(cleaned);
+  const validCharsOnly = /^[A-Z0-9\s.-]+$/.test(cleaned);
   return validCharsOnly;
 }
 
@@ -228,9 +234,7 @@ export function validateOCRResult(
 
   // Check for valid characters
   if (!hasValidCharacters(text)) {
-    reasons.push(
-      `Text contains invalid characters or missing letters/numbers: "${text}"`
-    );
+    reasons.push(`Text contains invalid characters or missing letters/numbers: "${text}"`);
     return {
       isValid: false,
       format: 'unknown',

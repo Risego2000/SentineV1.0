@@ -38,6 +38,8 @@ coverage/
 
 # Embedded runtimes and heavy resources
 resources/python/
+Real-ESRGAN/
+SwinIR/
 *.pt
 *.onnx
 *.bin

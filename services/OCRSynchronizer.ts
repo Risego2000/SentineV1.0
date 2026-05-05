@@ -32,21 +32,67 @@ export const OCRSynchronizer = {
       if (isElectron()) {
         const api = getElectronAPI();
         const result = await api.ipc.invoke('ocr:extractPlate', {
-          images: zoomFrames.slice(0, 10),
+          images: zoomFrames,
         });
-        return {
-          plate: result.plate || '',
-          candidates: result.candidates || [],
-        };
+        const normalizedCandidates = (result.candidates || [])
+          .map((c: any) =>
+            OCRSynchronizer.normalizePlate(typeof c === 'string' ? c : c?.text || c?.plate || '')
+          )
+          .filter(Boolean);
+        const normalizedPlate = OCRSynchronizer.normalizePlate(
+          result.plate || normalizedCandidates[0] || ''
+        );
+
+        if (normalizedPlate) {
+          return {
+            plate: normalizedPlate,
+            candidates: [...new Set([normalizedPlate, ...normalizedCandidates])],
+          };
+        }
       } else {
-        // Send to PaddleOCR backend for processing via HTTP
+        // Try hybrid YOLO+Gemini endpoint first (best accuracy)
+        try {
+          const hybridResponse = await fetch(getApiUrl('/api/ocr/plate-yolo-hybrid'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              zoomFrames: zoomFrames,
+            }),
+          });
+
+          if (hybridResponse.ok) {
+            const result = await hybridResponse.json();
+            const normalizedCandidates = (result.candidates || [])
+              .map((c: any) =>
+                OCRSynchronizer.normalizePlate(typeof c === 'string' ? c : c?.text || c?.plate || '')
+              )
+              .filter(Boolean);
+            const normalizedPlate = OCRSynchronizer.normalizePlate(
+              result.plate || normalizedCandidates[0] || ''
+            );
+
+            if (normalizedPlate) {
+              console.log('[OCR] ✓ Using YOLO hybrid detection');
+              return {
+                plate: normalizedPlate,
+                candidates: [...new Set([normalizedPlate, ...normalizedCandidates])],
+              };
+            }
+          }
+        } catch (hybridError) {
+          console.warn('[OCR] YOLO hybrid failed, trying standard OCR:', hybridError);
+        }
+
+        // Fallback: Standard Gemini-based OCR
         const response = await fetch(getApiUrl('/api/ocr/plate'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            images: zoomFrames.slice(0, 10),
+            images: zoomFrames,
           }),
         });
 
@@ -55,14 +101,43 @@ export const OCRSynchronizer = {
         }
 
         const result = await response.json();
-        const plate = result.plate || '';
-        const candidates = result.candidates || [];
+        const normalizedCandidates = (result.candidates || [])
+          .map((c: any) =>
+            OCRSynchronizer.normalizePlate(typeof c === 'string' ? c : c?.text || c?.plate || '')
+          )
+          .filter(Boolean);
+        const normalizedPlate = OCRSynchronizer.normalizePlate(
+          result.plate || normalizedCandidates[0] || ''
+        );
 
-        return {
-          plate,
-          candidates,
-        };
+        if (normalizedPlate) {
+          return {
+            plate: normalizedPlate,
+            candidates: [...new Set([normalizedPlate, ...normalizedCandidates])],
+          };
+        }
       }
+
+      // Automatic backup: Gemini confirm on best frame if primary returns empty.
+      for (const frame of zoomFrames) {
+        const confirmResponse = await fetch(getApiUrl('/api/ocr/plate-confirm'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: frame }),
+        });
+        if (confirmResponse.ok) {
+          const confirm = await confirmResponse.json();
+          const recovered = OCRSynchronizer.normalizePlate(confirm?.plate || '');
+          if (recovered) {
+            return {
+              plate: recovered,
+              candidates: [recovered],
+            };
+          }
+        }
+      }
+
+      return { plate: '', candidates: [] };
     } catch (e) {
       console.error('[OCR] Error extracting license plate:', e);
       return { plate: '', candidates: [] };

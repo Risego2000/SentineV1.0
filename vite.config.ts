@@ -83,6 +83,9 @@ export default defineConfig(() => {
       },
     },
     plugins: [react()],
+    optimizeDeps: {
+      exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', 'h265web.js'],
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

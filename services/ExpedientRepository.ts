@@ -19,9 +19,57 @@ export interface SupabaseClient {
 export class ExpedientRepository {
   private supabase: SupabaseClient;
   private tableName = 'expedients';
+  private remotePersistenceDisabled = false;
+  private remoteDisableReason = '';
 
   constructor(supabase: SupabaseClient) {
     this.supabase = supabase;
+    try {
+      const persisted =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('sentinel_remote_expedients_disabled')
+          : null;
+      if (persisted) {
+        this.remotePersistenceDisabled = true;
+        this.remoteDisableReason = persisted;
+      }
+    } catch {
+      // ignore storage access issues
+    }
+  }
+
+  private shouldDisableRemotePersistence(error: any): boolean {
+    const code = String(error?.code || '');
+    const message = String(error?.message || '');
+    // Schema/cache mismatch, FK mismatch, or permissions mismatch are not recoverable client-side.
+    return (
+      code === 'PGRST204' ||
+      code === '23503' ||
+      code === '42501' ||
+      message.includes('schema cache') ||
+      message.includes('violates foreign key') ||
+      message.includes('row-level security')
+    );
+  }
+
+  private disableRemotePersistence(error: any): void {
+    if (this.remotePersistenceDisabled) return;
+    this.remotePersistenceDisabled = true;
+    this.remoteDisableReason = `${error?.code || 'UNKNOWN'}: ${error?.message || 'remote schema/policy issue'}`;
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          'sentinel_remote_expedients_disabled',
+          this.remoteDisableReason
+        );
+      }
+    } catch {
+      // ignore storage access issues
+    }
+    logger.warn(
+      'EXPEDIENT_REPO',
+      `Remote persistence disabled for session (${this.remoteDisableReason}). Local flow continues.`
+    );
   }
 
   /**
@@ -29,86 +77,155 @@ export class ExpedientRepository {
    */
   async create(expedient: Expedient): Promise<Expedient | null> {
     try {
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .insert([
-          {
-            // Identificación
-            id: expedient.id,
-            infraction_id: expedient.infractionId,
-            created_at: new Date(expedient.createdAt).toISOString(),
-            updated_at: new Date(expedient.updatedAt).toISOString(),
-            state: expedient.state,
+      if (this.remotePersistenceDisabled) {
+        return expedient;
+      }
+      const session = await this.supabase.auth.getSession();
+      const authUid = session?.data?.session?.user?.id || null;
+      const fullPayload = {
+        // Identificación
+        id: expedient.id,
+        infraction_id: expedient.infractionId,
+        created_at: new Date(expedient.createdAt).toISOString(),
+        updated_at: new Date(expedient.updatedAt).toISOString(),
+        state: expedient.state,
 
-            // Información del caso
-            violation_type: expedient.violationType,
-            location: expedient.location,
-            timestamp: new Date(expedient.timestamp).toISOString(),
-            license_plate: expedient.licensePlate,
-            vehicle_description: expedient.vehicleDescription,
+        // Información del caso
+        violation_type: expedient.violationType,
+        location: expedient.location,
+        timestamp: new Date(expedient.timestamp).toISOString(),
+        license_plate: expedient.licensePlate,
+        vehicle_description: expedient.vehicleDescription,
 
-            // Datos del lugar
-            via: expedient.via,
-            numero_punto_kilometrico: expedient.numeroPuntoKilometrico,
-            municipio: expedient.municipio,
-            provincia: expedient.provincia,
-            latitud: expedient.latitud,
-            longitud: expedient.longitud,
-            gravedad: expedient.gravedad,
+        // Datos del lugar
+        via: expedient.via,
+        numero_punto_kilometrico: expedient.numeroPuntoKilometrico,
+        municipio: expedient.municipio,
+        provincia: expedient.provincia,
+        latitud: expedient.latitud,
+        longitud: expedient.longitud,
+        gravedad: expedient.gravedad,
+        norma_conducta_nombre: expedient.normaConductaNombre,
+        norma_conducta_abreviatura: expedient.normaConductaAbreviatura,
+        articulo_conducta: expedient.articuloConducta,
+        articulo_conducta_texto: expedient.articuloConductaTexto,
+        norma_sancionadora_nombre: expedient.normaSancionadoraNombre,
+        norma_sancionadora_abreviatura: expedient.normaSancionadoraAbreviatura,
+        articulo_sancionador: expedient.articuloSancionador,
+        articulo_sancionador_texto: expedient.articuloSancionadorTexto,
+        codigo_senal: expedient.codigoSenal,
+        descripcion_senal: expedient.descripcionSenal,
+        definicion_infraccion: expedient.definicionInfraccion,
+        conducta_denunciada: expedient.conductaDenunciada,
+        sancion_euros: expedient.sancionEuros,
+        puntos_detraccion: expedient.puntosDetraccion,
+        riesgo_nivel: expedient.riesgoNivel,
 
-            // Datos del vehículo
-            marca: expedient.marca,
-            modelo: expedient.modelo,
-            color: expedient.color,
-            numero_chasis: expedient.numeroChasis,
-            estado_itv: expedient.estadoITV,
-            seguro_obligatorio: expedient.seguroObligatorio,
+        // Datos del vehículo
+        marca: expedient.marca,
+        modelo: expedient.modelo,
+        color: expedient.color,
+        numero_chasis: expedient.numeroChasis,
+        estado_itv: expedient.estadoITV,
+        seguro_obligatorio: expedient.seguroObligatorio,
 
-            // Datos del titular
-            titular_nombre: expedient.titularNombre,
-            titular_dni: expedient.titularDNI,
-            titular_domicilio: expedient.titularDomicilio,
-            titular_localidad: expedient.titularLocalidad,
-            titular_provincia: expedient.titularProvincia,
-            titular_telefono: expedient.titularTelefono,
-            titular_email: expedient.titularEmail,
+        // Datos del titular
+        titular_nombre: expedient.titularNombre,
+        titular_dni: expedient.titularDNI,
+        titular_domicilio: expedient.titularDomicilio,
+        titular_localidad: expedient.titularLocalidad,
+        titular_provincia: expedient.titularProvincia,
+        titular_telefono: expedient.titularTelefono,
+        titular_email: expedient.titularEmail,
 
-            // Datos del conductor
-            conductor_nombre: expedient.conductorNombre,
-            conductor_dni: expedient.conductorDNI,
-            conductor_permiso: expedient.conductorPermiso,
-            conductor_clase: expedient.conductorClase,
-            conductor_domicilio: expedient.conductorDomicilio,
-            conductor_localidad: expedient.conductorLocalidad,
-            conductor_provincia: expedient.conductorProvincia,
-            conductor_telefono: expedient.conductorTelefono,
-            conductor_email: expedient.conductorEmail,
+        // Datos del conductor
+        conductor_nombre: expedient.conductorNombre,
+        conductor_dni: expedient.conductorDNI,
+        conductor_permiso: expedient.conductorPermiso,
+        conductor_clase: expedient.conductorClase,
+        conductor_domicilio: expedient.conductorDomicilio,
+        conductor_localidad: expedient.conductorLocalidad,
+        conductor_provincia: expedient.conductorProvincia,
+        conductor_telefono: expedient.conductorTelefono,
+        conductor_email: expedient.conductorEmail,
 
-            // Descripción de hechos
-            descripcion_detallada_hechos: expedient.descripcionDetalladaHechos,
-            circunstancias_agravantes: expedient.circunstanciasAgravantes,
+        // Descripción de hechos
+        descripcion_detallada_hechos: expedient.descripcionDetalladaHechos,
+        circunstancias_agravantes: expedient.circunstanciasAgravantes,
 
-            // Evidencia
-            evidence_id: expedient.evidenceId,
-            photos_count: expedient.photosCount,
-            video_clip_hash: expedient.videoClipHash,
+        // Evidencia
+        evidence_id: expedient.evidenceId,
+        photos_count: expedient.photosCount,
+        video_clip_hash: expedient.videoClipHash,
 
-            // Metadatos
-            operator: expedient.operator,
-            supervisor: expedient.supervisor,
-            signature_is_signed: expedient.signature.isSigned,
-            signature_signed_by: expedient.signature.signedBy,
-            signature_hash: expedient.signature.signatureHash,
-            state_history: JSON.stringify(expedient.stateHistory),
-            audit_log: JSON.stringify(expedient.auditLog),
-            dpia_certified: expedient.dpiaCertified,
-            data_retention_days: expedient.dataRetentionDays,
-          },
-        ])
-        .select();
+        // Metadatos
+        operator: expedient.operator,
+        supervisor: expedient.supervisor,
+        signature_is_signed: expedient.signature.isSigned,
+        signature_signed_by: expedient.signature.signedBy,
+        signature_hash: expedient.signature.signatureHash,
+        state_history: JSON.stringify(expedient.stateHistory),
+        audit_log: JSON.stringify(expedient.auditLog),
+        dpia_certified: expedient.dpiaCertified,
+        data_retention_days: expedient.dataRetentionDays,
+        custody_last_checked_at: expedient.custodyLastCheckedAt
+          ? new Date(expedient.custodyLastCheckedAt).toISOString()
+          : null,
+        custody_last_status: expedient.custodyLastStatus || null,
+        custody_last_summary: expedient.custodyLastSummary || null,
+        custody_verification_rows: expedient.custodyVerificationRows || null,
+        operator_id: authUid,
+      };
 
-      if (error) {
-        logger.error('EXPEDIENT_REPO', 'Failed to create expedient', error);
+      const payloadTiers: Record<string, any>[] = [
+        {
+          id: expedient.id,
+          infraction_id: expedient.infractionId,
+          created_at: new Date(expedient.createdAt).toISOString(),
+          updated_at: new Date(expedient.updatedAt).toISOString(),
+          state: expedient.state,
+          violation_type: expedient.violationType,
+          location: expedient.location,
+          timestamp: new Date(expedient.timestamp).toISOString(),
+          license_plate: expedient.licensePlate,
+          vehicle_description: expedient.vehicleDescription,
+          evidence_id: expedient.evidenceId,
+          operator: expedient.operator,
+          supervisor: expedient.supervisor,
+          signature_is_signed: expedient.signature.isSigned,
+          state_history: JSON.stringify(expedient.stateHistory),
+          audit_log: JSON.stringify(expedient.auditLog),
+          ...(authUid ? { operator_id: authUid } : {}),
+        },
+        {
+          id: expedient.id,
+          infraction_id: expedient.infractionId,
+          state: expedient.state,
+          ...(authUid ? { operator_id: authUid } : {}),
+        },
+        fullPayload,
+      ];
+
+      let created = false;
+      for (let i = 0; i < payloadTiers.length; i += 1) {
+        const attempt = await this.supabase.from(this.tableName).insert([payloadTiers[i]]);
+        if (!attempt.error) {
+          created = true;
+          if (i > 0) logger.warn('EXPEDIENT_REPO', `Create succeeded with fallback tier ${i + 1}`);
+          break;
+        }
+        logger.warn(
+          'EXPEDIENT_REPO',
+          `Create tier ${i + 1} failed, trying next payload tier`,
+          attempt.error
+        );
+        if (this.shouldDisableRemotePersistence(attempt.error)) {
+          this.disableRemotePersistence(attempt.error);
+          return expedient;
+        }
+      }
+      if (!created) {
+        logger.error('EXPEDIENT_REPO', 'Failed to create expedient after all fallback tiers');
         return null;
       }
 
@@ -148,82 +265,135 @@ export class ExpedientRepository {
    */
   async update(expedient: Expedient): Promise<Expedient | null> {
     try {
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .update({
+      if (this.remotePersistenceDisabled) {
+        return expedient;
+      }
+      const session = await this.supabase.auth.getSession();
+      const authUid = session?.data?.session?.user?.id || null;
+      const fullUpdate: Record<string, any> = {
+        updated_at: new Date(expedient.updatedAt).toISOString(),
+        state: expedient.state,
+        violation_type: expedient.violationType,
+        location: expedient.location,
+        timestamp: new Date(expedient.timestamp).toISOString(),
+        license_plate: expedient.licensePlate,
+        vehicle_description: expedient.vehicleDescription,
+        via: expedient.via,
+        numero_punto_kilometrico: expedient.numeroPuntoKilometrico,
+        municipio: expedient.municipio,
+        provincia: expedient.provincia,
+        latitud: expedient.latitud,
+        longitud: expedient.longitud,
+        gravedad: expedient.gravedad,
+        norma_conducta_nombre: expedient.normaConductaNombre,
+        norma_conducta_abreviatura: expedient.normaConductaAbreviatura,
+        articulo_conducta: expedient.articuloConducta,
+        articulo_conducta_texto: expedient.articuloConductaTexto,
+        norma_sancionadora_nombre: expedient.normaSancionadoraNombre,
+        norma_sancionadora_abreviatura: expedient.normaSancionadoraAbreviatura,
+        articulo_sancionador: expedient.articuloSancionador,
+        articulo_sancionador_texto: expedient.articuloSancionadorTexto,
+        codigo_senal: expedient.codigoSenal,
+        descripcion_senal: expedient.descripcionSenal,
+        definicion_infraccion: expedient.definicionInfraccion,
+        conducta_denunciada: expedient.conductaDenunciada,
+        sancion_euros: expedient.sancionEuros,
+        puntos_detraccion: expedient.puntosDetraccion,
+        riesgo_nivel: expedient.riesgoNivel,
+        marca: expedient.marca,
+        modelo: expedient.modelo,
+        color: expedient.color,
+        numero_chasis: expedient.numeroChasis,
+        estado_itv: expedient.estadoITV,
+        seguro_obligatorio: expedient.seguroObligatorio,
+        titular_nombre: expedient.titularNombre,
+        titular_dni: expedient.titularDNI,
+        titular_domicilio: expedient.titularDomicilio,
+        titular_localidad: expedient.titularLocalidad,
+        titular_provincia: expedient.titularProvincia,
+        titular_telefono: expedient.titularTelefono,
+        titular_email: expedient.titularEmail,
+        conductor_nombre: expedient.conductorNombre,
+        conductor_dni: expedient.conductorDNI,
+        conductor_permiso: expedient.conductorPermiso,
+        conductor_clase: expedient.conductorClase,
+        conductor_domicilio: expedient.conductorDomicilio,
+        conductor_localidad: expedient.conductorLocalidad,
+        conductor_provincia: expedient.conductorProvincia,
+        conductor_telefono: expedient.conductorTelefono,
+        conductor_email: expedient.conductorEmail,
+        descripcion_detallada_hechos: expedient.descripcionDetalladaHechos,
+        circunstancias_agravantes: expedient.circunstanciasAgravantes,
+        evidence_id: expedient.evidenceId,
+        photos_count: expedient.photosCount,
+        video_clip_hash: expedient.videoClipHash,
+        operator: expedient.operator,
+        supervisor: expedient.supervisor,
+        signature_is_signed: expedient.signature.isSigned,
+        signature_signed_by: expedient.signature.signedBy,
+        signature_hash: expedient.signature.signatureHash,
+        state_history: JSON.stringify(expedient.stateHistory),
+        audit_log: JSON.stringify(expedient.auditLog),
+        dpia_certified: expedient.dpiaCertified,
+        data_retention_days: expedient.dataRetentionDays,
+        custody_last_checked_at: expedient.custodyLastCheckedAt
+          ? new Date(expedient.custodyLastCheckedAt).toISOString()
+          : null,
+        custody_last_status: expedient.custodyLastStatus || null,
+        custody_last_summary: expedient.custodyLastSummary || null,
+        custody_verification_rows: expedient.custodyVerificationRows || null,
+      };
+      if (authUid) fullUpdate.operator_id = authUid;
+
+      const updateTiers: Record<string, any>[] = [
+        {
           updated_at: new Date(expedient.updatedAt).toISOString(),
           state: expedient.state,
-
-          // Información del caso
+          infraction_id: expedient.infractionId,
           violation_type: expedient.violationType,
           location: expedient.location,
           timestamp: new Date(expedient.timestamp).toISOString(),
           license_plate: expedient.licensePlate,
           vehicle_description: expedient.vehicleDescription,
-
-          // Datos del lugar
-          via: expedient.via,
-          numero_punto_kilometrico: expedient.numeroPuntoKilometrico,
-          municipio: expedient.municipio,
-          provincia: expedient.provincia,
-          latitud: expedient.latitud,
-          longitud: expedient.longitud,
-          gravedad: expedient.gravedad,
-
-          // Datos del vehículo
-          marca: expedient.marca,
-          modelo: expedient.modelo,
-          color: expedient.color,
-          numero_chasis: expedient.numeroChasis,
-          estado_itv: expedient.estadoITV,
-          seguro_obligatorio: expedient.seguroObligatorio,
-
-          // Datos del titular
-          titular_nombre: expedient.titularNombre,
-          titular_dni: expedient.titularDNI,
-          titular_domicilio: expedient.titularDomicilio,
-          titular_localidad: expedient.titularLocalidad,
-          titular_provincia: expedient.titularProvincia,
-          titular_telefono: expedient.titularTelefono,
-          titular_email: expedient.titularEmail,
-
-          // Datos del conductor
-          conductor_nombre: expedient.conductorNombre,
-          conductor_dni: expedient.conductorDNI,
-          conductor_permiso: expedient.conductorPermiso,
-          conductor_clase: expedient.conductorClase,
-          conductor_domicilio: expedient.conductorDomicilio,
-          conductor_localidad: expedient.conductorLocalidad,
-          conductor_provincia: expedient.conductorProvincia,
-          conductor_telefono: expedient.conductorTelefono,
-          conductor_email: expedient.conductorEmail,
-
-          // Descripción de hechos
-          descripcion_detallada_hechos: expedient.descripcionDetalladaHechos,
-          circunstancias_agravantes: expedient.circunstanciasAgravantes,
-
-          // Evidencia
           evidence_id: expedient.evidenceId,
-          photos_count: expedient.photosCount,
-          video_clip_hash: expedient.videoClipHash,
-
-          // Metadatos operacionales
           operator: expedient.operator,
           supervisor: expedient.supervisor,
           signature_is_signed: expedient.signature.isSigned,
-          signature_signed_by: expedient.signature.signedBy,
-          signature_hash: expedient.signature.signatureHash,
           state_history: JSON.stringify(expedient.stateHistory),
           audit_log: JSON.stringify(expedient.auditLog),
-          dpia_certified: expedient.dpiaCertified,
-          data_retention_days: expedient.dataRetentionDays,
-        })
-        .eq('id', expedient.id)
-        .select()
-        .single();
+          ...(authUid ? { operator_id: authUid } : {}),
+        },
+        {
+          updated_at: new Date(expedient.updatedAt).toISOString(),
+          state: expedient.state,
+          ...(authUid ? { operator_id: authUid } : {}),
+        },
+        fullUpdate,
+      ];
 
-      if (error) {
-        logger.error('EXPEDIENT_REPO', 'Failed to update expedient', error);
+      let updated = false;
+      for (let i = 0; i < updateTiers.length; i += 1) {
+        const attempt = await this.supabase
+          .from(this.tableName)
+          .update(updateTiers[i])
+          .eq('id', expedient.id);
+        if (!attempt.error) {
+          updated = true;
+          if (i > 0) logger.warn('EXPEDIENT_REPO', `Update succeeded with fallback tier ${i + 1}`);
+          break;
+        }
+        logger.warn(
+          'EXPEDIENT_REPO',
+          `Update tier ${i + 1} failed, trying next payload tier`,
+          attempt.error
+        );
+        if (this.shouldDisableRemotePersistence(attempt.error)) {
+          this.disableRemotePersistence(attempt.error);
+          return expedient;
+        }
+      }
+      if (!updated) {
+        logger.error('EXPEDIENT_REPO', 'Failed to update expedient after all fallback tiers');
         return null;
       }
 
@@ -304,6 +474,24 @@ export class ExpedientRepository {
   }
 
   /**
+   * Delete expedient by ID
+   */
+  async deleteById(id: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase.from(this.tableName).delete().eq('id', id);
+      if (error) {
+        logger.error('EXPEDIENT_REPO', `Failed to delete expedient ${id}`, error);
+        return false;
+      }
+      logger.info('EXPEDIENT_REPO', `Deleted expedient ${id}`);
+      return true;
+    } catch (error) {
+      logger.error('EXPEDIENT_REPO', 'deleteById error', error);
+      return false;
+    }
+  }
+
+  /**
    * Get expedients awaiting review
    */
   async getPendingReview(): Promise<Expedient[]> {
@@ -331,6 +519,11 @@ export class ExpedientRepository {
    */
   private mapFromDatabase(row: any): Expedient | null {
     try {
+      const extraData =
+        typeof row.extra_data === 'string'
+          ? JSON.parse(row.extra_data || '{}')
+          : row.extra_data || {};
+
       return {
         // Identificación
         id: row.id,
@@ -354,6 +547,21 @@ export class ExpedientRepository {
         latitud: row.latitud,
         longitud: row.longitud,
         gravedad: row.gravedad,
+        normaConductaNombre: row.norma_conducta_nombre,
+        normaConductaAbreviatura: row.norma_conducta_abreviatura,
+        articuloConducta: row.articulo_conducta,
+        articuloConductaTexto: row.articulo_conducta_texto,
+        normaSancionadoraNombre: row.norma_sancionadora_nombre,
+        normaSancionadoraAbreviatura: row.norma_sancionadora_abreviatura,
+        articuloSancionador: row.articulo_sancionador,
+        articuloSancionadorTexto: row.articulo_sancionador_texto,
+        codigoSenal: row.codigo_senal,
+        descripcionSenal: row.descripcion_senal,
+        definicionInfraccion: row.definicion_infraccion,
+        conductaDenunciada: row.conducta_denunciada,
+        sancionEuros: row.sancion_euros,
+        puntosDetraccion: row.puntos_detraccion,
+        riesgoNivel: row.riesgo_nivel,
 
         // Datos del vehículo
         marca: row.marca,
@@ -391,6 +599,30 @@ export class ExpedientRepository {
         evidenceId: row.evidence_id,
         photosCount: row.photos_count,
         videoClipHash: row.video_clip_hash,
+        image: row.image || row.image_data || extraData.image,
+        extraSnapshots: row.extra_snapshots || extraData.extraSnapshots,
+        zoomSnapshots: row.zoom_snapshots || extraData.zoomSnapshots,
+        videoClip: row.video_clip || row.video_clip_url || extraData.videoClip,
+        makeModel: row.make_model || extraData.makeModel,
+        severity: row.severity || extraData.severity,
+        ruleCategory: row.rule_category || extraData.ruleCategory,
+        description: row.description || extraData.description,
+        legalBase: row.legal_base || extraData.legalBase,
+        reasoning: row.reasoning || extraData.reasoning,
+        videoTimeCode: row.video_time_code || extraData.videoTimeCode,
+        visualTimestamp: row.visual_timestamp || extraData.visualTimestamp,
+        ocrResults: row.ocr_results || extraData.ocrResults,
+        plateOcr: row.plate_ocr || extraData.plateOcr,
+        plateOcrCandidates: row.plate_ocr_candidates || extraData.plateOcrCandidates,
+        validationStatus: row.validation_status || extraData.validationStatus,
+        playbackTime: row.playback_time || extraData.playbackTime,
+        telemetrySpeedEstimated: extraData.telemetrySpeedEstimated,
+        telemetryBehaviorAnomalies: extraData.telemetryBehaviorAnomalies,
+        operativeCode: row.operative_code || extraData.operativeCode,
+        priority: row.priority || extraData.priority,
+        priorityLevel: row.priority_level || extraData.priorityLevel,
+        fineAmount: row.fine_amount || extraData.fineAmount,
+        pointsDeducted: row.points_deducted || extraData.pointsDeducted,
 
         // Metadatos operacionales
         operator: row.operator,
@@ -406,6 +638,12 @@ export class ExpedientRepository {
         auditLog: JSON.parse(row.audit_log || '[]'),
         dpiaCertified: row.dpia_certified,
         dataRetentionDays: row.data_retention_days,
+        custodyLastCheckedAt: row.custody_last_checked_at
+          ? new Date(row.custody_last_checked_at).getTime()
+          : undefined,
+        custodyLastStatus: row.custody_last_status || undefined,
+        custodyLastSummary: row.custody_last_summary || undefined,
+        custodyVerificationRows: row.custody_verification_rows || undefined,
       };
     } catch (error) {
       logger.error('EXPEDIENT_REPO', 'mapFromDatabase error', error);

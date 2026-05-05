@@ -15,6 +15,9 @@ export function createOCRRouter(config: ServerConfig): Router {
    * Extract license plate from base64 image
    */
   router.post('/api/ocr/extract-plate', OCRController.extractPlate);
+  // Backward-compatible aliases used by frontend/electron clients.
+  router.post('/api/ocr/plate', OCRController.extractPlate);
+  router.post('/api/ocr/plate-confirm', OCRController.extractPlate);
 
   /**
    * POST /api/ocr/detect-plate-region

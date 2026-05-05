@@ -45,6 +45,10 @@ export const SystemTerminal = memo(() => {
                         ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
                         : log.type === 'AI'
                           ? 'bg-blue-500/10 text-blue-500 border-blue-500'
+                          : log.type === 'DEBUG'
+                            ? 'bg-violet-500/10 text-violet-400 border-violet-500/30'
+                            : log.type === 'SUCCESS'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                           : log.type === 'CORE'
                             ? 'bg-slate-800 text-slate-400 border-white/5'
                             : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -52,6 +56,11 @@ export const SystemTerminal = memo(() => {
                 >
                   {log.type}
                 </span>
+                {log.category && (
+                  <span className="px-1.5 py-0.5 rounded-sm font-bold text-[8px] uppercase tracking-widest border bg-slate-900/60 text-slate-300 border-white/10">
+                    {log.category}
+                  </span>
+                )}
               </div>
               <span className="text-slate-400 break-words font-medium uppercase leading-relaxed tracking-tight">
                 {log.content}

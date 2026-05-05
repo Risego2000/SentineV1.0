@@ -4,7 +4,12 @@
  * Ensures legal compliance and prevents invalid operations
  */
 
-import { Expedient, ExpedientState, ExpedientStateTransition, ExpedientValidation } from './Expedient';
+import {
+  Expedient,
+  ExpedientState,
+  ExpedientStateTransition,
+  ExpedientValidation,
+} from './Expedient';
 import { logger } from '../services/logger';
 
 export interface StateTransitionResult {
@@ -18,13 +23,13 @@ export interface StateTransitionResult {
  * Define allowed state transitions
  */
 const ALLOWED_TRANSITIONS: Record<ExpedientState, ExpedientState[]> = {
-  DETECTED: ['UNDER_REVIEW', 'REJECTED'],           // Auto-detection → manual review or reject
-  UNDER_REVIEW: ['VALIDATED', 'REJECTED'],          // Review → approve or reject
-  VALIDATED: ['SIGNED', 'REJECTED'],                // Validated → sign or reject (reconsidered)
-  REJECTED: ['UNDER_REVIEW'],                       // Rejected → can reopen for review
-  SIGNED: ['EXPORTED', 'REJECTED'],                 // Signed → export or reject if compromise found
-  EXPORTED: ['ARCHIVED'],                           // Exported → archive when done
-  ARCHIVED: [],                                      // Terminal state
+  DETECTED: ['UNDER_REVIEW', 'REJECTED'], // Auto-detection → manual review or reject
+  UNDER_REVIEW: ['VALIDATED', 'REJECTED'], // Review → approve or reject
+  VALIDATED: ['SIGNED', 'REJECTED'], // Validated → sign or reject (reconsidered)
+  REJECTED: ['UNDER_REVIEW'], // Rejected → can reopen for review
+  SIGNED: ['EXPORTED', 'REJECTED'], // Signed → export or reject if compromise found
+  EXPORTED: ['ARCHIVED'], // Exported → archive when done
+  ARCHIVED: [], // Terminal state
 };
 
 /**
@@ -49,10 +54,7 @@ export class ExpedientStateMachine {
   /**
    * Transition to UNDER_REVIEW (operator starts review)
    */
-  static transitionToUnderReview(
-    expedient: Expedient,
-    operator: string
-  ): StateTransitionResult {
+  static transitionToUnderReview(expedient: Expedient, operator: string): StateTransitionResult {
     if (!this.canTransition(expedient.state, 'UNDER_REVIEW')) {
       return {
         success: false,
@@ -234,10 +236,7 @@ export class ExpedientStateMachine {
   /**
    * Transition to EXPORTED (generate official report)
    */
-  static transitionToExported(
-    expedient: Expedient,
-    actor: string
-  ): StateTransitionResult {
+  static transitionToExported(expedient: Expedient, actor: string): StateTransitionResult {
     if (!this.canTransition(expedient.state, 'EXPORTED')) {
       return {
         success: false,
@@ -275,10 +274,7 @@ export class ExpedientStateMachine {
   /**
    * Transition to ARCHIVED (end of lifecycle)
    */
-  static transitionToArchived(
-    expedient: Expedient,
-    actor: string
-  ): StateTransitionResult {
+  static transitionToArchived(expedient: Expedient, actor: string): StateTransitionResult {
     if (!this.canTransition(expedient.state, 'ARCHIVED')) {
       return {
         success: false,

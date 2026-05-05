@@ -6,18 +6,27 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { useSentinel } from './useSentinel';
 import { ByteTracker } from '../services/ByteTracker';
+import { FrameContinuityValidator, getFrameContinuityValidator } from '../services/FrameContinuityValidator';
+import { getGlobalTrackRegistry } from '../services/GlobalTrackRegistry';
 import { lineIntersect, isPointInPoly } from '../utils';
 import { Track, GeometryLine } from '../types';
 import { EvidenceCaptureManager } from '../services/EvidenceCaptureManager';
 import { ForensicRule, FORENSIC_RULES } from '../types/forensicRules';
-import { getApiUrl } from '../services/apiConfig';
+import { publishRealtimeEvent } from '../services/realtimeEvents';
+import { logger } from '../services/logger';
 
 const MAX_TAIL_POINTS = 50;
-const MIN_FINALIZE_DELAY_MS = 0;
-const MAX_FINALIZE_DELAY_MS = 0;
+const MIN_FINALIZE_DELAY_MS = 8000;
+const MAX_FINALIZE_DELAY_MS = 12000;
 
 const getFinalizeDelayMs = (track: Track) => {
-  return 0;
+  const speed = Number(track?.avgVelocity || 0);
+  if (!Number.isFinite(speed) || speed <= 0.0001) return MAX_FINALIZE_DELAY_MS;
+  // Higher speed -> earlier finalization window.
+  const normalized = Math.max(0, Math.min(1, speed / 0.03));
+  return Math.round(
+    MAX_FINALIZE_DELAY_MS - normalized * (MAX_FINALIZE_DELAY_MS - MIN_FINALIZE_DELAY_MS)
+  );
 };
 
 /**
@@ -37,9 +46,11 @@ export const useFrameProcessor = () => {
     updateBufferStatus,
     viewerId,
     addLog,
+    addInfraction,
   } = useSentinel();
 
   const trackerRef = useRef<ByteTracker>(new ByteTracker());
+  const continuityValidatorRef = useRef<FrameContinuityValidator>(getFrameContinuityValidator());
   const seenTrackIds = useRef<Set<number>>(new Set<number>());
   const frameCountRef = useRef<number>(0);
   const isProcessingRef = useRef<boolean>(false);
@@ -48,18 +59,43 @@ export const useFrameProcessor = () => {
   const tileCanvasesRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const finalizeTimersRef = useRef<Map<number, number>>(new Map());
 
+  // Initialize ByteTracker with global registry and continuity validator
+  useEffect(() => {
+    if (!viewerId) return;
+
+    const tracker = trackerRef.current;
+    const globalRegistry = getGlobalTrackRegistry();
+
+    // Initialize tracker with viewer context (source: live, upload, or ip-camera)
+    // Infer source from context - default to 'upload' (file-based)
+    const source: 'live' | 'upload' | 'ip-camera' = 'upload'; // Can be parameterized if needed
+    tracker.initialize(viewerId, source);
+
+    logger.debug(
+      'FRAME_PROCESSOR',
+      `ByteTracker initialized (viewerId: ${viewerId}, source: ${source})`
+    );
+    logger.debug('FRAME_PROCESSOR', `GlobalRegistry sessionId: ${globalRegistry.getSessionId()}`);
+  }, [viewerId]);
+
   // Initialize EvidenceCaptureManager
   useEffect(() => {
     const timers = finalizeTimersRef.current;
     const canvases = tileCanvasesRef.current;
     evidenceManagerRef.current = new EvidenceCaptureManager({
-      maxSimultaneous: 3,
+      maxSimultaneous: 2,
       priorityMode: 'first',
       autoAbortOnExit: true,
     });
 
     evidenceManagerRef.current.setBufferCallback((targetId, seconds) => {
       updateBufferStatus({ seconds });
+    });
+    evidenceManagerRef.current.setProgressCallback((targetId, progress) => {
+      updateBufferStatus({
+        capturedPhotos: progress.capturedPhotos,
+        plateCandidate: progress.plateCandidate,
+      });
     });
 
     return () => {
@@ -113,6 +149,70 @@ export const useFrameProcessor = () => {
       if (!manager) return;
 
       const rule = findRulesForGeometry(line);
+
+      // ============================================================================
+      // ALWAYS create and add infraction to module, regardless of capture capacity
+      // ============================================================================
+      const infractionId = Date.now();
+      const timeCode = new Date().toLocaleTimeString();
+      const now = new Date();
+      const localTimeStr = now.toLocaleString('es-ES');
+
+      // Capture first frame as evidence
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = video.videoWidth;
+      canvas2d.height = video.videoHeight;
+      const ctx = canvas2d.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+      }
+      const snapshotImage = canvas2d.toDataURL('image/jpeg');
+
+      const initialInfraction = {
+        // AuditResponse fields (required)
+        infraction: true,
+        plate: track.plate || 'UNKNOWN',
+        makeModel: 'Detectado',
+        color: 'Detectado',
+        description: `${line.label || 'VIOLACIÓN'} detectada para vehículo ${track.plate || 'desconocido'}`,
+        severity: 'ALTA' as any,
+        ruleCategory: line.label || 'VIOLACIÓN',
+        legalBase: 'Código de Tráfico',
+        reasoning: [`Detección de ${line.label || 'violación'} en zona vigilada`],
+        visualTimestamp: timeCode,
+        videoTimeCode: timeCode,
+        localTime: localTimeStr,
+        telemetry: {
+          speedEstimated: 'N/A',
+        },
+        // InfractionLog-specific fields
+        id: infractionId,
+        image: snapshotImage,
+        time: timeCode,
+        validationStatus: 'pending' as const,
+        priority: (rule?.priority || 'ALTA') as any,
+        fineAmount: rule?.fineAmount || 300,
+        pointsDeducted: rule?.pointsDeducted || 3,
+      };
+
+      // NOTE: Infraction is NOT created here (ROI A detection)
+      // It will be created and analyzed only AFTER ROI B validation by ForensicQueue
+      // (See ForensicQueueV3.ts line 637: listeners.forEach(listener => listener(infractionLog)))
+      console.log('[TRIGGER_CAPTURE] Buffer activated, waiting for ROI B validation:', {
+        id: initialInfraction.id,
+        plate: initialInfraction.plate,
+        label: line.label,
+        timestamp: timeCode,
+      });
+
+      addLog(
+        'AI',
+        `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Vehículo ID: ${track.id} (${track.plate || 'SIN_PLACA'})`
+      );
+
+      // ============================================================================
+      // TRY to capture evidence if manager has capacity
+      // ============================================================================
       const captureKey = manager.startCapture(
         track,
         line,
@@ -127,76 +227,15 @@ export const useFrameProcessor = () => {
         track.auditStatus = 'processing';
         updateBufferStatus({ state: 'recording', activeTracks: manager.getActiveCount() });
 
-        // Extract license plate from current frame using Gemini Vision API and add infraction to panel
-        (async () => {
-          try {
-            // Collect all snapshots for OCR (better accuracy with multiple angles)
-            const snapshots = track.snapshots && track.snapshots.length > 0
-              ? track.snapshots
-              : [canvas.toDataURL('image/jpeg')]; // Fallback to current frame
-
-            // Extract timestamp from OSD (first snapshot with visible timestamp)
-            let osdTimestamp = null;
-            for (const snapshot of snapshots) {
-              try {
-                const tsResponse = await fetch(getApiUrl('/api/ocr/timestamp'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ image: snapshot }),
-                });
-                if (tsResponse.ok) {
-                  const tsResult = await tsResponse.json();
-                  if (tsResult.timestamp && tsResult.confidence > 0.7) {
-                    osdTimestamp = tsResult.timestamp;
-                    break; // Found a good timestamp
-                  }
-                }
-              } catch (err) {
-                // Continue to next snapshot if timestamp extraction fails
-                continue;
-              }
-            }
-
-            // Call server endpoint for best OCR accuracy (Gemini Vision - multi-image)
-            const response = await fetch(getApiUrl('/api/ocr/plate'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ images: snapshots }),
-            });
-
-            if (response.ok) {
-              const ocrResult = await response.json();
-              const plate = ocrResult.plate && ocrResult.plate !== 'NO_PLATE'
-                ? ocrResult.plate
-                : 'MATRÍCULA NO DETECTADA';
-
-              const timestamp = osdTimestamp ? new Date(osdTimestamp).toLocaleString('es-ES') : 'Hora desconocida';
-
-              addLog(
-                'AI',
-                `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Placa: ${plate} ${
-                  ocrResult.confidence ? `(${(ocrResult.confidence * 100).toFixed(0)}%)` : ''
-                } - ${timestamp}`
-              );
-
-              // Store the OSD timestamp for forensic report
-              if (osdTimestamp) {
-                track.infractionTimestamp = osdTimestamp;
-              }
-            } else {
-              throw new Error(`OCR API error: ${response.status}`);
-            }
-          } catch (err) {
-            // Fallback if OCR fails
-            addLog(
-              'AI',
-              `🚨 INFRACCIÓN DETECTADA: ${line.label || 'VIOLACIÓN'} - Vehículo ID: ${track.id}`
-            );
-          }
-        })();
+        console.log('[TRIGGER_CAPTURE] Capture started with key:', captureKey);
+      } else {
+        console.warn('[TRIGGER_CAPTURE] Capture manager at capacity or unavailable for', {
+          plate: track.plate,
+          label: line.label,
+        });
       }
     },
-    [findRulesForGeometry, updateBufferStatus, addLog]
+    [findRulesForGeometry, updateBufferStatus, addLog, addInfraction]
   );
 
   /**
@@ -228,7 +267,15 @@ export const useFrameProcessor = () => {
       if (!manager || !manager.isCapturing(track.id)) return false;
 
       try {
-        await manager.finalizeCapture(track, line, video, viewerId);
+        // Fire finalize in background (non-blocking) - don't await
+        // This allows OCR/analysis to start while capture completes
+        manager.finalizeCapture(track, line, video, viewerId).catch((err) => {
+          logger.error('FRAME_PROCESSOR', 'Capture finalization failed', err);
+          track.audited = false;
+          track.auditStatus = 'failed';
+        });
+
+        // Immediately update UI (non-blocking)
         track.auditStatus = 'pending';
         updateBufferStatus({
           state: 'idle',
@@ -242,17 +289,7 @@ export const useFrameProcessor = () => {
         });
         return true;
       } catch (error) {
-        // Rollback so track can be audited again if capture persistence failed.
-        track.audited = false;
-        track.auditStatus = 'failed';
-        manager.abortCapture(
-          track.id,
-          `Finalize failed: ${error instanceof Error ? error.message : String(error)}`
-        );
-        updateBufferStatus({
-          state: 'idle',
-          activeTracks: Math.max(0, manager.getActiveCount() - 1),
-        });
+        logger.error('FRAME_PROCESSOR', 'Error in finalize setup', error);
         return false;
       }
     },
@@ -311,18 +348,24 @@ export const useFrameProcessor = () => {
 
         // Only process evidence/geometry interactions for established tracks
         if (t.hits < minHits) return;
+        if ((evidenceManagerRef.current?.getActiveCount() || 0) >= 2 && !t.roiATurnCaptureKey)
+          return;
 
-        // Mid-path turn capture — ~30 frames after ROI A, before ROI B
-        if (t.roiATurnCaptureKey && !t.forbiddenTurnCaptured && !t.hasMidFrame) {
+        // Mid-path turn capture — repeated while traveling ROI A -> ROI B.
+        if (t.roiATurnCaptureKey) {
           const framesSinceA = frameCountRef.current - (t.firstHitFrame || 0);
-          if (framesSinceA >= 30) {
+          if (framesSinceA >= 24) {
             evidenceManagerRef.current?.captureMidTurn(t, v);
-            t.hasMidFrame = true;
-            updateBufferStatus({ capturedPhotos: 4 });
+            updateBufferStatus({
+              capturedPhotos: evidenceManagerRef.current?.getSnapshotCount(t.id) ?? 0,
+            });
           }
         }
-        // Check mid-capture for active suspects (non-turn captures)
-        checkMidCapture(v, t);
+        // Check generic mid-capture only for non-turn flows.
+        // Turn ROI tracks already use the dedicated `captureMidTurn` path above.
+        if (!t.roiATurnCaptureKey) {
+          checkMidCapture(v, t);
+        }
 
         if (t.audited) return;
 
@@ -415,11 +458,27 @@ export const useFrameProcessor = () => {
                     (g) => g.type === 'roi_turn' && g.label.toUpperCase().includes('ROI A')
                   ) || geometry.find((g) => g.type === 'roi_turn');
 
+                // DEBUG: ROI A Detection
+                console.log('=== ROI A PHASE 1 DEBUG ===', {
+                  vehicleId: t.id,
+                  vehicleHits: t.hits,
+                  minHitsRequired: minHits,
+                  uniqueTurnRoisCount: uniqueTurnRois.length,
+                  canonicalRoiAFound: !!canonicalRoiA,
+                  canonicalRoiALabel: canonicalRoiA?.label,
+                  alreadyCapturing: !!t.roiATurnCaptureKey,
+                  currentLineId: line.id,
+                  canonicalRoiAId: canonicalRoiA?.id,
+                  lineIdMatchesRoiA: line.id === canonicalRoiA?.id,
+                  allConditionsMet: uniqueTurnRois.length === 1 && !t.roiATurnCaptureKey && line.id === canonicalRoiA?.id && t.hits >= minHits
+                });
+
                 // PHASE 1: ROI A — start 20s buffer only when entering the designated ROI A
                 if (
                   uniqueTurnRois.length === 1 &&
                   !t.roiATurnCaptureKey &&
-                  line.id === canonicalRoiA?.id
+                  line.id === canonicalRoiA?.id &&
+                  t.hits >= minHits
                 ) {
                   const manager = evidenceManagerRef.current;
                   const key = manager?.startTurnCapture(t, line, v, canvas, frameCountRef.current);
@@ -427,11 +486,16 @@ export const useFrameProcessor = () => {
                     t.roiAId = line.id;
                     t.roiATurnCaptureKey = key;
                     t.firstHitFrame = frameCountRef.current;
+
+                    // CRITICAL: Trigger capture to create infraction in module
+                    // Without this, infractions don't appear in the UI
+                    triggerCapture(v, canvas, t, { ...line, label: 'FORBIDDEN_TURN_PHASE1' });
+
                     updateBufferStatus({
                       state: 'recording',
                       phase: 'roi_a',
                       roiALabel: line.label,
-                      capturedPhotos: 2,
+                      capturedPhotos: manager?.getSnapshotCount(t.id) ?? 0,
                       activeTracks: manager?.getActiveCount() ?? 0,
                     });
                   }
@@ -462,7 +526,7 @@ export const useFrameProcessor = () => {
                   updateBufferStatus({
                     phase: 'confirmed',
                     roiBLabel: line.label,
-                    capturedPhotos: manager?.getSnapshotCount(t.id) ?? 6,
+                    capturedPhotos: manager?.getSnapshotCount(t.id) ?? 0,
                     activeTracks: manager?.getActiveCount() ?? 0,
                   });
                   scheduleFinalizeCapture(v, canvas, t, confirmedLine);
@@ -475,6 +539,11 @@ export const useFrameProcessor = () => {
 
       if (newDetections > 0) {
         setStats((prev) => ({ ...prev, det: prev.det + newDetections }));
+        void publishRealtimeEvent(
+          'detection',
+          { count: newDetections, ts: Date.now() },
+          { viewerId: viewerId || undefined }
+        );
       }
     },
     [
@@ -507,24 +576,40 @@ export const useFrameProcessor = () => {
         frameCountRef.current++;
         trackerRef.current.step();
 
-        if (frameCountRef.current % (engineConfig.detectionSkip || 1) === 0) {
-          const rawResults = await detect(v);
-          const results = Array.isArray(rawResults) ? rawResults : [];
+        const rawResults = await detect(v);
+        const results = Array.isArray(rawResults) ? rawResults : [];
 
-          const activeTracks = trackerRef.current.update(
-            results,
-            engineConfig.persistence,
-            engineConfig.confidenceThreshold
+        const activeTracks = trackerRef.current.update(
+          results,
+          engineConfig.persistence,
+          engineConfig.confidenceThreshold
+        );
+
+        // Validate frame-to-frame continuity
+        const continuityReport = continuityValidatorRef.current.validateFrameTransition(activeTracks);
+        if (continuityReport.integrityScore < 95 && continuityReport.detectedAnomalies.length > 0) {
+          logger.warn(
+            'FRAME_PROCESSOR',
+            `Continuity warning: integrity ${continuityReport.integrityScore.toFixed(1)}% (frame ${continuityReport.frame})`
           );
-          processTrackResults(activeTracks, v, canvas);
-        } else {
-          processTrackResults(trackerRef.current.tracks, v, canvas);
         }
+
+        processTrackResults(activeTracks, v, canvas);
 
         // Pose detection disabled for traffic enforcement (not needed)
         // if (isPoseEnabled) {
         //   await detectPose(v);
         // }
+
+        // Update stats with global registry info
+        const globalRegistry = getGlobalTrackRegistry();
+        const registryStats = globalRegistry.getSessionStats();
+        if (setStats) {
+          setStats((prev) => ({
+            ...prev,
+            globalIdCount: registryStats.totalAllocated,
+          }));
+        }
 
         // Cleanup any captures for tracks that have been dropped
         const activeTrackIds = new Set(trackerRef.current.tracks.map((t) => t.id));
@@ -532,6 +617,13 @@ export const useFrameProcessor = () => {
         if (manager) {
           const oldCount = manager.getActiveCount();
           manager.syncActiveTracks(activeTrackIds);
+          // Cancel pending finalize timers for tracks that are no longer being captured.
+          for (const [trackId, timerId] of finalizeTimersRef.current.entries()) {
+            if (!manager.isCapturing(trackId)) {
+              window.clearTimeout(timerId);
+              finalizeTimersRef.current.delete(trackId);
+            }
+          }
           if (manager.getActiveCount() < oldCount && manager.getActiveCount() === 0) {
             updateBufferStatus({ state: 'idle', activeTracks: 0 });
           } else if (manager.getActiveCount() < oldCount) {

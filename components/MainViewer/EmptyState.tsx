@@ -16,10 +16,10 @@ const ShieldParticles = () => {
   const particles = React.useMemo(
     () =>
       [...Array(16)].map((_, i) => ({
-        duration: 1.2 + Math.random() * 1.5,
+        duration: 1.2 + ((i * 37) % 15) / 10,
         delay: i * 0.12,
-        left: 10 + Math.random() * 80,
-        top: 10 + Math.random() * 80,
+        left: 10 + ((i * 53) % 80),
+        top: 10 + ((i * 29) % 80),
       })),
     []
   );
@@ -87,78 +87,35 @@ export const EmptyState = () => {
 
   if (mini)
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-30 bg-[#020617]">
+      <div className="absolute inset-0 flex items-center justify-center z-30 bg-[#020617]">
         <div className="relative flex items-center justify-center w-[50%] aspect-square max-w-[200px]">
           <div className="absolute inset-0 border border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
           <div className="absolute inset-0 border border-cyan-500/10 border-b-cyan-500/30 rounded-full animate-reverse-spin scale-90" />
           <EscudoMask className="w-[60%] h-[60%]" />
-        </div>
-        <span className="text-blue-500/30 font-mono text-[7px] tracking-widest uppercase text-center mt-4 animate-pulse-slow">
-          SENTINEL.V16
-        </span>
-        <div className="mt-2 flex gap-1">
-          {[0, 0.2, 0.4].map((d, i) => (
-            <div
-              key={i}
-              className="w-1 h-1 bg-cyan-500/50 rounded-full animate-pulse"
-              style={{ animationDelay: `${d}s` }}
-            />
-          ))}
         </div>
       </div>
     );
 
   if (compact)
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-30 bg-[#020617] p-6">
+      <div className="absolute inset-0 flex items-center justify-center z-30 bg-[#020617] p-6">
         <div className="relative flex items-center justify-center w-[50%] aspect-square max-w-[300px]">
           <div className="absolute inset-0 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
           <div className="absolute inset-0 border border-cyan-500/20 border-b-cyan-500 rounded-full animate-pulse-ring scale-95 opacity-50" />
           <div className="absolute inset-0 border border-blue-500/10 border-l-blue-500/30 rounded-full animate-reverse-spin scale-80" />
           <EscudoMask className="w-[60%] h-[60%]" />
         </div>
-        <div className="flex flex-col items-center gap-1 mt-6">
-          <span className="text-blue-500/30 font-mono text-[8px] tracking-[0.4em] uppercase text-center animate-pulse-slow">
-            SENTINEL.V16_ALFA
-          </span>
-          <div className="flex gap-1">
-            {[0, 0.2, 0.4].map((d, i) => (
-              <div
-                key={i}
-                className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"
-                style={{ animationDelay: `${d}s` }}
-              />
-            ))}
-          </div>
-        </div>
       </div>
     );
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center z-30 bg-[#020617] p-8">
+    <div className="absolute inset-0 flex items-center justify-center z-30 bg-[#020617] p-8">
       <div className="relative flex items-center justify-center w-[50%] aspect-square max-w-[500px]">
         <div className="absolute inset-0 border-2 border-blue-500/10 rounded-full animate-spin-slow scale-110" />
         <div className="absolute inset-0 border-2 border-cyan-500/5 rounded-full animate-pulse-ring scale-125" />
         <div className="absolute inset-0 border border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
         <div className="absolute inset-0 border border-cyan-500/10 border-l-cyan-500/20 rounded-full animate-reverse-spin scale-95" />
         <EscudoMask className="w-[60%] h-[60%]" />
-      </div>
-      <div className="flex flex-col items-center gap-2 mt-12">
-        <span className="text-blue-500/30 font-mono text-[9px] tracking-[0.5em] uppercase text-center animate-pulse-slow">
-          Protocolo de Seguridad: SENTINEL.V16_ALFA
-        </span>
-        <div className="flex items-center gap-2">
-          <div className="w-16 h-1 bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent rounded-full animate-profiling-bar" />
-        </div>
-        <div className="flex gap-1">
-          {[0, 0.2, 0.4].map((d, i) => (
-            <div
-              key={i}
-              className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"
-              style={{ animationDelay: `${d}s` }}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );

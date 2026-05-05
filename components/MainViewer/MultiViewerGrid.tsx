@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { SentinelProvider } from '../../context/SentinelProvider';
 import { SentinelViewer } from './SentinelViewer';
@@ -11,6 +11,9 @@ import { InfractionModal } from '../InfractionModal';
 
 export const MultiViewerGrid = () => {
   const { gridSize, activeViewers, focusedViewerId, setFocusedViewer } = useLayoutStore();
+  const sidebarViewerId = activeViewers.includes(focusedViewerId)
+    ? focusedViewerId
+    : activeViewers[0];
 
   const getGridClass = () => {
     switch (gridSize) {
@@ -41,17 +44,17 @@ export const MultiViewerGrid = () => {
             <SentinelViewer viewerId={viewerId} />
           </div>
 
-          {focusedViewerId === viewerId && (
+          {sidebarViewerId === viewerId && (
             <Portal targetId="sidebar-root">
               <Sidebar />
             </Portal>
           )}
-          {focusedViewerId === viewerId && (
+          {sidebarViewerId === viewerId && (
             <Portal targetId="right-sidebar-root">
               <RightSidebar />
             </Portal>
           )}
-          {focusedViewerId === viewerId && <HelpCapsule />}
+          {sidebarViewerId === viewerId && <HelpCapsule />}
           <SentinelModalPortal />
         </SentinelProvider>
       ))}
@@ -70,10 +73,7 @@ const SentinelModalPortal = () => {
 };
 
 const Portal = ({ children, targetId }: { children: React.ReactNode; targetId: string }) => {
-  const [target, setTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setTarget(document.getElementById(targetId));
-  }, [targetId]);
+  const target = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
   if (!target) return null;
   return createPortal(children, target);
 };

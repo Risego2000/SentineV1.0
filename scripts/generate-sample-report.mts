@@ -89,7 +89,11 @@ Object.defineProperty(globalThis, 'fetch', {
       const bytes = await fs.readFile(localPath);
       const ext = path.extname(localPath).toLowerCase();
       const type =
-        ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream';
+        ext === '.png'
+          ? 'image/png'
+          : ext === '.jpg' || ext === '.jpeg'
+            ? 'image/jpeg'
+            : 'application/octet-stream';
 
       return {
         ok: true,

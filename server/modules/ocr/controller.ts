@@ -14,15 +14,19 @@ export class OCRController {
    */
   static async extractPlate(req: Request, res: Response): Promise<void> {
     try {
-      const { image } = req.body;
+      const { image, images } = req.body;
+      const normalizedImages = Array.isArray(images)
+        ? images.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0)
+        : [];
+      const singleImage = typeof image === 'string' && image.length > 0 ? image : null;
 
-      if (!image || typeof image !== 'string') {
-        res.status(400).json({ error: 'Missing or invalid image parameter' });
+      if (!singleImage && normalizedImages.length === 0) {
+        res.status(400).json({ error: 'Missing or invalid image/images parameter' });
         return;
       }
 
       const ocrBackend = getOCRBackend();
-      const result = await ocrBackend.extractPlate(image);
+      const result = await ocrBackend.extractPlate(singleImage ?? normalizedImages);
 
       res.json({
         plate: result.plate,

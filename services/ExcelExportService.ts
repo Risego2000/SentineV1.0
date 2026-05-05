@@ -33,16 +33,25 @@ export class ExcelExportService {
       // Sheet 5: Hechos y Descripción
       this.addFactsSheet(workbook, expedient);
 
-      // Sheet 6: Evidencia (Fotos)
+      // Sheet 6: Marco Jurídico completo
+      this.addLegalSheet(workbook, expedient);
+
+      // Sheet 7: Evidencia (Fotos)
       if (photos && photos.length > 0) {
         await this.addPhotosSheet(workbook, photos);
       }
 
-      // Sheet 7: Auditoría y Historial
+      // Sheet 8: Auditoría y Historial
       this.addAuditSheet(workbook, expedient);
 
-      // Sheet 8: Firma Digital
+      // Sheet 9: Firma Digital
       this.addSignatureSheet(workbook, expedient);
+
+      // Sheet 10: Datos generados por la aplicación (OCR/IA/flujo/evidencia)
+      this.addAppGeneratedSheet(workbook, expedient, photos);
+
+      // Sheet 11: Volcado completo del expediente (todos los campos, incl. anidados)
+      this.addCompleteDumpSheet(workbook, expedient);
 
       // Generar buffer
       const buffer = await workbook.xlsx.writeBuffer();
@@ -51,6 +60,234 @@ export class ExcelExportService {
       console.error('[ExcelExportService] Error generating Excel:', error);
       return null;
     }
+  }
+
+  private static addAppGeneratedSheet(
+    workbook: ExcelJS.Workbook,
+    expedient: Expedient,
+    photos?: { name: string; base64: string }[]
+  ): void {
+    const sheet = workbook.addWorksheet('App Generada');
+    const labelStyle = {
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFECF0F1' } },
+      font: { bold: true },
+    };
+
+    let row = 1;
+    sheet.getCell(`A${row}`).value = '🧠 DATOS GENERADOS POR LA APLICACIÓN';
+    sheet.getCell(`A${row}`).font = { bold: true, size: 12 };
+
+    row += 2;
+    this.addRow(sheet, 'Estado', expedient.state, row, labelStyle);
+    this.addRow(sheet, 'Validation Status', expedient.validationStatus || '—', row + 1, labelStyle);
+    this.addRow(sheet, 'Rule Category', expedient.ruleCategory || '—', row + 2, labelStyle);
+    this.addRow(sheet, 'Operative Code', expedient.operativeCode || '—', row + 3, labelStyle);
+    this.addRow(sheet, 'Prioridad', expedient.priority || '—', row + 4, labelStyle);
+    this.addRow(
+      sheet,
+      'Priority Level',
+      expedient.priorityLevel?.toString() || '—',
+      row + 5,
+      labelStyle
+    );
+
+    row += 7;
+    this.addRow(sheet, 'OCR Placa', expedient.plateOcr || '—', row, labelStyle);
+    this.addRow(
+      sheet,
+      'OCR Candidatos',
+      expedient.plateOcrCandidates?.join(' | ') || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'OCR Resultados',
+      expedient.ocrResults?.join(' | ') || '—',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(sheet, 'Video Time Code', expedient.videoTimeCode || '—', row + 3, labelStyle);
+    this.addRow(sheet, 'Visual Timestamp', expedient.visualTimestamp || '—', row + 4, labelStyle);
+    this.addRow(
+      sheet,
+      'Playback Time',
+      expedient.playbackTime?.toString() || '—',
+      row + 5,
+      labelStyle
+    );
+
+    row += 7;
+    this.addRow(sheet, 'Severity IA', expedient.severity || '—', row, labelStyle);
+    this.addRow(sheet, 'Descripción IA', expedient.description || '—', row + 1, labelStyle);
+    this.addRow(sheet, 'Base Legal IA', expedient.legalBase || '—', row + 2, labelStyle);
+    this.addRow(
+      sheet,
+      'Reasoning IA',
+      expedient.reasoning?.join(' | ') || '—',
+      row + 3,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Telemetry Speed',
+      expedient.telemetrySpeedEstimated || '—',
+      row + 4,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Telemetry Anomalies',
+      expedient.telemetryBehaviorAnomalies || '—',
+      row + 5,
+      labelStyle
+    );
+
+    row += 7;
+    this.addRow(sheet, 'Evidence ID', expedient.evidenceId || '—', row, labelStyle);
+    this.addRow(sheet, 'Video Clip Hash', expedient.videoClipHash || '—', row + 1, labelStyle);
+    this.addRow(
+      sheet,
+      'Photos Count',
+      expedient.photosCount?.toString() || '0',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(sheet, 'Main Image Present', expedient.image ? 'Sí' : 'No', row + 3, labelStyle);
+    this.addRow(
+      sheet,
+      'General Snapshots',
+      (expedient.extraSnapshots?.length || 0).toString(),
+      row + 4,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Detail Snapshots',
+      (expedient.zoomSnapshots?.length || 0).toString(),
+      row + 5,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Video Clip Present',
+      expedient.videoClip ? 'Sí' : 'No',
+      row + 6,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Fotos Embebidas en XLS',
+      (photos?.length || 0).toString(),
+      row + 7,
+      labelStyle
+    );
+
+    row += 9;
+    this.addRow(
+      sheet,
+      'Custody Last Checked At',
+      expedient.custodyLastCheckedAt
+        ? new Date(expedient.custodyLastCheckedAt).toLocaleString('es-ES')
+        : '—',
+      row,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Custody Last Status',
+      expedient.custodyLastStatus || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Custody Last Summary',
+      expedient.custodyLastSummary || '—',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Custody Verification Rows',
+      expedient.custodyVerificationRows?.length
+        ? JSON.stringify(expedient.custodyVerificationRows)
+        : '—',
+      row + 3,
+      labelStyle
+    );
+
+    sheet.columns = [{ width: 34 }, { width: 110 }];
+    sheet.getColumn('B').alignment = { wrapText: true, vertical: 'top' };
+  }
+
+  private static addCompleteDumpSheet(workbook: ExcelJS.Workbook, expedient: Expedient): void {
+    const sheet = workbook.addWorksheet('Expediente Completo');
+    sheet.getCell('A1').value = '🗂️ VOLCADO COMPLETO DEL EXPEDIENTE';
+    sheet.getCell('A1').font = { bold: true, size: 12 };
+
+    const rows = this.flattenObject(expedient);
+    let row = 3;
+    sheet.getCell(`A${row}`).value = 'Campo';
+    sheet.getCell(`B${row}`).value = 'Valor';
+    sheet.getCell(`A${row}`).font = { bold: true };
+    sheet.getCell(`B${row}`).font = { bold: true };
+    row += 1;
+
+    for (const entry of rows) {
+      sheet.getCell(`A${row}`).value = entry.key;
+      sheet.getCell(`B${row}`).value = entry.value;
+      sheet.getCell(`B${row}`).alignment = { wrapText: true, vertical: 'top' };
+      row += 1;
+    }
+
+    sheet.columns = [{ width: 42 }, { width: 120 }];
+    sheet.getColumn('B').alignment = { wrapText: true, vertical: 'top' };
+  }
+
+  private static flattenObject(obj: any, prefix = ''): Array<{ key: string; value: string }> {
+    const out: Array<{ key: string; value: string }> = [];
+    if (obj === null || obj === undefined) {
+      out.push({ key: prefix || '(root)', value: 'null' });
+      return out;
+    }
+
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) {
+        out.push({ key: prefix, value: '[]' });
+        return out;
+      }
+      obj.forEach((item, idx) => {
+        const key = `${prefix}[${idx}]`;
+        if (item && typeof item === 'object') {
+          out.push(...this.flattenObject(item, key));
+        } else {
+          out.push({ key, value: String(item) });
+        }
+      });
+      return out;
+    }
+
+    if (typeof obj === 'object') {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) {
+        out.push({ key: prefix, value: '{}' });
+        return out;
+      }
+      for (const key of keys) {
+        const value = obj[key];
+        const next = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object') {
+          out.push(...this.flattenObject(value, next));
+        } else {
+          out.push({ key: next, value: value === undefined ? 'undefined' : String(value) });
+        }
+      }
+      return out;
+    }
+
+    out.push({ key: prefix, value: String(obj) });
+    return out;
   }
 
   /**
@@ -82,28 +319,50 @@ export class ExcelExportService {
     let row = 3;
     this.addRow(sheet, 'ID Expediente', expedient.id, row, labelStyle);
     this.addRow(sheet, 'ID Infracción', expedient.infractionId, row + 1, labelStyle);
-    this.addRow(sheet, 'Fecha Creación', new Date(expedient.createdAt).toLocaleString('es-ES'), row + 2, labelStyle);
-    this.addRow(sheet, 'Última Actualización', new Date(expedient.updatedAt).toLocaleString('es-ES'), row + 3, labelStyle);
+    this.addRow(
+      sheet,
+      'Fecha Creación',
+      new Date(expedient.createdAt).toLocaleString('es-ES'),
+      row + 2,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Última Actualización',
+      new Date(expedient.updatedAt).toLocaleString('es-ES'),
+      row + 3,
+      labelStyle
+    );
     this.addRow(sheet, 'Estado', expedient.state, row + 4, labelStyle);
 
     // Infracción
     row += 6;
     this.addRow(sheet, 'Tipo de Infracción', expedient.violationType, row, labelStyle);
     this.addRow(sheet, 'Ubicación', expedient.location, row + 1, labelStyle);
-    this.addRow(sheet, 'Fecha/Hora Infracción', new Date(expedient.timestamp).toLocaleString('es-ES'), row + 2, labelStyle);
-    this.addRow(sheet, 'Matrícula Vehículo', expedient.licensePlate, row + 3, labelStyle);
+    this.addRow(
+      sheet,
+      'Fecha/Hora Infracción',
+      new Date(expedient.timestamp).toLocaleString('es-ES'),
+      row + 2,
+      labelStyle
+    );
+    const placaDetectada = expedient.plateOcr || expedient.licensePlate;
+    this.addRow(sheet, 'Matrícula Detectada (OCR)', placaDetectada, row + 3, labelStyle);
+    this.addRow(sheet, 'Matrícula Base', expedient.licensePlate, row + 4, labelStyle);
+    this.addRow(
+      sheet,
+      'Candidatos OCR',
+      expedient.plateOcrCandidates?.join(', ') || '—',
+      row + 5,
+      labelStyle
+    );
 
     // Operador y Supervisor
-    row += 5;
+    row += 7;
     this.addRow(sheet, 'Operador', expedient.operator || '—', row, labelStyle);
     this.addRow(sheet, 'Supervisor', expedient.supervisor || '—', row + 1, labelStyle);
 
-    sheet.columns = [
-      { width: 25 },
-      { width: 35 },
-      { width: 20 },
-      { width: 20 },
-    ];
+    sheet.columns = [{ width: 25 }, { width: 35 }, { width: 20 }, { width: 20 }];
   }
 
   /**
@@ -122,7 +381,13 @@ export class ExcelExportService {
 
     row += 2;
     this.addRow(sheet, 'Vía/Calle', expedient.via || '—', row, labelStyle);
-    this.addRow(sheet, 'KM/Punto Kilométrico', expedient.numeroPuntoKilometrico || '—', row + 1, labelStyle);
+    this.addRow(
+      sheet,
+      'KM/Punto Kilométrico',
+      expedient.numeroPuntoKilometrico || '—',
+      row + 1,
+      labelStyle
+    );
     this.addRow(sheet, 'Municipio', expedient.municipio || '—', row + 2, labelStyle);
     this.addRow(sheet, 'Provincia', expedient.provincia || '—', row + 3, labelStyle);
     this.addRow(sheet, 'Latitud', expedient.latitud?.toString() || '—', row + 4, labelStyle);
@@ -153,7 +418,13 @@ export class ExcelExportService {
     this.addRow(sheet, 'Color', expedient.color || '—', row + 3, labelStyle);
     this.addRow(sheet, 'Número de Chasis', expedient.numeroChasis || '—', row + 4, labelStyle);
     this.addRow(sheet, 'Estado ITV', expedient.estadoITV || '—', row + 5, labelStyle);
-    this.addRow(sheet, 'Seguro Obligatorio', expedient.seguroObligatorio ? 'Sí' : 'No', row + 6, labelStyle);
+    this.addRow(
+      sheet,
+      'Seguro Obligatorio',
+      expedient.seguroObligatorio ? 'Sí' : 'No',
+      row + 6,
+      labelStyle
+    );
     this.addRow(sheet, 'Descripción', expedient.vehicleDescription || '—', row + 7, labelStyle);
 
     sheet.columns = [{ width: 25 }, { width: 35 }, { width: 20 }, { width: 20 }];
@@ -231,8 +502,126 @@ export class ExcelExportService {
     sheet.getCell(`B${row}`).value = expedient.circunstanciasAgravantes || '—';
     sheet.getCell(`B${row}`).alignment = { wrapText: true };
 
+    row += 2;
+    sheet.getCell(`A${row}`).value = 'Descripción IA / Preinforme:';
+    sheet.getCell(`A${row}`).font = { bold: true };
+    sheet.getCell(`B${row}`).value = expedient.description || '—';
+    sheet.getCell(`B${row}`).alignment = { wrapText: true };
+
+    row += 1;
+    sheet.getCell(`A${row}`).value = 'Base Legal IA:';
+    sheet.getCell(`A${row}`).font = { bold: true };
+    sheet.getCell(`B${row}`).value = expedient.legalBase || '—';
+    sheet.getCell(`B${row}`).alignment = { wrapText: true };
+
     sheet.columns = [{ width: 25 }, { width: 60 }, { width: 20 }, { width: 20 }];
     sheet.getColumn('B').width = 60;
+  }
+
+  private static addLegalSheet(workbook: ExcelJS.Workbook, expedient: Expedient): void {
+    const sheet = workbook.addWorksheet('Marco Jurídico');
+    const labelStyle = {
+      fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFECF0F1' } },
+      font: { bold: true },
+    };
+
+    let row = 1;
+    sheet.getCell(`A${row}`).value = '⚖️ MARCO JURÍDICO COMPLETO';
+    sheet.getCell(`A${row}`).font = { bold: true, size: 12 };
+
+    row += 2;
+    this.addRow(sheet, 'Tipo / ID Infracción', expedient.violationType || '—', row, labelStyle);
+    this.addRow(
+      sheet,
+      'Definición de la Infracción',
+      expedient.definicionInfraccion || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Conducta Denunciada',
+      expedient.conductaDenunciada || '—',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(sheet, 'Código de Señal', expedient.codigoSenal || '—', row + 3, labelStyle);
+    this.addRow(
+      sheet,
+      'Descripción de Señal',
+      expedient.descripcionSenal || '—',
+      row + 4,
+      labelStyle
+    );
+
+    row += 6;
+    this.addRow(sheet, 'Norma de Conducta', expedient.normaConductaNombre || '—', row, labelStyle);
+    this.addRow(
+      sheet,
+      'Abreviatura Conducta',
+      expedient.normaConductaAbreviatura || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(sheet, 'Artículo Conducta', expedient.articuloConducta || '—', row + 2, labelStyle);
+    this.addRow(
+      sheet,
+      'Texto Articulado Conducta',
+      expedient.articuloConductaTexto || '—',
+      row + 3,
+      labelStyle
+    );
+
+    row += 5;
+    this.addRow(
+      sheet,
+      'Norma Sancionadora',
+      expedient.normaSancionadoraNombre || '—',
+      row,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Abreviatura Sancionadora',
+      expedient.normaSancionadoraAbreviatura || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Artículo Sancionador',
+      expedient.articuloSancionador || '—',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Texto Articulado Sancionador',
+      expedient.articuloSancionadorTexto || '—',
+      row + 3,
+      labelStyle
+    );
+
+    row += 5;
+    this.addRow(sheet, 'Sanción (€)', expedient.sancionEuros?.toString() || '—', row, labelStyle);
+    this.addRow(
+      sheet,
+      'Puntos de Detracción',
+      expedient.puntosDetraccion?.toString() || '—',
+      row + 1,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Nivel de Riesgo',
+      expedient.riesgoNivel?.toString() || '—',
+      row + 2,
+      labelStyle
+    );
+    this.addRow(sheet, 'Prioridad', expedient.priority || '—', row + 3, labelStyle);
+
+    sheet.columns = [{ width: 32 }, { width: 90 }, { width: 20 }, { width: 20 }];
+    sheet.getColumn('B').alignment = { wrapText: true, vertical: 'top' };
   }
 
   /**
@@ -279,8 +668,11 @@ export class ExcelExportService {
       }
     }
 
-    sheet.setPageSetup({ paperSize: 9, orientation: 'landscape' });
-    sheet.pageSetup.margins = { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75 };
+    sheet.pageSetup = {
+      paperSize: 9,
+      orientation: 'landscape',
+      margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75 },
+    };
   }
 
   /**
@@ -347,13 +739,7 @@ export class ExcelExportService {
       row += 1;
     });
 
-    sheet.columns = [
-      { width: 20 },
-      { width: 15 },
-      { width: 15 },
-      { width: 15 },
-      { width: 30 },
-    ];
+    sheet.columns = [{ width: 20 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 30 }];
   }
 
   /**
@@ -374,17 +760,41 @@ export class ExcelExportService {
     row += 2;
     this.addRow(sheet, 'Firmado', expedient.signature.isSigned ? 'Sí ✓' : 'No', row, labelStyle);
     this.addRow(sheet, 'Firmado por', expedient.signature.signedBy || '—', row + 1, labelStyle);
-    this.addRow(sheet, 'Fecha Firma', new Date(expedient.signature.signedAt).toLocaleString('es-ES'), row + 2, labelStyle);
+    this.addRow(
+      sheet,
+      'Fecha Firma',
+      new Date(expedient.signature.signedAt).toLocaleString('es-ES'),
+      row + 2,
+      labelStyle
+    );
     this.addRow(sheet, 'Método', expedient.signature.method, row + 3, labelStyle);
-    this.addRow(sheet, 'Hash SHA-256', expedient.signature.signatureHash || '—', row + 4, labelStyle);
+    this.addRow(
+      sheet,
+      'Hash SHA-256',
+      expedient.signature.signatureHash || '—',
+      row + 4,
+      labelStyle
+    );
 
     row += 6;
     sheet.getCell(`A${row}`).value = '⚖️ CUMPLIMIENTO LEGAL';
     sheet.getCell(`A${row}`).font = { bold: true, size: 11 };
 
     row += 2;
-    this.addRow(sheet, 'DPIA Certificado', expedient.dpiaCertified ? 'Sí ✓' : 'No', row, labelStyle);
-    this.addRow(sheet, 'Retención Datos (días)', expedient.dataRetentionDays?.toString() || '—', row + 1, labelStyle);
+    this.addRow(
+      sheet,
+      'DPIA Certificado',
+      expedient.dpiaCertified ? 'Sí ✓' : 'No',
+      row,
+      labelStyle
+    );
+    this.addRow(
+      sheet,
+      'Retención Datos (días)',
+      expedient.dataRetentionDays?.toString() || '—',
+      row + 1,
+      labelStyle
+    );
 
     sheet.columns = [{ width: 25 }, { width: 50 }, { width: 20 }, { width: 20 }];
   }

@@ -222,10 +222,13 @@ export function validateEnvironment(): EnvValidationResult {
     }
 
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',');
-    if (allowedOrigins.some((origin) => origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    if (
+      allowedOrigins.some((origin) => origin.includes('localhost') || origin.includes('127.0.0.1'))
+    ) {
       warnings.push({
         variable: 'ALLOWED_ORIGINS',
-        message: 'localhost origins detected in production. Ensure firewall is properly configured.',
+        message:
+          'localhost origins detected in production. Ensure firewall is properly configured.',
       });
     }
   }
@@ -253,7 +256,9 @@ export function assertValidEnvironment(): void {
 
   // Log warnings in development/staging
   if (result.warnings.length > 0 && process.env.NODE_ENV !== 'production') {
-    const warningMessages = result.warnings.map((w) => `  - ${w.variable}: ${w.message}`).join('\n');
+    const warningMessages = result.warnings
+      .map((w) => `  - ${w.variable}: ${w.message}`)
+      .join('\n');
     console.warn(`[ENV] Warnings:\n${warningMessages}`);
   }
 }
@@ -299,6 +304,8 @@ export function logEnvironmentInfo(): void {
   console.log(`  - PORT: ${result.values.PORT || 3002}`);
   console.log(`  - NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
   console.log(`  - GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '***set***' : 'NOT SET'}`);
-  console.log(`  - SENTINEL_API_TOKEN: ${process.env.SENTINEL_API_TOKEN ? '***set***' : 'NOT SET'}`);
+  console.log(
+    `  - SENTINEL_API_TOKEN: ${process.env.SENTINEL_API_TOKEN ? '***set***' : 'NOT SET'}`
+  );
   console.log(`  - REPORTS_DIR: ${result.values.REPORTS_DIR || 'C:\\Denuncias'}`);
 }

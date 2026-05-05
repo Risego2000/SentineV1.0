@@ -46,7 +46,7 @@ export class PDFExportService {
 
       // Load template PDF
       const templatePath = '/boletin_v4.pdf';
-      const templateBytes = await fetch(templatePath).then(res => res.arrayBuffer());
+      const templateBytes = await fetch(templatePath).then((res) => res.arrayBuffer());
       const pdfDoc = await PDFDocument.load(templateBytes);
 
       // Get first page
@@ -388,11 +388,7 @@ export class PDFExportService {
   /**
    * Add watermark to PDF
    */
-  private static addWatermark(
-    page: PDFPage,
-    watermark: string,
-    pageHeight: number
-  ): void {
+  private static addWatermark(page: PDFPage, watermark: string, pageHeight: number): void {
     const watermarkText = watermark === 'OFICIAL' ? 'OFICIAL' : 'PREINFORME';
     const opacity = watermark === 'OFICIAL' ? 0.1 : 0.2;
 

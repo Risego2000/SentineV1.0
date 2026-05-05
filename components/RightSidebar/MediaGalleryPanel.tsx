@@ -210,7 +210,9 @@ export const MediaGalleryPanel: React.FC = () => {
                             <Play size={16} className="text-slate-500" fill="currentColor" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-semibold text-white truncate">{file.file_name}</p>
+                            <p className="text-[10px] font-semibold text-white truncate">
+                              {file.file_name}
+                            </p>
                             <p className="text-[9px] text-slate-500">
                               {(file.file_size / (1024 * 1024)).toFixed(1)} MB
                             </p>
@@ -252,7 +254,11 @@ export const MediaGalleryPanel: React.FC = () => {
           >
             ✕
           </button>
-          <img src={selectedImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain" />
+          <img
+            src={selectedImage}
+            alt="Preview"
+            className="max-w-full max-h-[90vh] object-contain"
+          />
         </div>
       )}
     </div>

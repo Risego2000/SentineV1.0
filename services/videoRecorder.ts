@@ -10,16 +10,20 @@ export class VideoBufferService {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private readonly maxSeconds = 41;
+  private readonly maxSeconds = 40;
   private bufferCallback?: (seconds: number) => void;
   private mode: 'circular' | 'roi_based' = 'circular';
   private recordingStartTime: number = 0;
   private isRecording = false;
+  private pendingStopTimer: number | null = null;
+  private stopPromise: Promise<void> | null = null;
+  private resolveStop: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, mode: 'circular' | 'roi_based' = 'circular') {
     this.mode = mode;
     try {
-      this.stream = canvas.captureStream(30);
+      const targetFps = mode === 'roi_based' ? 20 : 30;
+      this.stream = canvas.captureStream(targetFps);
 
       const mimeTypes = [
         'video/webm;codecs=h264',
@@ -39,11 +43,11 @@ export class VideoBufferService {
         `Inicializando MediaRecorder en modo ${mode} con mimeType: ${mimeType}`
       );
 
+      const targetBitrate = mode === 'roi_based' ? 3500000 : 8000000;
       this.mediaRecorder = new MediaRecorder(this.stream, {
         mimeType,
-        // 8 Mbps — calidad forense alta. MediaRecorder webm/h264 necesita buen bitrate
-        // para que los frames de evidencia a 2688px tengan nitidez en la matrícula.
-        videoBitsPerSecond: 8000000,
+        // Lower bitrate in ROI mode to avoid frame stalls right at ROI A crossing.
+        videoBitsPerSecond: targetBitrate,
       });
 
       this.mediaRecorder.ondataavailable = (e) => {
@@ -69,6 +73,13 @@ export class VideoBufferService {
 
       this.mediaRecorder.onstop = () => {
         logger.info('RECORDER', 'MediaRecorder detenido');
+        if (this.pendingStopTimer !== null) {
+          window.clearTimeout(this.pendingStopTimer);
+          this.pendingStopTimer = null;
+        }
+        this.resolveStop?.();
+        this.resolveStop = null;
+        this.stopPromise = null;
       };
     } catch (e) {
       logger.error('RECORDER', 'Error al inicializar MediaRecorder', e);
@@ -108,6 +119,49 @@ export class VideoBufferService {
       }
       this.mediaRecorder.stop();
     }
+  }
+
+  stopWithMinDuration(minSeconds = 30) {
+    if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') return;
+    if (this.mode !== 'roi_based') {
+      this.stop();
+      return;
+    }
+    if (this.stopPromise) return;
+
+    const elapsed = (Date.now() - this.recordingStartTime) / 1000;
+    const remainingMs = Math.max(0, (minSeconds - elapsed) * 1000);
+
+    this.stopPromise = new Promise<void>((resolve) => {
+      this.resolveStop = resolve;
+    });
+
+    const performStop = () => {
+      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        this.resolveStop?.();
+        this.resolveStop = null;
+        this.stopPromise = null;
+        return;
+      }
+      this.isRecording = false;
+      const totalElapsed = ((Date.now() - this.recordingStartTime) / 1000).toFixed(1);
+      logger.info('RECORDER', `Grabación finalizada en ROI B (duración: ${totalElapsed}s)`);
+      this.mediaRecorder.stop();
+    };
+
+    if (remainingMs > 0) {
+      this.pendingStopTimer = window.setTimeout(performStop, remainingMs);
+    } else {
+      performStop();
+    }
+  }
+
+  async waitUntilStopped(timeoutMs = 35000): Promise<void> {
+    if (!this.stopPromise) return;
+    await Promise.race([
+      this.stopPromise,
+      new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
+    ]);
   }
 
   getBufferSeconds(): number {

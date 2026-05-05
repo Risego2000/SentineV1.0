@@ -47,10 +47,14 @@ export function useAuth() {
           session = await getSession();
           break;
         } catch (err) {
-          if (err instanceof DOMException && err.name === 'NotAllowedError' && err.message.includes('steal')) {
+          if (
+            err instanceof DOMException &&
+            err.name === 'NotAllowedError' &&
+            err.message.includes('steal')
+          ) {
             retries--;
             if (retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, 100 * (4 - retries)));
+              await new Promise((resolve) => setTimeout(resolve, 100 * (4 - retries)));
               continue;
             }
           }

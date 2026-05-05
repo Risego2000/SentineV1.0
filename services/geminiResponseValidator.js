@@ -26,7 +26,7 @@ export function validateAuditResponse(response) {
     'description',
     'legalBase',
     'reasoning',
-    'telemetry'
+    'telemetry',
   ];
 
   for (const field of requiredFields) {
@@ -51,7 +51,8 @@ export function validateAuditResponse(response) {
   // VALIDATE PLATE FORMAT
   if (response.plate && response.plate !== 'UNKNOWN' && response.plate !== 'NO_IMAGES') {
     // Spanish license plate regex
-    const plateRegex = /^(\d{4}[A-Z]{3}|N\d{4}[A-Z]{3}|H\d{4}[A-Z]{3}|C\d{4}[A-Z]{3}|CD|CC|[A-Z]{2}\d{4}[A-Z]{2})$/;
+    const plateRegex =
+      /^(\d{4}[A-Z]{3}|N\d{4}[A-Z]{3}|H\d{4}[A-Z]{3}|C\d{4}[A-Z]{3}|CD|CC|[A-Z]{2}\d{4}[A-Z]{2})$/;
     if (!plateRegex.test(response.plate)) {
       warnings.push(`Plate "${response.plate}" does not match expected Spanish format`);
     }
@@ -61,7 +62,9 @@ export function validateAuditResponse(response) {
   if (response.videoTimeCode) {
     const timecodeRegex = /^\d{1,2}:\d{2}:\d{2}$/;
     if (!timecodeRegex.test(response.videoTimeCode)) {
-      warnings.push(`videoTimeCode "${response.videoTimeCode}" has invalid format (expected HH:MM:SS)`);
+      warnings.push(
+        `videoTimeCode "${response.videoTimeCode}" has invalid format (expected HH:MM:SS)`
+      );
     }
   }
 
@@ -108,8 +111,8 @@ export function validateAuditResponse(response) {
 
   // CALCULATE CONFIDENCE SCORE (0-1)
   let score = 1.0;
-  score -= errors.length * 0.3;    // Each error: -0.3
-  score -= warnings.length * 0.1;  // Each warning: -0.1
+  score -= errors.length * 0.3; // Each error: -0.3
+  score -= warnings.length * 0.1; // Each warning: -0.1
   score = Math.max(0, Math.min(1, score));
 
   const valid = errors.length === 0;
@@ -119,7 +122,7 @@ export function validateAuditResponse(response) {
     errors,
     warnings,
     score,
-    requiresManualReview: score < 0.7 || response.infraction === undefined
+    requiresManualReview: score < 0.7 || response.infraction === undefined,
   };
 }
 
@@ -135,9 +138,43 @@ function detectHallucinations(response) {
 
   // Spanish traffic code articles (Código de la Circulación)
   const validArticles = [
-    '32', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45',
-    '47', '48', '49', '50', '51', '52', '54', '55', '56', '57', '58', '59', '60',
-    '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71'
+    '32',
+    '34',
+    '35',
+    '36',
+    '37',
+    '38',
+    '39',
+    '40',
+    '41',
+    '42',
+    '43',
+    '44',
+    '45',
+    '47',
+    '48',
+    '49',
+    '50',
+    '51',
+    '52',
+    '54',
+    '55',
+    '56',
+    '57',
+    '58',
+    '59',
+    '60',
+    '61',
+    '62',
+    '63',
+    '64',
+    '65',
+    '66',
+    '67',
+    '68',
+    '69',
+    '70',
+    '71',
   ];
 
   // Check if article number is reasonable
@@ -193,7 +230,12 @@ export function validateGeometryResponse(response) {
   for (let i = 0; i < response.lines.length; i++) {
     const line = response.lines[i];
 
-    if (line.x1 === undefined || line.y1 === undefined || line.x2 === undefined || line.y2 === undefined) {
+    if (
+      line.x1 === undefined ||
+      line.y1 === undefined ||
+      line.x2 === undefined ||
+      line.y2 === undefined
+    ) {
       errors.push(`Line ${i}: missing coordinates`);
       continue;
     }
@@ -214,7 +256,16 @@ export function validateGeometryResponse(response) {
     }
 
     // Validate type
-    const validTypes = ['forbidden', 'stop_line', 'lane_divider', 'box_junction', 'pedestrian', 'bus_lane', 'roi_general', 'roi_turn'];
+    const validTypes = [
+      'forbidden',
+      'stop_line',
+      'lane_divider',
+      'box_junction',
+      'pedestrian',
+      'bus_lane',
+      'roi_general',
+      'roi_turn',
+    ];
     if (line.type && !validTypes.includes(line.type)) {
       warnings.push(`Line ${i}: unknown type "${line.type}"`);
     }
@@ -226,7 +277,7 @@ export function validateGeometryResponse(response) {
     valid,
     errors,
     warnings,
-    lineCount: response.lines.length
+    lineCount: response.lines.length,
   };
 }
 
@@ -235,17 +286,17 @@ export function validateGeometryResponse(response) {
  * Combines multiple factors into 0-1 score
  */
 export function scoreResponseConfidence(audit, snapshots, track) {
-  let score = 0.5;  // baseline
+  let score = 0.5; // baseline
 
   // FACTOR 1: Validation score (if available)
   if (audit._validationScore) {
-    score = audit._validationScore * 0.3;  // 30% weight
+    score = audit._validationScore * 0.3; // 30% weight
   }
 
   // FACTOR 2: Image quality (if available)
   if (snapshots && snapshots.length > 0) {
     // Assume better with more snapshots
-    const imageQualityBonus = Math.min(0.2, snapshots.length * 0.05);  // +0.05 per image, max 0.2
+    const imageQualityBonus = Math.min(0.2, snapshots.length * 0.05); // +0.05 per image, max 0.2
     score += imageQualityBonus;
   }
 
@@ -287,16 +338,19 @@ export function requiresManualReview(audit, confidenceScore) {
     // 1. Low confidence
     confidenceScore < 0.7 ||
     // 2. Reasoning indicates uncertainty
-    (audit.reasoning && audit.reasoning.some(r =>
-      r.includes('UNCERTAIN') ||
-      r.includes('AMBIGUOUS') ||
-      r.includes('UNCLEAR') ||
-      r.includes('NO SE') ||
-      r.includes('possibly') ||
-      r.includes('might be')
-    )) ||
+    (audit.reasoning &&
+      audit.reasoning.some(
+        (r) =>
+          r.includes('UNCERTAIN') ||
+          r.includes('AMBIGUOUS') ||
+          r.includes('UNCLEAR') ||
+          r.includes('NO SE') ||
+          r.includes('possibly') ||
+          r.includes('might be')
+      )) ||
     // 3. Missing critical data
-    (!audit.plate || audit.plate === 'UNKNOWN') ||
+    !audit.plate ||
+    audit.plate === 'UNKNOWN' ||
     // 4. Edge case violations
     (audit.infraction && !audit.severity) ||
     // 5. Conflicting fields
@@ -308,5 +362,5 @@ export default {
   validateAuditResponse,
   validateGeometryResponse,
   scoreResponseConfidence,
-  requiresManualReview
+  requiresManualReview,
 };

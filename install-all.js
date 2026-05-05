@@ -20,19 +20,19 @@ const steps = [
   {
     name: 'Download FFmpeg',
     cmd: 'node download-ffmpeg.js',
-    required: true
+    required: true,
   },
   {
     name: 'Download Python',
     cmd: 'node download-python.js',
-    required: false
+    required: false,
   },
   {
     name: 'Install PaddleOCR',
     cmd: 'resources\\python\\python.exe -m pip install paddleocr paddlepaddle pillow',
     required: false,
-    condition: () => fs.existsSync(path.join(__dirname, 'resources/python/python.exe'))
-  }
+    condition: () => fs.existsSync(path.join(__dirname, 'resources/python/python.exe')),
+  },
 ];
 
 async function runStep(step, index) {
@@ -49,7 +49,7 @@ async function runStep(step, index) {
     console.log(`Running: ${step.cmd}\n`);
     execSync(step.cmd, {
       cwd: __dirname,
-      stdio: 'inherit'
+      stdio: 'inherit',
     });
     console.log(`\n✓ ${step.name} completed`);
     return { success: true, skipped: false };
@@ -84,9 +84,9 @@ async function main() {
   console.log('Installation Summary');
   console.log('='.repeat(60));
 
-  const completed = results.filter(r => r.success).length;
-  const skipped = results.filter(r => r.skipped).length;
-  const failed = results.filter(r => !r.success && !r.skipped).length;
+  const completed = results.filter((r) => r.success).length;
+  const skipped = results.filter((r) => r.skipped).length;
+  const failed = results.filter((r) => !r.success && !r.skipped).length;
 
   console.log(`Completed: ${completed}`);
   console.log(`Skipped:   ${skipped}`);

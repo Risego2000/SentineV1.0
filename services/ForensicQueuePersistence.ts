@@ -20,12 +20,14 @@ export class ForensicQueuePersistence {
   private storeName = 'queue_items';
   private db: IDBDatabase | null = null;
   private initPromise: Promise<void> | null = null;
+  private unavailable = false;
 
   constructor() {
     this.init();
   }
 
   private init(): Promise<void> {
+    if (this.unavailable) return Promise.resolve();
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = new Promise((resolve, reject) => {
@@ -49,7 +51,9 @@ export class ForensicQueuePersistence {
 
       request.onerror = () => {
         this.initPromise = null;
-        reject(new Error('FAILED_TO_OPEN_QUEUE_DB'));
+        this.db = null;
+        this.unavailable = true;
+        resolve();
       };
     });
 
@@ -58,6 +62,7 @@ export class ForensicQueuePersistence {
 
   async saveQueueItems(items: PersistedQueueItem[]): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
@@ -82,6 +87,7 @@ export class ForensicQueuePersistence {
 
   async loadQueueItems(): Promise<PersistedQueueItem[]> {
     if (!this.db) await this.init();
+    if (!this.db) return [];
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly');
@@ -107,6 +113,7 @@ export class ForensicQueuePersistence {
 
   async deleteQueueItem(jobId: string): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
@@ -120,6 +127,7 @@ export class ForensicQueuePersistence {
 
   async updateQueueItem(item: PersistedQueueItem): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
@@ -133,6 +141,7 @@ export class ForensicQueuePersistence {
 
   async clearQueue(): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
@@ -149,6 +158,7 @@ export class ForensicQueuePersistence {
    */
   async cleanupExpiredJobs(): Promise<number> {
     if (!this.db) await this.init();
+    if (!this.db) return 0;
 
     const items = await this.loadQueueItems();
     const now = Date.now();

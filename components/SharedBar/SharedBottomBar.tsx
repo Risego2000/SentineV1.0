@@ -19,8 +19,12 @@ const fmt = (s: number) => {
   );
 };
 
+const isFiniteNumber = (n: number) => Number.isFinite(n);
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
 export const SharedBottomBar = () => {
-  const { videoRef, logs, isPlaying, setIsPlayingFn } = useFocusedViewerStore();
+  const { videoRef, logs, isPlaying, playbackRate, setIsPlayingFn, setPlaybackRateFn } =
+    useFocusedViewerStore();
   const { helpProps } = useHelp();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -30,15 +34,16 @@ export const SharedBottomBar = () => {
   useEffect(() => {
     cancelAnimationFrame(rafRef.current);
     const v = videoRef?.current;
-    if (!v) {
-      setProgress(0);
-      setDuration(0);
-      return;
-    }
+    if (!v) return;
     const tick = () => {
-      if (!isNaN(v.duration)) {
-        setDuration(v.duration);
-        setProgress(v.duration > 0 ? (v.currentTime / v.duration) * 100 : 0);
+      if (isFiniteNumber(v.duration) && v.duration > 0) {
+        const safeDuration = v.duration;
+        const safeCurrent = isFiniteNumber(v.currentTime) ? clamp(v.currentTime, 0, safeDuration) : 0;
+        setDuration(safeDuration);
+        setProgress(clamp((safeCurrent / safeDuration) * 100, 0, 100));
+      } else {
+        setDuration(0);
+        setProgress(0);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -50,9 +55,14 @@ export const SharedBottomBar = () => {
     const v = videoRef?.current;
     if (!timelineRef.current || !v) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    const t = ((e.clientX - rect.left) / rect.width) * v.duration;
-    v.currentTime = t;
-    setProgress((t / v.duration) * 100);
+    if (!isFiniteNumber(rect.width) || rect.width <= 0) return;
+    const safeDuration = isFiniteNumber(v.duration) && v.duration > 0 ? v.duration : 0;
+    if (safeDuration <= 0) return;
+    const ratio = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const t = ratio * safeDuration;
+    if (!isFiniteNumber(t)) return;
+    Reflect.set(v, 'currentTime', t);
+    setProgress(clamp((t / safeDuration) * 100, 0, 100));
   };
 
   const handleKey = useCallback(
@@ -60,18 +70,22 @@ export const SharedBottomBar = () => {
       const v = videoRef?.current;
       if (!v) return;
       const s = e.shiftKey ? 10 : 1;
+      const safeDuration = isFiniteNumber(v.duration) && v.duration > 0 ? v.duration : 0;
+      const safeCurrent = isFiniteNumber(v.currentTime) ? v.currentTime : 0;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        v.currentTime = Math.max(0, v.currentTime - s);
+        const next = Math.max(0, safeCurrent - s);
+        if (isFiniteNumber(next)) Reflect.set(v, 'currentTime', next);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        v.currentTime = Math.min(v.duration || 0, v.currentTime + s);
+        const next = Math.min(safeDuration || 0, safeCurrent + s);
+        if (isFiniteNumber(next)) Reflect.set(v, 'currentTime', next);
       } else if (e.key === 'Home') {
         e.preventDefault();
-        v.currentTime = 0;
+        Reflect.set(v, 'currentTime', 0);
       } else if (e.key === 'End') {
         e.preventDefault();
-        v.currentTime = v.duration || 0;
+        if (isFiniteNumber(safeDuration)) Reflect.set(v, 'currentTime', safeDuration || 0);
       }
     },
     [videoRef]
@@ -79,6 +93,7 @@ export const SharedBottomBar = () => {
 
   const incidents = logs.filter((l) => l.infraction === true);
   const cur = (progress * duration) / 100;
+  const speedOptions: Array<1 | 2 | 4 | 8> = [1, 2, 4, 8];
 
   return (
     <div className="shrink-0 bg-[#0d0d0f] border-t border-white/5 z-50 flex items-center gap-4 px-6 h-14">
@@ -144,13 +159,21 @@ export const SharedBottomBar = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 const v = videoRef?.current;
-                if (v && log.playbackTime !== undefined) v.currentTime = log.playbackTime;
+                if (v && log.playbackTime !== undefined && isFiniteNumber(log.playbackTime)) {
+                  const safeDuration = isFiniteNumber(v.duration) && v.duration > 0 ? v.duration : 0;
+                  const next = clamp(log.playbackTime, 0, safeDuration || log.playbackTime);
+                  if (isFiniteNumber(next)) Reflect.set(v, 'currentTime', next);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   const v = videoRef?.current;
-                  if (v && log.playbackTime !== undefined) v.currentTime = log.playbackTime;
+                  if (v && log.playbackTime !== undefined && isFiniteNumber(log.playbackTime)) {
+                    const safeDuration = isFiniteNumber(v.duration) && v.duration > 0 ? v.duration : 0;
+                    const next = clamp(log.playbackTime, 0, safeDuration || log.playbackTime);
+                    if (isFiniteNumber(next)) Reflect.set(v, 'currentTime', next);
+                  }
                 }
               }}
             >
@@ -171,6 +194,30 @@ export const SharedBottomBar = () => {
       <span className="text-[10px] font-mono font-black text-slate-600 tracking-wider shrink-0 w-[72px] tabular-nums">
         {fmt(duration)}
       </span>
+
+      <div className="shrink-0 flex items-center gap-1 bg-slate-900/70 border border-white/10 rounded-md p-1 ml-2">
+        {speedOptions.map((rate) => (
+          <button
+            key={rate}
+            type="button"
+            className={
+              'px-2 py-1 rounded text-[10px] font-mono font-bold tracking-wide transition-colors border ' +
+              (playbackRate === rate
+                ? 'bg-blue-500/20 text-blue-300 border-blue-400/50'
+                : 'bg-transparent text-slate-400 border-transparent hover:text-slate-200 hover:border-white/20')
+            }
+            onClick={() => {
+              const v = videoRef?.current;
+              if (v) v.playbackRate = rate;
+              setPlaybackRateFn?.(rate);
+            }}
+            aria-label={`Velocidad x${rate}`}
+            {...helpProps(`Cambiar velocidad de reproducción a x${rate}`)}
+          >
+            x{rate}
+          </button>
+        ))}
+      </div>
 
       {incidents.length > 0 && (
         <div className="shrink-0 flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-1.5 ml-2">

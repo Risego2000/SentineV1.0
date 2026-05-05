@@ -117,11 +117,7 @@ export class RAFScheduler {
         task.callback(deltaTime, timestamp);
         task.lastRun = timestamp;
       } catch (error) {
-        logger.error(
-          'RAF_SCHEDULER',
-          `Error executing task ${task.id}`,
-          error
-        );
+        logger.error('RAF_SCHEDULER', `Error executing task ${task.id}`, error);
       }
     }
     const executionTime = performance.now() - startTime;
@@ -179,7 +175,8 @@ export class RAFScheduler {
    */
   logStats() {
     const stats = this.getStats();
-    logger.debug('RAF_SCHEDULER',
+    logger.debug(
+      'RAF_SCHEDULER',
       `Tasks: ${stats.taskCount}, Frames: ${stats.frameCount}, Dropped: ${stats.droppedFrames}, ${stats.frameRate}`
     );
   }

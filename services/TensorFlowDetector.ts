@@ -15,6 +15,7 @@ import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as tf from '@tensorflow/tfjs';
 import { logger } from './logger';
 import { RELEVANT_CLASSES } from '../constants';
+import { calculateIoU } from '../utils';
 
 interface DetectionOutput {
   label: string;
@@ -40,13 +41,14 @@ interface TensorFlowDetectorConfig {
  */
 export class TensorFlowDetector {
   private model: cocoSsd.ObjectDetection | null = null;
-  private confidenceThreshold: number = 0.25;
+  private confidenceThreshold: number = 0.20; // Reduced from 0.25 for better detection in dense scenes
   private isLoading: boolean = false;
   private lastDetections: DetectionOutput[] = [];
   private frameCount: number = 0;
+  private maxDensityFrames: number = 0; // Track dense scene occurrences
 
   constructor(config?: TensorFlowDetectorConfig) {
-    this.confidenceThreshold = config?.confidenceThreshold ?? 0.25;
+    this.confidenceThreshold = config?.confidenceThreshold ?? 0.20;
   }
 
   /**
@@ -62,7 +64,10 @@ export class TensorFlowDetector {
       // Load the model from CDN
       this.model = await cocoSsd.load();
 
-      logger.ai('TENSORFLOW_DETECTOR', 'COCO-SSD model loaded successfully (90 COCO classes, GPU acceleration)');
+      logger.ai(
+        'TENSORFLOW_DETECTOR',
+        'COCO-SSD model loaded successfully (90 COCO classes, GPU acceleration)'
+      );
     } catch (error) {
       logger.error('TENSORFLOW_DETECTOR', 'Failed to load COCO-SSD model', error);
       throw error;
@@ -97,7 +102,7 @@ export class TensorFlowDetector {
       const predictions = await this.model.detect(source);
 
       // Convert COCO-SSD format to StandardDetection
-      const detections: DetectionOutput[] = predictions
+      let detections: DetectionOutput[] = predictions
         .filter((pred) => {
           // Confident detections for stable tracking
           if (pred.score < this.confidenceThreshold) return false;
@@ -126,12 +131,30 @@ export class TensorFlowDetector {
         // Sort by score (descending) for consistency in matching
         .sort((a, b) => b.score - a.score);
 
+      // Duplicate suppression within same frame (NMS-style)
+      // Remove lower-confidence detections that heavily overlap with higher-confidence ones
+      detections = this.suppressDuplicateDetections(detections);
+
+      // Detect dense scenes
+      if (detections.length >= 800) {
+        this.maxDensityFrames++;
+        if (detections.length >= 950) {
+          logger.warn(
+            'TENSORFLOW_DETECTOR',
+            `Dense scene detected: ${detections.length} vehicles (${this.maxDensityFrames} dense frames total)`
+          );
+        }
+      }
+
       // Cache detections for frame-to-frame continuity
       this.lastDetections = detections;
       this.frameCount++;
 
       if (this.frameCount % 30 === 0) {
-        logger.debug('TENSORFLOW_DETECTOR', `Frame ${this.frameCount}: ${detections.length} detections`);
+        logger.debug(
+          'TENSORFLOW_DETECTOR',
+          `Frame ${this.frameCount}: ${detections.length} detections`
+        );
       }
 
       return detections;
@@ -140,6 +163,84 @@ export class TensorFlowDetector {
       // Return cached detections for continuity on error
       return this.lastDetections;
     }
+  }
+
+  /**
+   * Suppress duplicate detections within same frame using IoU-based NMS with grid indexing
+   * Grid-based spatial indexing reduces O(n²) comparisons to O(n*k) where k is avg detections per cell
+   * Essential for dense scenes with 800+ vehicles
+   */
+  private suppressDuplicateDetections(detections: DetectionOutput[]): DetectionOutput[] {
+    if (detections.length <= 1) return detections;
+
+    const GRID_SIZE = 10; // 10x10 grid = 100 cells
+    const suppressed: DetectionOutput[] = [];
+    const usedIndices = new Set<number>();
+
+    // Grid-based spatial indexing: map detections to grid cells
+    const grid = new Map<string, number[]>();
+    for (let i = 0; i < detections.length; i++) {
+      const det = detections[i];
+      const cellX = Math.floor((det.box.x + det.box.w / 2) * GRID_SIZE);
+      const cellY = Math.floor((det.box.y + det.box.h / 2) * GRID_SIZE);
+      const key = `${cellX},${cellY}`;
+
+      if (!grid.has(key)) {
+        grid.set(key, []);
+      }
+      grid.get(key)!.push(i);
+    }
+
+    // Process detections, checking only nearby cells
+    for (let i = 0; i < detections.length; i++) {
+      if (usedIndices.has(i)) continue;
+
+      const current = detections[i];
+      suppressed.push(current);
+
+      // Get neighboring cells
+      const cellX = Math.floor((current.box.x + current.box.w / 2) * GRID_SIZE);
+      const cellY = Math.floor((current.box.y + current.box.h / 2) * GRID_SIZE);
+
+      const nearbyIndices = new Set<number>();
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const key = `${cellX + dx},${cellY + dy}`;
+          const cellIndices = grid.get(key);
+          if (cellIndices) {
+            cellIndices.forEach((idx) => nearbyIndices.add(idx));
+          }
+        }
+      }
+
+      // Only compare with detections in nearby cells
+      for (const j of nearbyIndices) {
+        if (i >= j || usedIndices.has(j)) continue;
+
+        const other = detections[j];
+
+        // Only suppress same-class detections
+        if (current.label !== other.label) continue;
+
+        // Calculate IoU
+        const iou = calculateIoU(current.box, other.box);
+
+        // Suppress if >50% overlap
+        if (iou > 0.5) {
+          usedIndices.add(j);
+        }
+      }
+    }
+
+    return suppressed;
+  }
+
+
+  /**
+   * Get max density frame count
+   */
+  getMaxDensityFrameCount(): number {
+    return this.maxDensityFrames;
   }
 
   /**

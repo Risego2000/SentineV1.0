@@ -54,7 +54,13 @@ export class AIGeometryRequestValidator {
 
     // Validate image (optional, base64 string)
     if (obj.image !== undefined) {
-      if (!isValidString(obj.image as unknown, 100, AppConfig.Validation.MAX_IMAGE_SIZE_MB * 1024 * 1024)) {
+      if (
+        !isValidString(
+          obj.image as unknown,
+          100,
+          AppConfig.Validation.MAX_IMAGE_SIZE_MB * 1024 * 1024
+        )
+      ) {
         return {
           valid: false,
           error: `image must be base64 string (max ${AppConfig.Validation.MAX_IMAGE_SIZE_MB}MB)`,
@@ -112,7 +118,7 @@ export interface AIAuditRequestDTO {
     type?: string;
   };
   directives: string;
-  auditPreset?: typeof AppConfig.AIService.AUDIT_PRESETS[number];
+  auditPreset?: (typeof AppConfig.AIService.AUDIT_PRESETS)[number];
 }
 
 export class AIAuditRequestValidator {
@@ -144,7 +150,11 @@ export class AIAuditRequestValidator {
       return { valid: false, error: 'track.label must be a string', path: '$.track.label' };
     }
     if (typeof track.avgVelocity !== 'number') {
-      return { valid: false, error: 'track.avgVelocity must be a number', path: '$.track.avgVelocity' };
+      return {
+        valid: false,
+        error: 'track.avgVelocity must be a number',
+        path: '$.track.avgVelocity',
+      };
     }
 
     // Validate line
@@ -197,7 +207,9 @@ export class AIAuditRequestValidator {
         track: track as AIAuditRequestDTO['track'],
         line: line as AIAuditRequestDTO['line'],
         directives: obj.directives as string,
-        auditPreset: obj.auditPreset as typeof AppConfig.AIService.AUDIT_PRESETS[number] | undefined,
+        auditPreset: obj.auditPreset as
+          | (typeof AppConfig.AIService.AUDIT_PRESETS)[number]
+          | undefined,
       },
     };
   }
@@ -233,12 +245,28 @@ export class ConfigSaveRequestValidator {
     }
 
     // Validate no dangerous characters in filename
-    if (/[<>:"|?*\x00-\x1f\\\/]/.test(obj.fileName as string)) {
-      return {
-        valid: false,
-        error: 'fileName contains invalid characters',
-        path: '$.fileName',
-      };
+    const fileName = obj.fileName as string;
+    for (let i = 0; i < fileName.length; i += 1) {
+      const ch = fileName[i];
+      const code = fileName.charCodeAt(i);
+      if (
+        code < 32 ||
+        ch === '<' ||
+        ch === '>' ||
+        ch === ':' ||
+        ch === '"' ||
+        ch === '|' ||
+        ch === '?' ||
+        ch === '*' ||
+        ch === '\\' ||
+        ch === '/'
+      ) {
+        return {
+          valid: false,
+          error: 'fileName contains invalid characters',
+          path: '$.fileName',
+        };
+      }
     }
 
     // Validate config
@@ -275,7 +303,7 @@ export class ConfigSaveRequestValidator {
  */
 export interface TranscodeRequestDTO {
   jobId: string;
-  outputCodec: typeof AppConfig.Video.SUPPORTED_CODECS[number];
+  outputCodec: (typeof AppConfig.Video.SUPPORTED_CODECS)[number];
 }
 
 export class TranscodeRequestValidator {
@@ -305,7 +333,7 @@ export class TranscodeRequestValidator {
       valid: true,
       value: {
         jobId: jobId as string,
-        outputCodec: outputCodec as typeof AppConfig.Video.SUPPORTED_CODECS[number],
+        outputCodec: outputCodec as (typeof AppConfig.Video.SUPPORTED_CODECS)[number],
       },
     };
   }

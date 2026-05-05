@@ -38,3 +38,37 @@ export const isPointInPoly = (
   }
   return inside;
 };
+
+/**
+ * Calculate Intersection over Union (IoU) between two bounding boxes.
+ * Shared utility to avoid duplication across tracking and detection systems.
+ */
+export const calculateIoU = (
+  box1: { x: number; y: number; w: number; h: number },
+  box2: { x: number; y: number; w: number; h: number }
+): number => {
+  const x1_min = box1.x;
+  const y1_min = box1.y;
+  const x1_max = box1.x + box1.w;
+  const y1_max = box1.y + box1.h;
+
+  const x2_min = box2.x;
+  const y2_min = box2.y;
+  const x2_max = box2.x + box2.w;
+  const y2_max = box2.y + box2.h;
+
+  const xi_min = Math.max(x1_min, x2_min);
+  const yi_min = Math.max(y1_min, y2_min);
+  const xi_max = Math.min(x1_max, x2_max);
+  const yi_max = Math.min(y1_max, y2_max);
+
+  const inter_width = Math.max(0, xi_max - xi_min);
+  const inter_height = Math.max(0, yi_max - yi_min);
+  const inter_area = inter_width * inter_height;
+
+  const box1_area = box1.w * box1.h;
+  const box2_area = box2.w * box2.h;
+  const union_area = box1_area + box2_area - inter_area;
+
+  return union_area > 0 ? inter_area / union_area : 0;
+};

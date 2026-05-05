@@ -19,10 +19,18 @@ export const validators = {
 
     const g = geo as any;
     return (
-      typeof g.x1 === 'number' && g.x1 >= 0 && g.x1 <= 1 &&
-      typeof g.y1 === 'number' && g.y1 >= 0 && g.y1 <= 1 &&
-      typeof g.x2 === 'number' && g.x2 >= 0 && g.x2 <= 1 &&
-      typeof g.y2 === 'number' && g.y2 >= 0 && g.y2 <= 1
+      typeof g.x1 === 'number' &&
+      g.x1 >= 0 &&
+      g.x1 <= 1 &&
+      typeof g.y1 === 'number' &&
+      g.y1 >= 0 &&
+      g.y1 <= 1 &&
+      typeof g.x2 === 'number' &&
+      g.x2 >= 0 &&
+      g.x2 <= 1 &&
+      typeof g.y2 === 'number' &&
+      g.y2 >= 0 &&
+      g.y2 <= 1
     );
   },
 
@@ -39,14 +47,14 @@ export const validators = {
   /**
    * Validar códec de video
    */
-  isValidCodec: (codec: unknown): codec is ('h264' | 'hevc' | 'h265') => {
+  isValidCodec: (codec: unknown): codec is 'h264' | 'hevc' | 'h265' => {
     return ['h264', 'hevc', 'h265'].includes(String(codec).toLowerCase());
   },
 
   /**
    * Validar códec de audio
    */
-  isValidAudioCodec: (codec: unknown): codec is ('aac' | 'mp3' | 'libopus') => {
+  isValidAudioCodec: (codec: unknown): codec is 'aac' | 'mp3' | 'libopus' => {
     return ['aac', 'mp3', 'libopus'].includes(String(codec).toLowerCase());
   },
 
@@ -78,7 +86,7 @@ export const validators = {
       /^fc00:/i, // IPv6 private
     ];
 
-    return privateRanges.some(pattern => pattern.test(ip));
+    return privateRanges.some((pattern) => pattern.test(ip));
   },
 
   /**
@@ -91,7 +99,8 @@ export const validators = {
     return (
       typeof t.id === 'string' &&
       typeof t.heading === 'number' &&
-      Array.isArray(t.box) && t.box.length === 4 &&
+      Array.isArray(t.box) &&
+      t.box.length === 4 &&
       Array.isArray(t.velocityHistory)
     );
   },
@@ -110,9 +119,24 @@ export const validators = {
   isValidFilename: (filename: string): boolean => {
     if (!filename || typeof filename !== 'string') return false;
 
-    // Sin caracteres peligrosos
-    const dangerousChars = /[<>:"|?*\x00-\x1f\\]/;
-    if (dangerousChars.test(filename)) return false;
+    // Sin caracteres peligrosos ni controles ASCII.
+    for (let i = 0; i < filename.length; i += 1) {
+      const ch = filename[i];
+      const code = filename.charCodeAt(i);
+      if (
+        code < 32 ||
+        ch === '<' ||
+        ch === '>' ||
+        ch === ':' ||
+        ch === '"' ||
+        ch === '|' ||
+        ch === '?' ||
+        ch === '*' ||
+        ch === '\\'
+      ) {
+        return false;
+      }
+    }
 
     // Sin path traversal
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
@@ -133,14 +157,16 @@ export const validators = {
   /**
    * Validar nivel de severidad
    */
-  isValidSeverity: (severity: unknown): severity is ('LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') => {
+  isValidSeverity: (severity: unknown): severity is 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' => {
     return ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(String(severity));
   },
 
   /**
    * Validar estado de trabajo
    */
-  isValidJobStatus: (status: unknown): status is ('pending' | 'processing' | 'completed' | 'failed') => {
+  isValidJobStatus: (
+    status: unknown
+  ): status is 'pending' | 'processing' | 'completed' | 'failed' => {
     return ['pending', 'processing', 'completed', 'failed'].includes(String(status));
   },
 
@@ -173,7 +199,7 @@ export const validators = {
       (d.zoneNames === undefined || Array.isArray(d.zoneNames)) &&
       (d.additionalContext === undefined || typeof d.additionalContext === 'string')
     );
-  }
+  },
 };
 
 /**

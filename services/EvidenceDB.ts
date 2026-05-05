@@ -11,12 +11,30 @@ export class EvidenceDB {
   private logStoreName = 'infractions';
   private db: IDBDatabase | null = null;
   private initPromise: Promise<void> | null = null;
+  private indexedDbUnavailable = false;
+  private warnedUnavailable = false;
+  private memoryEvidence = new Map<
+    string,
+    {
+      snapshots: string[];
+      contextSnapshots?: string[];
+      contextHash?: string;
+      zoomSnapshots?: string[];
+      zoomHash?: string;
+      ocrResults?: string[];
+      ocrCandidates?: any[];
+      ocrValidationReport?: string;
+      clip?: string;
+      timestamp: number;
+    }
+  >();
 
   constructor() {
     this.init();
   }
 
   private init(): Promise<void> {
+    if (this.indexedDbUnavailable) return Promise.resolve();
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = new Promise((resolve, reject) => {
@@ -54,12 +72,16 @@ export class EvidenceDB {
       };
 
       request.onerror = () => {
-        // TIER 1: IndexedDB is optional - data persists in Supabase
-        // Graceful fallback: continue without local cache
-        console.warn('[EvidenceDB] IndexedDB unavailable (Electron/private mode) - using Supabase only');
+        // TIER 1: IndexedDB is optional - fallback to memory/session mode
+        if (!this.warnedUnavailable) {
+          console.warn(
+            '[EvidenceDB] IndexedDB unavailable (Electron/private mode) - using fallback mode'
+          );
+          this.warnedUnavailable = true;
+        }
         this.db = null;
-        this.initPromise = null;
-        resolve(); // Don't reject - continue without local cache
+        this.indexedDbUnavailable = true;
+        resolve();
       };
     });
 
@@ -82,9 +104,9 @@ export class EvidenceDB {
   ): Promise<void> {
     if (!this.db) await this.init();
 
-    // TIER 1: If IndexedDB unavailable, skip local cache (Supabase is primary)
+    // TIER 1 fallback: keep evidence in memory for current session
     if (!this.db) {
-      console.warn('[EvidenceDB] Skipping local cache - IndexedDB unavailable');
+      this.memoryEvidence.set(id, { ...data, timestamp: Date.now() });
       return;
     }
 
@@ -116,7 +138,8 @@ export class EvidenceDB {
 
     // TIER 1: If IndexedDB unavailable, return null (no local cache)
     if (!this.db) {
-      return null;
+      const cached = this.memoryEvidence.get(id);
+      return cached || null;
     }
 
     return new Promise((resolve, reject) => {
@@ -137,6 +160,7 @@ export class EvidenceDB {
 
     // TIER 1: If IndexedDB unavailable, skip deletion (no local cache)
     if (!this.db) {
+      this.memoryEvidence.delete(id);
       return;
     }
 
@@ -159,6 +183,13 @@ export class EvidenceDB {
    */
   async purgeOldEvidence(): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) {
+      const expiration = Date.now() - 24 * 60 * 60 * 1000;
+      for (const [id, value] of this.memoryEvidence.entries()) {
+        if (value.timestamp < expiration) this.memoryEvidence.delete(id);
+      }
+      return;
+    }
     const expiration = Date.now() - 24 * 60 * 60 * 1000;
 
     return new Promise((resolve) => {
@@ -189,6 +220,7 @@ export class EvidenceDB {
 
   async saveInfraction(log: InfractionLog): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
       const store = transaction.objectStore(this.logStoreName);
@@ -201,6 +233,7 @@ export class EvidenceDB {
 
   async syncUnsyncedInfractions(): Promise<InfractionLog[]> {
     if (!this.db) await this.init();
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readonly');
       const store = transaction.objectStore(this.logStoreName);
@@ -231,6 +264,7 @@ export class EvidenceDB {
 
   async markInfractionSynced(id: number): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
       const store = transaction.objectStore(this.logStoreName);
@@ -302,6 +336,7 @@ export class EvidenceDB {
 
   async getAllInfractions(): Promise<InfractionLog[]> {
     if (!this.db) await this.init();
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readonly');
       const store = transaction.objectStore(this.logStoreName);
@@ -313,6 +348,7 @@ export class EvidenceDB {
 
   async deleteInfraction(id: number): Promise<void> {
     if (!this.db) await this.init();
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.logStoreName], 'readwrite');
       const store = transaction.objectStore(this.logStoreName);

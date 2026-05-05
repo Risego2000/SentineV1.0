@@ -20,9 +20,11 @@ const pythonDir = path.join(__dirname, 'resources', 'python');
 
 function checkUrl(url) {
   return new Promise((resolve) => {
-    https.head(url, { timeout: 5000 }, (res) => {
-      resolve(res.statusCode === 200 || res.statusCode === 302);
-    }).on('error', () => resolve(false));
+    https
+      .head(url, { timeout: 5000 }, (res) => {
+        resolve(res.statusCode === 200 || res.statusCode === 302);
+      })
+      .on('error', () => resolve(false));
   });
 }
 
@@ -50,7 +52,7 @@ async function main() {
     const urls = [
       'https://www.python.org/ftp/python/3.10.13/python-3.10.13-embed-amd64.zip',
       'https://www.python.org/ftp/python/3.10.14/python-3.10.14-embed-amd64.zip', // Try 3.10.14
-      'https://www.python.org/ftp/python/3.11.0/python-3.11.0-embed-amd64.zip'    // Try 3.11
+      'https://www.python.org/ftp/python/3.11.0/python-3.11.0-embed-amd64.zip', // Try 3.11
     ];
 
     let downloadUrl = null;
@@ -92,7 +94,9 @@ async function main() {
     }
 
     // Use PowerShell to extract
-    await execAsync(`powershell -Command "Expand-Archive -Path '${tempZip}' -DestinationPath '${tempExtract}' -Force"`);
+    await execAsync(
+      `powershell -Command "Expand-Archive -Path '${tempZip}' -DestinationPath '${tempExtract}' -Force"`
+    );
 
     // Copy all files from extraction to python directory
     console.log('Installing Python...');
@@ -122,7 +126,6 @@ async function main() {
     } else {
       throw new Error('Installation may have failed');
     }
-
   } catch (error) {
     console.error('ERROR:', error.message);
     console.log('\nManual download: https://www.python.org/downloads/windows/');
@@ -139,28 +142,32 @@ function download(url, dest, redirectCount = 0) {
     }
 
     const file = createWriteStream(dest);
-    https.get(url, {
-      headers: { 'User-Agent': 'SentinelV16' }
-    }, (res) => {
-      // Handle redirects
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        file.close();
-        fs.unlinkSync(dest);
-        return download(res.headers.location, dest, redirectCount + 1)
-          .then(resolve)
-          .catch(reject);
-      }
+    https
+      .get(
+        url,
+        {
+          headers: { 'User-Agent': 'SentinelV16' },
+        },
+        (res) => {
+          // Handle redirects
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            file.close();
+            fs.unlinkSync(dest);
+            return download(res.headers.location, dest, redirectCount + 1)
+              .then(resolve)
+              .catch(reject);
+          }
 
-      if (res.statusCode !== 200) {
-        file.close();
-        fs.unlinkSync(dest);
-        return reject(new Error(`Download failed with status ${res.statusCode}`));
-      }
+          if (res.statusCode !== 200) {
+            file.close();
+            fs.unlinkSync(dest);
+            return reject(new Error(`Download failed with status ${res.statusCode}`));
+          }
 
-      pipeline(res, file)
-        .then(resolve)
-        .catch(reject);
-    }).on('error', reject);
+          pipeline(res, file).then(resolve).catch(reject);
+        }
+      )
+      .on('error', reject);
   });
 }
 

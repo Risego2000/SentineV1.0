@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, Download, Play, AlertCircle, Upload } from 'lucide-react';
-import { getEvidenceFiles, deleteEvidenceFile, getPublicUrl } from '../../services/evidenceStorageService';
+import {
+  getEvidenceFiles,
+  deleteEvidenceFile,
+  getPublicUrl,
+} from '../../services/evidenceStorageService';
 import type { EvidenceFile } from '../../services/evidenceStorageService';
 import { EvidenceUploadDialog } from './EvidenceUploadDialog';
 
@@ -193,7 +197,11 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ infractionId }
           >
             ✕
           </button>
-          <img src={selectedImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain" />
+          <img
+            src={selectedImage}
+            alt="Preview"
+            className="max-w-full max-h-[90vh] object-contain"
+          />
         </div>
       )}
 

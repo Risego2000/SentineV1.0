@@ -27,10 +27,7 @@ export const getApiBaseUrl = (): string => {
   // This is populated by the port discovery mechanism
   if (typeof window !== 'undefined') {
     const detectedPort = sessionStorage.getItem('sentinel_api_port');
-    if (
-      detectedPort &&
-      (hostname === 'localhost' || hostname === '127.0.0.1')
-    ) {
+    if (detectedPort && (hostname === 'localhost' || hostname === '127.0.0.1')) {
       return `${protocol}//${hostname}:${detectedPort}`;
     }
   }
@@ -49,10 +46,7 @@ export const getApiBaseUrl = (): string => {
   // In development, if running on any port except 3002,
   // assume backend is on 3002 (standard Sentinel port configuration)
   // This handles all dev server ports: 3001, 3003, 3004, etc.
-  if (
-    (hostname === 'localhost' || hostname === '127.0.0.1') &&
-    currentPort !== '3002'
-  ) {
+  if ((hostname === 'localhost' || hostname === '127.0.0.1') && currentPort !== '3002') {
     return `${protocol}//${hostname}:3002`;
   }
 

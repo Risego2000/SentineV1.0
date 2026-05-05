@@ -32,7 +32,7 @@ export const Sidebar = memo(() => {
 
   return (
     <aside
-      className={`transition-all duration-300 ease-in-out border-r border-white/5 flex flex-col bg-[#0d0d0f] z-50 shrink-0 h-screen overflow-hidden ${
+      className={`sidebar-unified transition-all duration-300 ease-in-out border-r border-white/5 flex flex-col bg-[#0d0d0f] z-50 shrink-0 h-screen overflow-hidden ${
         isSidebarCollapsed ? 'w-16' : 'w-80'
       }`}
     >

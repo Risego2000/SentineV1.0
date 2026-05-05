@@ -24,11 +24,17 @@ import { evidenceDB } from '../services/EvidenceDB';
 import { ReportService } from '../services/ReportService';
 import { getExpedientService } from '../services/ExpedientService';
 import { getApiUrl } from '../services/apiConfig';
+import { supabase } from '../services/supabase';
+import { publishRealtimeEvent } from '../services/realtimeEvents';
+import { detectVideoCodec } from '../services/videoCodecDetector';
 import {
   createIpCameraSession,
   isSupportedIpCameraUrl,
   sanitizeCameraUrlForLogs,
 } from '../services/ipCameraService';
+import {
+  canPlayHevcNatively,
+} from '../services/hevcDirectPlayback';
 
 import { SentinelContext, SentinelContextType } from './SentinelContext';
 
@@ -43,6 +49,18 @@ export const SentinelProvider = ({
   viewerId?: string;
   key?: React.Key;
 }) => {
+  const IS_ELECTRON =
+    typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron');
+  const AUTO_SERVER_TRANSCODE_FALLBACK = IS_ELECTRON;
+  const expedientImagesPersistenceDisabledRef = useRef(false);
+  useEffect(() => {
+    try {
+      const persisted = window.localStorage.getItem('sentinel_expedient_images_disabled');
+      expedientImagesPersistenceDisabledRef.current = persisted === '1';
+    } catch {
+      expedientImagesPersistenceDisabledRef.current = false;
+    }
+  }, []);
   const [source, _setSource] = useState<'none' | 'live' | 'upload' | 'ip'>('none');
   const [selectedLog, setSelectedLog] = useState<InfractionLog | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -320,18 +338,290 @@ export const SentinelProvider = ({
       // In a true multi-viewer setup, ForensicQueue needs an Event Emitter architecture.
 
       const infractionWithViewer = { ...log, viewerId };
-      setLogs((prev) => [infractionWithViewer, ...prev]);
+
+      // Use video OSD timestamp if available, otherwise use system time
+      const videoTimestamp = infractionWithViewer.videoTimeCode || infractionWithViewer.visualTimestamp;
+      const infraredTimestamp = videoTimestamp || new Date().toISOString();
+
+      console.log('[ADD_INFRACTION] Called with:', {
+        id: infractionWithViewer.id,
+        plate: infractionWithViewer.plate,
+        ruleCategory: infractionWithViewer.ruleCategory,
+        timestamp: infraredTimestamp,
+        videoTimeCode: infractionWithViewer.videoTimeCode,
+      });
+      setLogs((prev) => {
+        console.log('[ADD_INFRACTION] Adding to logs. Previous count:', prev.length, ', New count:', prev.length + 1);
+        return [infractionWithViewer, ...prev];
+      });
       setStats((prev) => ({ ...prev, inf: prev.inf + 1 }));
+      const livePhotos =
+        1 +
+        (infractionWithViewer.extraSnapshots?.length || 0) +
+        (infractionWithViewer.zoomSnapshots?.length || 0);
+      updateBufferStatus({
+        capturedPhotos: livePhotos,
+        plateCandidate:
+          infractionWithViewer.plateOcr ||
+          (infractionWithViewer.plate && infractionWithViewer.plate !== 'UNKNOWN'
+            ? infractionWithViewer.plate
+            : undefined),
+      });
       logger.ai(
         'SENTINEL_CONTEXT',
         `[${viewerId || 'GLOBAL'}] Sanción Detectada: ${log.plate || 'SIN_PLACA'} - ${log.description}`
       );
       addLog('AI', `Sanción Detectada: ${log.plate || 'SIN_PLACA'} - ${log.description}`);
 
+      // Sync infraction to backend cache (so FORENSE module can access it without RLS issues)
       (async () => {
         try {
+          const syncResponse = await fetch('http://localhost:3002/api/infractions/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: infractionWithViewer.id,
+              plate: infractionWithViewer.plate,
+              make_model: infractionWithViewer.makeModel,
+              color: infractionWithViewer.color,
+              description: infractionWithViewer.description,
+              severity: infractionWithViewer.severity,
+              rule_category: infractionWithViewer.ruleCategory,
+              legal_base: infractionWithViewer.legalBase,
+              image_url: infractionWithViewer.image,
+              extra_snapshots: infractionWithViewer.extraSnapshots,
+              zoom_snapshots: infractionWithViewer.zoomSnapshots,
+              video_clip_url: infractionWithViewer.videoClip,
+              created_at: new Date().toISOString(),
+            }),
+          });
+          if (syncResponse.ok) {
+            console.log('[INFRACTION_SYNC] ✓ Synced to backend cache:', infractionWithViewer.id);
+          } else {
+            console.warn('[INFRACTION_SYNC] ✗ Failed to sync to backend:', await syncResponse.text());
+          }
+        } catch (syncErr) {
+          console.warn('[INFRACTION_SYNC] ✗ Error syncing to backend:', syncErr);
+        }
+      })();
+      void publishRealtimeEvent(
+        'infraction_confirmed',
+        {
+          infractionId: log.id,
+          plate: log.plate || null,
+          severity: log.severity || null,
+          ruleCategory: log.ruleCategory || null,
+          ts: Date.now(),
+        },
+        { viewerId: viewerId || undefined }
+      );
+
+      (async () => {
+        try {
+          const toImageUrl = (value: string): string => {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            if (
+              raw.startsWith('data:') ||
+              raw.startsWith('http://') ||
+              raw.startsWith('https://') ||
+              raw.startsWith('blob:')
+            ) {
+              return raw;
+            }
+            return `data:image/jpeg;base64,${raw}`;
+          };
+
+          const persistExpedientImages = async (expedientId: string, infraction: InfractionLog) => {
+            if (expedientImagesPersistenceDisabledRef.current) return;
+            const main = infraction.image ? [infraction.image] : [];
+            const general = Array.isArray(infraction.extraSnapshots)
+              ? infraction.extraSnapshots
+              : [];
+            const detail = Array.isArray(infraction.zoomSnapshots) ? infraction.zoomSnapshots : [];
+            const allRows = [
+              ...main.map((img) => ({ kind: 'OTRA', image_url: toImageUrl(img) })),
+              ...general.map((img) => ({ kind: 'GENERAL', image_url: toImageUrl(img) })),
+              ...detail.map((img) => ({ kind: 'DETALLE', image_url: toImageUrl(img) })),
+            ].filter((r) => !!r.image_url);
+
+            if (!allRows.length) return;
+
+            // Replace current gallery with latest complete set for this expedient
+            await supabase.from('expedient_images').delete().eq('expedient_id', expedientId);
+            const payload = allRows.map((row) => ({
+              expedient_id: expedientId,
+              kind: row.kind,
+              image_url: row.image_url,
+            }));
+            const { error } = await supabase.from('expedient_images').insert(payload as any);
+            if (error) {
+              const message = String(error.message || '');
+              const code = String((error as any).code || '');
+              if (
+                code === '42501' ||
+                message.includes('row-level security') ||
+                message.includes('permission')
+              ) {
+                expedientImagesPersistenceDisabledRef.current = true;
+                try {
+                  window.localStorage.setItem('sentinel_expedient_images_disabled', '1');
+                } catch {
+                  // ignore
+                }
+                console.warn(
+                  '[EXPEDIENT_IMAGES] Persist disabled for current session due to RLS/policy.'
+                );
+                return;
+              }
+              if (
+                code === '23503' ||
+                message.includes('foreign key') ||
+                message.includes('violates foreign key constraint')
+              ) {
+                expedientImagesPersistenceDisabledRef.current = true;
+                try {
+                  window.localStorage.setItem('sentinel_expedient_images_disabled', '1');
+                } catch {
+                  // ignore
+                }
+                console.warn(
+                  '[EXPEDIENT_IMAGES] Persist disabled for current session due to FK mismatch.'
+                );
+                return;
+              }
+              console.warn('[EXPEDIENT_IMAGES] Persist failed:', error.message);
+            } else {
+              console.log(`[EXPEDIENT_IMAGES] Stored ${payload.length} images for ${expedientId}`);
+            }
+          };
+
           await evidenceDB.saveInfraction(infractionWithViewer);
-          const rule = `${infractionWithViewer.operativeCode || ''} ${infractionWithViewer.ruleCategory || ''}`.toUpperCase();
+
+          // Guardar evidencia en Storage + URLs en tabla evidence
+          const saveEvidenceToSupabase = async (expedientId: string, infraction: InfractionLog) => {
+            try {
+              const { SupabaseStorageService } = await import('../services/SupabaseStorageService');
+              const evidenceInserts = [];
+
+              // Guardar imagen principal
+              if (infraction.image) {
+                const uploadResult = await SupabaseStorageService.uploadImage(
+                  infraction.image,
+                  expedientId,
+                  'ORIGINAL',
+                  'FULL'
+                );
+                if (uploadResult.success && uploadResult.url) {
+                  evidenceInserts.push({
+                    expedient_id: expedientId,
+                    infraction_id: String(infraction.id),
+                    kind: 'ORIGINAL',
+                    image_url: uploadResult.url,
+                    storage_path: uploadResult.path,
+                    description: 'Imagen principal de la infracción',
+                    capture_type: 'FULL',
+                    file_size_bytes: uploadResult.size || 0,
+                    content_type: 'image/jpeg',
+                    captured_at: new Date().toISOString(),
+                  });
+                }
+              }
+
+              // Guardar snapshots generales
+              if (infraction.extraSnapshots && infraction.extraSnapshots.length > 0) {
+                for (let idx = 0; idx < infraction.extraSnapshots.length; idx++) {
+                  const snap = infraction.extraSnapshots[idx];
+                  const captureType = idx === 0 ? 'INITIAL' : idx === Math.floor(infraction.extraSnapshots.length / 2) ? 'MID' : 'FINAL';
+                  const uploadResult = await SupabaseStorageService.uploadImage(
+                    snap,
+                    expedientId,
+                    'GENERAL',
+                    captureType
+                  );
+                  if (uploadResult.success && uploadResult.url) {
+                    evidenceInserts.push({
+                      expedient_id: expedientId,
+                      infraction_id: String(infraction.id),
+                      kind: 'GENERAL',
+                      image_url: uploadResult.url,
+                      storage_path: uploadResult.path,
+                      description: `Snapshot de contexto ${captureType}`,
+                      capture_type: captureType,
+                      file_size_bytes: uploadResult.size || 0,
+                      content_type: 'image/jpeg',
+                      captured_at: new Date().toISOString(),
+                    });
+                  }
+                }
+              }
+
+              // Guardar snapshots zoom
+              if (infraction.zoomSnapshots && infraction.zoomSnapshots.length > 0) {
+                for (let idx = 0; idx < infraction.zoomSnapshots.length; idx++) {
+                  const snap = infraction.zoomSnapshots[idx];
+                  const captureType = idx === 0 ? 'INITIAL' : idx === Math.floor(infraction.zoomSnapshots.length / 2) ? 'MID' : 'FINAL';
+                  const uploadResult = await SupabaseStorageService.uploadImage(
+                    snap,
+                    expedientId,
+                    'DETALLE',
+                    captureType
+                  );
+                  if (uploadResult.success && uploadResult.url) {
+                    evidenceInserts.push({
+                      expedient_id: expedientId,
+                      infraction_id: String(infraction.id),
+                      kind: 'DETALLE',
+                      image_url: uploadResult.url,
+                      storage_path: uploadResult.path,
+                      description: `Snapshot zoom ${captureType}`,
+                      capture_type: captureType,
+                      file_size_bytes: uploadResult.size || 0,
+                      content_type: 'image/jpeg',
+                      captured_at: new Date().toISOString(),
+                    });
+                  }
+                }
+              }
+
+              // Guardar video
+              if (infraction.videoClip) {
+                const uploadResult = await SupabaseStorageService.uploadVideo(
+                  infraction.videoClip,
+                  expedientId,
+                  'FULL'
+                );
+                if (uploadResult.success && uploadResult.url) {
+                  evidenceInserts.push({
+                    expedient_id: expedientId,
+                    infraction_id: String(infraction.id),
+                    kind: 'VIDEO',
+                    image_url: uploadResult.url,
+                    storage_path: uploadResult.path,
+                    description: 'Video clip de 8 segundos',
+                    capture_type: 'FULL',
+                    file_size_bytes: uploadResult.size || 0,
+                    content_type: 'video/mp4',
+                    captured_at: new Date().toISOString(),
+                  });
+                }
+              }
+
+              if (evidenceInserts.length > 0) {
+                const { error } = await supabase.from('evidence').insert(evidenceInserts as any);
+                if (error) {
+                  console.warn('[EVIDENCE] Failed to save evidence:', error.message);
+                } else {
+                  console.log(`[EVIDENCE] Saved ${evidenceInserts.length} evidence items for ${expedientId}`);
+                }
+              }
+            } catch (error) {
+              console.warn('[EVIDENCE] Error saving evidence:', error);
+            }
+          };
+
+          const rule =
+            `${infractionWithViewer.operativeCode || ''} ${infractionWithViewer.ruleCategory || ''}`.toUpperCase();
           const violationType = rule.includes('GIRO')
             ? 'FORBIDDEN_TURN'
             : rule.includes('STOP')
@@ -344,35 +634,110 @@ export const SentinelProvider = ({
             violationType,
           });
 
-          const expedient = await expedientService.createExpedient({
-            infractionId: String(infractionWithViewer.id),
-            violationType,
-            location: 'Daganzo de Arriba',
-            timestamp: infractionWithViewer.validatedAt || Date.now(),
-            evidenceId: String(infractionWithViewer.id),
-            licensePlate:
-              infractionWithViewer.plate ||
-              infractionWithViewer.plateOcr ||
-              'DESCONOCIDO',
-          });
+          let expedient;
+          let createError: unknown = null;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              // Use video OSD timestamp for expedient (when infraction actually occurred)
+              const videoTimestamp = infractionWithViewer.videoTimeCode || infractionWithViewer.visualTimestamp;
+              const expedientTimestamp = videoTimestamp
+                ? new Date(videoTimestamp).getTime()
+                : (infractionWithViewer.validatedAt || Date.now());
+
+              expedient = await expedientService.createExpedient({
+                infractionId: String(infractionWithViewer.id),
+                violationType,
+                location: 'Daganzo de Arriba',
+                timestamp: expedientTimestamp,
+                evidenceId: String(infractionWithViewer.id),
+                licensePlate:
+                  infractionWithViewer.plate || infractionWithViewer.plateOcr || 'DESCONOCIDO',
+              });
+              createError = null;
+              break;
+            } catch (err) {
+              createError = err;
+              if (attempt < 3) {
+                await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
+              }
+            }
+          }
+          if (!expedient) {
+            throw createError || new Error('No se pudo crear expediente tras reintentos');
+          }
 
           console.log('[EXPEDIENT] Created successfully:', expedient.id);
 
+          // Copiar TODA la información del PREINFORME DE REVISIÓN IA
+          expedient.makeModel = infractionWithViewer.makeModel || '';
           expedient.vehicleDescription = infractionWithViewer.makeModel || '';
           expedient.color = infractionWithViewer.color || '';
-          expedient.descripcionDetalladaHechos = infractionWithViewer.description;
+          expedient.description = infractionWithViewer.description || '';
+          expedient.descripcionDetalladaHechos = infractionWithViewer.description || '';
+          expedient.severity = infractionWithViewer.severity || 'MEDIUM';
           expedient.gravedad =
             infractionWithViewer.severity === 'CRITICAL'
               ? 'Muy Grave'
               : infractionWithViewer.severity === 'LOW'
                 ? 'Leve'
                 : 'Grave';
+          expedient.ruleCategory = infractionWithViewer.ruleCategory || '';
+          expedient.legalBase = infractionWithViewer.legalBase || '';
+          expedient.reasoning = infractionWithViewer.reasoning || [];
+          expedient.videoTimeCode = infractionWithViewer.videoTimeCode || '';
+          expedient.visualTimestamp = infractionWithViewer.visualTimestamp || '';
+          expedient.ocrResults = infractionWithViewer.ocrResults || [];
+          expedient.plateOcr = infractionWithViewer.plateOcr || '';
+          expedient.plateOcrCandidates = infractionWithViewer.plateOcrCandidates || [];
+          expedient.validationStatus = infractionWithViewer.validationStatus || 'pending';
+          expedient.playbackTime = infractionWithViewer.playbackTime;
+          expedient.videoClip = infractionWithViewer.videoClip;
+          expedient.telemetrySpeedEstimated = infractionWithViewer.telemetry?.speedEstimated || '';
+          expedient.telemetryBehaviorAnomalies =
+            infractionWithViewer.telemetry?.behaviorAnomalies || '';
+          expedient.operativeCode = infractionWithViewer.operativeCode || '';
+          expedient.priority = infractionWithViewer.priority;
+          expedient.priorityLevel = infractionWithViewer.priorityLevel;
+          expedient.fineAmount = infractionWithViewer.fineAmount;
+          expedient.pointsDeducted = infractionWithViewer.pointsDeducted;
+          expedient.image = infractionWithViewer.image;
+          expedient.extraSnapshots = infractionWithViewer.extraSnapshots;
+          expedient.zoomSnapshots = infractionWithViewer.zoomSnapshots;
           expedient.photosCount =
             1 +
             (infractionWithViewer.extraSnapshots?.length || 0) +
             (infractionWithViewer.zoomSnapshots?.length || 0);
           await expedientService.updateExpedient(expedient);
+          await persistExpedientImages(expedient.id, infractionWithViewer);
+          await saveEvidenceToSupabase(expedient.id, infractionWithViewer);
           console.log('[EXPEDIENT] Updated successfully:', expedient.id);
+
+          // Sync expedient to backend cache (so FORENSE module can access it without RLS issues)
+          try {
+            const syncResponse = await fetch('http://localhost:3002/api/expedients/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: expedient.id,
+                state: expedient.state || 'DETECTED',
+                created_at: expedient.createdAt || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                infraction_id: expedient.infractionId,
+                license_plate: expedient.licensePlate,
+                violation_type: expedient.violationType,
+                location: expedient.location,
+                timestamp: expedient.timestamp,
+              }),
+            });
+            if (syncResponse.ok) {
+              console.log('[EXPEDIENT_SYNC] ✓ Synced to backend cache:', expedient.id);
+            } else {
+              console.warn('[EXPEDIENT_SYNC] ✗ Failed to sync to backend:', await syncResponse.text());
+            }
+          } catch (syncErr) {
+            console.warn('[EXPEDIENT_SYNC] ✗ Error syncing to backend:', syncErr);
+          }
+
           addLog('INFO', `Expediente #${expedient.id} creado desde infracción #${log.id}`);
         } catch (error) {
           addLog(
@@ -382,7 +747,7 @@ export const SentinelProvider = ({
         }
       })();
     },
-    [addLog, setLogs, setStats, viewerId]
+    [addLog, setLogs, setStats, updateBufferStatus, viewerId]
   );
 
   useEffect(() => {
@@ -508,6 +873,19 @@ export const SentinelProvider = ({
       addLog('CORE', 'Iniciando captura de pantalla/ventana para análisis de tráfico...');
       setStatusMsg('COMPARTIENDO...');
       try {
+        if (
+          typeof navigator === 'undefined' ||
+          !navigator.mediaDevices ||
+          typeof navigator.mediaDevices.getDisplayMedia !== 'function'
+        ) {
+          const notSupportedError = new DOMException(
+            'Screen capture API is not available in this environment',
+            'NotSupportedError'
+          );
+          handleError('SCREEN_CAPTURE', notSupportedError);
+          return undefined;
+        }
+
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: { ideal: 30 } },
           audio: false,
@@ -519,7 +897,10 @@ export const SentinelProvider = ({
 
           // Handle both loadeddata and playing events
           const onVideoReady = () => {
-            addLog('CORE', `Video ready - readyState: ${video.readyState}, playing: ${!video.paused}`);
+            addLog(
+              'CORE',
+              `Video ready - readyState: ${video.readyState}, playing: ${!video.paused}`
+            );
             setSource('live');
             setStatusMsg('STREAM_ACTIVO');
             addLog('CORE', 'Captura de pantalla sincronizada. Señal en vivo lista.');
@@ -570,7 +951,7 @@ export const SentinelProvider = ({
         return stream;
       } catch (e) {
         handleError('SCREEN_CAPTURE', e);
-        throw e;
+        return undefined;
       }
     },
     [addLog, setStatusMsg, handleError, setSource]
@@ -584,6 +965,22 @@ export const SentinelProvider = ({
     [startScreenShare]
   );
 
+  const stopScreenShare = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const stream = video.srcObject as MediaStream | null;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    video.srcObject = null;
+    setIsPlaying(false);
+    setSource('none');
+    setStatusMsg('CAPTURA_FINALIZADA');
+    addLog('CORE', 'Captura de pantalla detenida por el operador.');
+  }, [addLog, setIsPlaying, setSource, setStatusMsg]);
+
   const formatEstimatedTime = (seconds: number): string => {
     if (seconds < 0 || !Number.isFinite(seconds)) return '?';
     const hours = Math.floor(seconds / 3600);
@@ -593,15 +990,6 @@ export const SentinelProvider = ({
     if (hours > 0) return `${hours}h ${minutes}m`;
     if (minutes > 0) return `${minutes}m ${secs}s`;
     return `${secs}s`;
-  };
-
-  const canPlayHevc = () => {
-    if (typeof document === 'undefined') return false;
-    const video = document.createElement('video');
-    return (
-      video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"') !== '' ||
-      video.canPlayType('video/mp4; codecs="hvc1"') !== ''
-    );
   };
 
   const transcodeVideo = async (
@@ -639,9 +1027,7 @@ export const SentinelProvider = ({
           lastProgress = pData.progress;
           lastProgressTime = currentTime;
 
-          setStatusMsg(
-            `TRANSCODIFICANDO... (${pData.progress}%) - ETA: ${estimatedTotal}`
-          );
+          setStatusMsg(`TRANSCODIFICANDO... (${pData.progress}%) - ETA: ${estimatedTotal}`);
         }
       } catch {
         // Progress polling is best-effort only.
@@ -662,16 +1048,69 @@ export const SentinelProvider = ({
       const transcodedBlob = await response.blob();
       const transcodedUrl = URL.createObjectURL(transcodedBlob);
       URL.revokeObjectURL(url);
+
+      // Reset media element pipeline before attaching the transcoded source.
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.currentTime = 0;
+      video.srcObject = null;
       video.src = transcodedUrl;
-      video.onloadeddata = () => {
-        addLog('SUCCESS', `Video transcodificado listo (H.264 compatible).`);
-        setStatusMsg('CARGA_COMPLETA');
-        if (autoPlay) setIsPlaying(true);
-      };
+      video.load();
+
+      await new Promise<void>((resolve, reject) => {
+        const onReady = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new Error('El video transcodificado no pudo cargarse en el reproductor.'));
+        };
+        const cleanup = () => {
+          video.removeEventListener('loadeddata', onReady);
+          video.removeEventListener('canplay', onReady);
+          video.removeEventListener('error', onError);
+        };
+        video.addEventListener('loadeddata', onReady, { once: true });
+        video.addEventListener('canplay', onReady, { once: true });
+        video.addEventListener('error', onError, { once: true });
+      });
+
+      addLog('SUCCESS', `Video transcodificado listo (H.264 compatible).`);
+      setStatusMsg('CARGA_COMPLETA');
+      if (autoPlay) {
+        setIsPlaying(true);
+        void video.play().catch((err) => {
+          addLog(
+            'WARN',
+            `Autoplay del transcodificado bloqueado/interrumpido: ${err instanceof Error ? err.message : String(err)}`
+          );
+        });
+      } else {
+        setIsPlaying(false);
+      }
     } catch (error) {
       clearInterval(pollInterval);
       addLog('ERROR', `Error en transcodificador: ${error}`);
       setStatusMsg('ERROR_CARGA');
+    }
+  };
+
+  const remuxCopyVideo = async (file: File): Promise<Blob | null> => {
+    try {
+      const fileBuffer = await file.arrayBuffer();
+      const remuxUrl = getApiUrl('/api/remux-copy');
+      const response = await fetch(remuxUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: fileBuffer,
+      });
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return blob.size > 0 ? blob : null;
+    } catch {
+      return null;
     }
   };
 
@@ -695,36 +1134,164 @@ export const SentinelProvider = ({
 
       addLog('INFO', `Cargando video: "${file.name}"...`);
       setStatusMsg('CARGANDO_VIDEO...');
+      setIsPlaying(false);
 
       const url = URL.createObjectURL(file);
-      video.src = url;
-      video.currentTime = 0;
-
-      const hevcSupported = canPlayHevc();
-      let transcodeAttempted = false;
-
-      const handleError = async () => {
-        video.removeEventListener('error', handleError);
-
-        if (!transcodeAttempted) {
-          transcodeAttempted = true;
-          addLog('WARN', `Fallo de reproducción. Iniciando transcodificación con GPU...`);
-          await transcodeVideo(file, video, url, autoPlay);
-        } else {
-          addLog('ERROR', `No se pudo cargar el video incluso después de transcodificar.`);
-          setStatusMsg('ERROR_CARGA');
-        }
+      const setVideoSourceAndWait = async (sourceUrl: string): Promise<void> => {
+        video.pause();
+        video.srcObject = null;
+        video.removeAttribute('src');
+        video.currentTime = 0;
+        video.src = sourceUrl;
+        video.load();
+        await new Promise<void>((resolve, reject) => {
+          const onReady = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(new Error('VIDEO_LOAD_FAILED'));
+          };
+          const cleanup = () => {
+            video.removeEventListener('loadeddata', onReady);
+            video.removeEventListener('canplay', onReady);
+            video.removeEventListener('error', onError);
+          };
+          video.addEventListener('loadeddata', onReady, { once: true });
+          video.addEventListener('canplay', onReady, { once: true });
+          video.addEventListener('error', onError, { once: true });
+        });
       };
 
-      if (!hevcSupported) {
-        addLog('INFO', `H.265 no soportado. Detectado: ${file.name} será transcodificado automáticamente.`);
+      const detectedCodec = await detectVideoCodec(file);
+      const isLikelyHevc = detectedCodec === 'hevc';
+      const hevcSupported = canPlayHevcNatively();
+
+      if (isLikelyHevc && hevcSupported) {
+        addLog('INFO', 'HEVC detectado. Reproducción directa sin transcodificar.');
+      } else if (isLikelyHevc && !hevcSupported) {
+        addLog('INFO', 'HEVC detectado. Intentando reproducción directa y puente WASM.');
       } else {
-        addLog('INFO', `H.265 soportado. Reproduciendo nativamente sin transcodificar.`);
+        addLog('INFO', `Codec detectado: ${detectedCodec}. Reproducción directa prioritaria.`);
       }
 
-      video.addEventListener('error', handleError, { once: true });
+      try {
+        await setVideoSourceAndWait(url);
+      } catch {
+        if (IS_ELECTRON) {
+          addLog('WARN', 'Electron: intentando remux sin pérdida antes del puente WASM...');
+          const remuxBlob = await remuxCopyVideo(file);
+          if (remuxBlob) {
+            const remuxUrl = URL.createObjectURL(remuxBlob);
+            try {
+              await setVideoSourceAndWait(remuxUrl);
+              addLog('SUCCESS', 'Video cargado tras remux sin pérdida (copy stream).');
+              video.onloadeddata = () => {
+                addLog('INFO', `Video "${file.name}" sincronizado.`);
+                setStatusMsg('SISTEMA_LISTO');
+                if (autoPlay) setIsPlaying(true);
+              };
+              setSource('upload');
+              return;
+            } catch {
+              URL.revokeObjectURL(remuxUrl);
+            }
+          }
+        }
+        if (isLikelyHevc && !hevcSupported) {
+          addLog('WARN', 'HEVC no soportado nativamente. Intentando puente ffmpeg.wasm...');
+          const { tryHevcWasmBridge } = await import('../services/hevcWasmBridge');
+          const wasmBlob = await tryHevcWasmBridge(file);
+          if (wasmBlob) {
+            const wasmUrl = URL.createObjectURL(wasmBlob);
+            try {
+              await setVideoSourceAndWait(wasmUrl);
+              addLog('SUCCESS', 'HEVC cargado vía WASM sin transcodificación de servidor.');
+            } catch {
+              URL.revokeObjectURL(wasmUrl);
+              if (AUTO_SERVER_TRANSCODE_FALLBACK) {
+                addLog('WARN', 'Puente WASM falló. Iniciando transcodificación con GPU.');
+                await transcodeVideo(file, video, url, autoPlay);
+              } else {
+                addLog(
+                  'ERROR',
+                  'No fue posible reproducir HEVC sin transcodificar en este entorno (directo + WASM).'
+                );
+                setStatusMsg('ERROR_CARGA');
+              }
+              return;
+            }
+          } else {
+            if (AUTO_SERVER_TRANSCODE_FALLBACK) {
+              addLog('WARN', 'Puente WASM no disponible. Iniciando transcodificación con GPU.');
+              await transcodeVideo(file, video, url, autoPlay);
+            } else {
+              addLog(
+                'ERROR',
+                'Puente WASM no disponible y transcodificación automática desactivada.'
+              );
+              setStatusMsg('ERROR_CARGA');
+            }
+            return;
+          }
+        } else if (
+          detectedCodec === 'unknown' &&
+          (file.name.toLowerCase().endsWith('.mp4') ||
+            file.name.toLowerCase().endsWith('.mov') ||
+            file.name.toLowerCase().endsWith('.mkv'))
+        ) {
+          addLog('WARN', 'Codec unknown. Intentando puente WASM antes de transcodificar...');
+          const { tryHevcWasmBridge } = await import('../services/hevcWasmBridge');
+          const wasmBlob = await tryHevcWasmBridge(file);
+          if (wasmBlob) {
+            const wasmUrl = URL.createObjectURL(wasmBlob);
+            try {
+              await setVideoSourceAndWait(wasmUrl);
+              addLog('SUCCESS', 'Video cargado vía WASM sin transcodificación de servidor.');
+            } catch {
+              URL.revokeObjectURL(wasmUrl);
+              if (AUTO_SERVER_TRANSCODE_FALLBACK) {
+                addLog('WARN', 'Puente WASM falló. Iniciando transcodificación con GPU.');
+                await transcodeVideo(file, video, url, autoPlay);
+              } else {
+                addLog(
+                  'ERROR',
+                  'No fue posible reproducir el archivo sin transcodificar en este entorno.'
+                );
+                setStatusMsg('ERROR_CARGA');
+              }
+              return;
+            }
+          } else {
+            if (AUTO_SERVER_TRANSCODE_FALLBACK) {
+              addLog('WARN', 'Puente WASM no disponible. Iniciando transcodificación con GPU.');
+              await transcodeVideo(file, video, url, autoPlay);
+            } else {
+              addLog(
+                'ERROR',
+                'Puente WASM no disponible y transcodificación automática desactivada.'
+              );
+              setStatusMsg('ERROR_CARGA');
+            }
+            return;
+          }
+        } else {
+          if (AUTO_SERVER_TRANSCODE_FALLBACK) {
+            addLog('WARN', 'Fallo de reproducción. Iniciando transcodificación con GPU...');
+            await transcodeVideo(file, video, url, autoPlay);
+          } else {
+            addLog(
+              'ERROR',
+              'Fallo de reproducción nativa y transcodificación automática desactivada.'
+            );
+            setStatusMsg('ERROR_CARGA');
+          }
+          return;
+        }
+      }
+
       video.onloadeddata = () => {
-        video.removeEventListener('error', handleError);
         addLog('INFO', `Video "${file.name}" sincronizado.`);
         setStatusMsg('SISTEMA_LISTO');
         if (autoPlay) setIsPlaying(true);
@@ -776,9 +1343,7 @@ export const SentinelProvider = ({
       addLog('INFO', 'Esperando a que finalice la cola forense para consolidar denuncias...');
       await forensicQueue.waitForIdle();
 
-      const validatedLogs = logsRef.current.filter(
-        (log) => log.validationStatus === 'validated'
-      );
+      const validatedLogs = logsRef.current.filter((log) => log.validationStatus === 'validated');
 
       if (validatedLogs.length === 0) {
         addLog(
@@ -920,9 +1485,27 @@ export const SentinelProvider = ({
       bionics: source !== 'none' ? 'ready' : 'pending',
       vector: geometry.length > 0 ? 'ready' : 'pending',
       mediapipeReady,
+      ocrAutoPipeline: true,
+      ocrImageEnhancement: true,
+      ocrPlateCropFallback: true,
+      ocrGeminiConfirmation: true,
     }),
     [neuralStatus, hasApiKey, source, geometry.length, mediapipeReady]
   );
+
+  useEffect(() => {
+    void publishRealtimeEvent(
+      'engine_status',
+      {
+        statusLabel,
+        systemStatus,
+        source,
+        isPlaying,
+        ts: Date.now(),
+      },
+      { viewerId: viewerId || undefined }
+    );
+  }, [statusLabel, systemStatus, source, isPlaying, viewerId]);
 
   useEffect(() => {
     const roiLines = geometry.filter((l) => l.type.startsWith('roi_'));
@@ -1018,6 +1601,7 @@ export const SentinelProvider = ({
       runAudit,
       startLiveFeed,
       startScreenShare,
+      stopScreenShare,
       onFileChange,
       onFilesChange,
       loadNextInQueue,
@@ -1088,6 +1672,7 @@ export const SentinelProvider = ({
       runAudit,
       startLiveFeed,
       startScreenShare,
+      stopScreenShare,
       onFileChange,
       onFilesChange,
       loadNextInQueue,

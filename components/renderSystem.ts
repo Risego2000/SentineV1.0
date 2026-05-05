@@ -123,6 +123,7 @@ export const renderScene = (
     // 3. Draw Tracks
     if (showDetections) {
       tracks.forEach((track) => {
+        if ((track.missedFrames || 0) > 0) return;
         ctx.save();
         const color = track.color || VEHICLE_COLORS[track.label] || '#ffffff';
         const label = LABEL_MAP[track.label] || track.label.toUpperCase();

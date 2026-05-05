@@ -3,19 +3,95 @@
  * Displays pending expedients and allows review workflow
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Expedient } from '../domain/Expedient';
 import { ExpedientWorkflow } from '../components/ExpedientWorkflow';
+import { InfractionModal } from '../components/InfractionModal';
 import { PDFExportService } from '../services/PDFExportService';
 import { ExcelExportService } from '../services/ExcelExportService';
 import { getExpedientService } from '../services/ExpedientService';
+import { supabase, SUPABASE_TABLES } from '../services/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { InfractionLog } from '../types';
+
+interface InfractionSchemaRow {
+  id: string;
+  created_at: string | null;
+  updated_at: string | null;
+  status: string | null;
+  evidence_id: string | null;
+  plate: string | null;
+  make_model: string | null;
+  color: string | null;
+  description: string | null;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
+  rule_category: string | null;
+  legal_base: string | null;
+  audit_result: any;
+  image_url: string | null;
+  extra_snapshots: string[] | null;
+  zoom_snapshots: string[] | null;
+  video_clip_url: string | null;
+  time: string | null;
+  playback_time: number | null;
+  local_time: string | null;
+  video_time_code: string | null;
+  visual_timestamp: string | null;
+  telemetry: any;
+  report_path: string | null;
+  report_generated_at: string | null;
+  validation_status: 'pending' | 'validated' | 'rejected' | null;
+  validated_at: string | null;
+  operator_id: string | null;
+  extra_data: any;
+}
+
+const mapIncidentToInfractionRow = (row: any): InfractionSchemaRow => ({
+  id: String(row.id),
+  created_at: row.created_at || null,
+  updated_at: row.updated_at || null,
+  status: row.status || null,
+  evidence_id: row.evidence_id || null,
+  plate: row.plate || null,
+  make_model: row.make_model || null,
+  color: row.color || null,
+  description: row.description || null,
+  severity: row.severity || null,
+  rule_category: row.rule_category || null,
+  legal_base: row.legal_base || null,
+  audit_result: row.audit_result || null,
+  image_url: row.image_url || row.image || null,
+  extra_snapshots: row.extra_snapshots || null,
+  zoom_snapshots: row.zoom_snapshots || null,
+  video_clip_url: row.video_clip_url || row.video_clip || null,
+  time: row.time || null,
+  playback_time: row.playback_time || null,
+  local_time: row.local_time || null,
+  video_time_code: row.video_time_code || null,
+  visual_timestamp: row.visual_timestamp || null,
+  telemetry: row.telemetry || null,
+  report_path: row.report_path || null,
+  report_generated_at: row.report_generated_at || null,
+  validation_status: row.validation_status || null,
+  validated_at: row.validated_at || null,
+  operator_id: row.operator_id || null,
+  extra_data: row.extra_data || null,
+});
 
 interface PageState {
   expedients: Expedient[];
+  infractions: InfractionLog[];
   selectedExpedientId: string | null;
+  selectedInfractionId: number | null;
+  selectedType: 'expedient' | 'infraction' | null;
   loading: boolean;
+  refreshing: boolean;
+  manualRefreshing: boolean;
   error: string | null;
   success?: string | null;
+  infractionRowsByExpedientId: Record<string, InfractionSchemaRow | null>;
+  expedientImagesByExpedientId: Record<string, string[]>;
+  infractionsTableUnavailable: boolean;
   currentUser: {
     name: string;
     role: 'OPERATOR' | 'SUPERVISOR' | 'ADMIN';
@@ -23,11 +99,22 @@ interface PageState {
 }
 
 export const ExpedientListPage: React.FC = () => {
+  const { user } = useAuth();
+  const infractionsTableUnavailableRef = useRef(false);
+  const infractionLoadInFlightRef = useRef(false);
   const [state, setState] = useState<PageState>({
     expedients: [],
+    infractions: [],
     selectedExpedientId: null,
+    selectedInfractionId: null,
+    selectedType: null,
     loading: true,
+    refreshing: false,
+    manualRefreshing: false,
     error: null,
+    infractionRowsByExpedientId: {},
+    expedientImagesByExpedientId: {},
+    infractionsTableUnavailable: false,
     currentUser: {
       name: sessionStorage.getItem('currentUserName') || 'Operador',
       role: (sessionStorage.getItem('currentUserRole') as any) || 'OPERATOR',
@@ -36,39 +123,159 @@ export const ExpedientListPage: React.FC = () => {
 
   const expedientService = getExpedientService();
   const selectedExpedient = state.expedients.find((e) => e.id === state.selectedExpedientId);
+  const selectedInfraction = state.infractions.find((i) => i.id === state.selectedInfractionId);
+  const selectedInfractionRow = selectedExpedient
+    ? state.infractionRowsByExpedientId[selectedExpedient.id] || null
+    : null;
+  const detectedCount = state.expedients.filter((e) => e.state === 'DETECTED').length;
+  const reviewCount = state.expedients.filter((e) => e.state === 'UNDER_REVIEW').length;
+  const signedCount = state.expedients.filter((e) => e.state === 'SIGNED').length;
 
   // Load pending expedients on mount
   useEffect(() => {
-    loadPendingExpedients();
+    loadPendingExpedients({ silent: false });
   }, []);
 
-  const loadPendingExpedients = async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      // Load all active expedients (except ARCHIVED)
-      const states = ['DETECTED', 'UNDER_REVIEW', 'VALIDATED', 'REJECTED', 'SIGNED', 'EXPORTED'];
-      const allExpedients: Expedient[] = [];
+  // Auto-refresh expedients to keep dossier data updated in real time.
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (!infractionsTableUnavailableRef.current) {
+        loadPendingExpedients({ silent: true });
+      }
+    }, 7000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
-      for (const state of states) {
-        const expedients = await expedientService.getExpedientsByState(state);
-        allExpedients.push(...expedients);
+  // Keep operator identity aligned with active authenticated session.
+  useEffect(() => {
+    if (!user) return;
+    const normalizedRole =
+      user.role === 'admin' ? 'ADMIN' : user.role === 'viewer' ? 'OPERATOR' : 'OPERATOR';
+    const sessionName = user.name || user.email?.split('@')[0] || 'Operador';
+    setState((prev) => ({
+      ...prev,
+      currentUser: {
+        name: sessionName,
+        role: normalizedRole,
+      },
+    }));
+    sessionStorage.setItem('currentUserName', sessionName);
+    sessionStorage.setItem('currentUserRole', normalizedRole);
+  }, [user]);
+
+  const loadPendingExpedients = async (
+    { silent = false, manual = false }: { silent?: boolean; manual?: boolean } = {}
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      loading: silent ? prev.loading : true,
+      refreshing: silent,
+      manualRefreshing: manual,
+      error: null,
+    }));
+    try {
+      // Load all active expedients from backend API (bypasses RLS restrictions)
+      // The backend uses service role key to query Supabase directly
+      const response = await fetch('http://localhost:3002/api/expedients', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(
+          `Failed to fetch expedients: ${response.status} - ${errorData?.error || errorData?.message || 'Unknown error'}`
+        );
       }
 
-      const all = allExpedients.sort(
-        (a, b) => b.createdAt - a.createdAt
-      );
+      const result = await response.json();
+      const allExpedients: Expedient[] = (result.expedients || []).map((exp: any) => ({
+        ...exp,
+        // Handle both Supabase format (snake_case) and cache format
+        id: exp.id || exp.expedient_id,
+        createdAt: exp.createdAt || (exp.created_at ? new Date(exp.created_at).getTime() : Date.now()),
+        updatedAt: exp.updatedAt || (exp.updated_at ? new Date(exp.updated_at).getTime() : Date.now()),
+        state: exp.state || 'DETECTED',
+        licensePlate: exp.licensePlate || exp.license_plate || 'UNKNOWN',
+        violationType: exp.violationType || exp.violation_type || 'UNKNOWN',
+      }));
+
+      const all = allExpedients.sort((a, b) => b.createdAt - a.createdAt);
+
+      // Also load infractions
+      const infractions = await loadInfractionLogs();
 
       setState((prev) => ({
         ...prev,
         expedients: all,
+        infractions: infractions,
         loading: false,
+        refreshing: false,
+        manualRefreshing: false,
       }));
+
+      if (!infractionsTableUnavailableRef.current) {
+        await loadInfractionRowsForExpedients(all);
+      }
+      await loadExpedientImages(all);
     } catch (error) {
       setState((prev) => ({
         ...prev,
         error: `Error loading expedients: ${error instanceof Error ? error.message : String(error)}`,
         loading: false,
+        refreshing: false,
+        manualRefreshing: false,
       }));
+    }
+  };
+
+  const loadInfractionLogs = async (): Promise<InfractionLog[]> => {
+    try {
+      // Load from backend API (cache) instead of Supabase to bypass RLS restrictions
+      const response = await fetch('http://localhost:3002/api/infractions', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn('Error loading infractions from backend:', response.status);
+        return [];
+      }
+
+      const result = await response.json();
+      const infractions = result.infractions || [];
+
+      // Map cache rows to InfractionLog type
+      return infractions.map((row: any) => ({
+        id: row.id,
+        plate: row.plate || row.license_plate,
+        makeModel: row.make_model || row.makeModel,
+        color: row.color,
+        description: row.description,
+        severity: row.severity,
+        ruleCategory: row.rule_category || row.ruleCategory,
+        legalBase: row.legal_base || row.legalBase,
+        image: row.image_url || row.image,
+        extraSnapshots: row.extra_snapshots || row.extraSnapshots || [],
+        zoomSnapshots: row.zoom_snapshots || row.zoomSnapshots || [],
+        videoClip: row.video_clip_url || row.videoClip,
+        time: row.time,
+        playbackTime: row.playback_time || row.playbackTime,
+        validationStatus: row.validation_status || row.validationStatus,
+        validatedAt: row.validated_at ? new Date(row.validated_at).getTime() : undefined,
+        operatorId: row.operator_id || row.operatorId,
+        fineAmount: row.fine_amount || row.fineAmount,
+        pointsDeducted: row.points_deducted || row.pointsDeducted,
+        localTime: row.local_time || row.localTime,
+        videoTimeCode: row.video_time_code || row.videoTimeCode,
+      }));
+    } catch (error) {
+      console.error('Error loading infraction logs:', error);
+      return [];
     }
   };
 
@@ -97,7 +304,8 @@ export const ExpedientListPage: React.FC = () => {
     if (selectedExpedient.state !== 'SIGNED' && selectedExpedient.state !== 'EXPORTED') {
       setState((prev) => ({
         ...prev,
-        error: 'Solo se pueden exportar reportes OFICIALES después de la firma digital. Genera un PREINFORME para previsualizaciones.',
+        error:
+          'Solo se pueden exportar reportes OFICIALES después de la firma digital. Genera un PREINFORME para previsualizaciones.',
       }));
       return;
     }
@@ -127,7 +335,8 @@ export const ExpedientListPage: React.FC = () => {
   };
 
   // Helper to check if export button should be enabled
-  const canExportOfficialPDF = selectedExpedient &&
+  const canExportOfficialPDF =
+    selectedExpedient &&
     selectedExpedient.state === 'SIGNED' &&
     selectedExpedient.signature.isSigned;
 
@@ -142,7 +351,11 @@ export const ExpedientListPage: React.FC = () => {
       const photos: { name: string; base64: string }[] = [];
 
       // Add general context photos (if available)
-      if (selectedExpedient && 'extraSnapshots' in selectedExpedient && selectedExpedient.extraSnapshots) {
+      if (
+        selectedExpedient &&
+        'extraSnapshots' in selectedExpedient &&
+        selectedExpedient.extraSnapshots
+      ) {
         const extraSnapshots = selectedExpedient.extraSnapshots as string[];
         extraSnapshots.forEach((snapshot, idx) => {
           if (snapshot) {
@@ -155,7 +368,11 @@ export const ExpedientListPage: React.FC = () => {
       }
 
       // Add detail/zoom photos (if available)
-      if (selectedExpedient && 'zoomSnapshots' in selectedExpedient && selectedExpedient.zoomSnapshots) {
+      if (
+        selectedExpedient &&
+        'zoomSnapshots' in selectedExpedient &&
+        selectedExpedient.zoomSnapshots
+      ) {
         const zoomSnapshots = selectedExpedient.zoomSnapshots as string[];
         zoomSnapshots.forEach((snapshot, idx) => {
           if (snapshot) {
@@ -227,18 +444,268 @@ export const ExpedientListPage: React.FC = () => {
     }
   };
 
+  const loadExpedientImages = async (expedients: Expedient[]) => {
+    try {
+      const expedientIds = [...new Set(expedients.map((e) => String(e.id || '')).filter(Boolean))];
+      if (!expedientIds.length) return;
+
+      const { data, error } = await supabase
+        .from('expedient_images')
+        .select('expedient_id, image_url')
+        .in('expedient_id', expedientIds);
+
+      if (error) {
+        console.warn('[EXPEDIENT_PAGE] Failed to load expedient_images:', error.message);
+        return;
+      }
+
+      const byExpedient: Record<string, string[]> = {};
+      for (const row of data || []) {
+        const expId = String((row as any).expedient_id || '').trim();
+        const url = String((row as any).image_url || '').trim();
+        if (!expId || !url) continue;
+        if (!byExpedient[expId]) byExpedient[expId] = [];
+        byExpedient[expId].push(url);
+      }
+
+      setState((prev) => ({
+        ...prev,
+        expedientImagesByExpedientId: byExpedient,
+      }));
+    } catch (err) {
+      console.warn('[EXPEDIENT_PAGE] Unexpected expedient_images load failure:', err);
+    }
+  };
+
+  const handleDeleteExpedient = async () => {
+    if (!selectedExpedient) return;
+    const confirmed = window.confirm(
+      `¿Eliminar expediente ${selectedExpedient.id}? Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    setState((prev) => ({ ...prev, loading: true, error: null, success: null }));
+    try {
+      const ok = await expedientService.deleteExpedient(selectedExpedient.id);
+      if (!ok) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: 'No se pudo eliminar el expediente.',
+        }));
+        return;
+      }
+
+      setState((prev) => {
+        const updated = prev.expedients.filter((e) => e.id !== selectedExpedient.id);
+        return {
+          ...prev,
+          expedients: updated,
+          selectedExpedientId: updated[0]?.id || null,
+          loading: false,
+          success: `Expediente ${selectedExpedient.id} eliminado.`,
+        };
+      });
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: `Error al eliminar expediente: ${error instanceof Error ? error.message : String(error)}`,
+      }));
+    }
+  };
+
+  const loadInfractionRowsForExpedients = async (expedients: Expedient[]) => {
+    if (infractionsTableUnavailableRef.current) return;
+    if (infractionLoadInFlightRef.current) return;
+    infractionLoadInFlightRef.current = true;
+    try {
+      const infractionIds = [
+        ...new Set(
+          expedients
+            .map((e) => e.infractionId)
+            .filter(Boolean)
+            .map(String)
+        ),
+      ];
+      const evidenceIds = [
+        ...new Set(
+          expedients
+            .map((e) => e.evidenceId)
+            .filter(Boolean)
+            .map(String)
+        ),
+      ];
+      const plates = [
+        ...new Set(
+          expedients
+            .map((e) => e.licensePlate)
+            .filter(Boolean)
+            .map((x) => String(x).toUpperCase())
+        ),
+      ];
+
+      let { data, error } = await supabase
+        .from(SUPABASE_TABLES.INFRACTIONS)
+        .select(
+          'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image_url, extra_snapshots, zoom_snapshots, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
+        )
+        .order('created_at', { ascending: false })
+        .limit(400);
+
+      if (error) {
+        const errorMessage = String(error.message || '');
+        const errorCode = String((error as any)?.code || '');
+        const errorStatus = Number((error as any)?.status || 0);
+        const missingInfractions = errorMessage.includes(
+          "Could not find the table 'public.infractions'"
+        );
+        const forbiddenInfractions =
+          errorStatus === 403 ||
+          errorCode === '42501' ||
+          errorMessage.toLowerCase().includes('forbidden') ||
+          errorMessage.toLowerCase().includes('permission denied');
+
+        if (missingInfractions || forbiddenInfractions) {
+          // Stop concurrent/repeated polling immediately while we test fallback table
+          infractionsTableUnavailableRef.current = true;
+
+          const incidentResult = await supabase
+            .from('incidents')
+            .select(
+              'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image, image_url, extra_snapshots, zoom_snapshots, video_clip, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
+            )
+            .order('created_at', { ascending: false })
+            .limit(400);
+          if (incidentResult.error) {
+            console.warn(
+              '[EXPEDIENT_PAGE] Failed to load incidents fallback rows:',
+              incidentResult.error.message
+            );
+            setState((prev) => ({
+              ...prev,
+              infractionsTableUnavailable: true,
+              error:
+                prev.error ||
+                'No hay permisos para leer "infractions/incidents" en Supabase (403). Revisa RLS/políticas.',
+            }));
+            return;
+          }
+
+          // Fallback available: re-enable infraction row loading
+          infractionsTableUnavailableRef.current = false;
+          data = (incidentResult.data || []).map(mapIncidentToInfractionRow);
+          error = null as any;
+        } else {
+          console.warn('[EXPEDIENT_PAGE] Failed to load infractions schema rows:', error.message);
+          return;
+        }
+      }
+
+      const rowsByInfractionId = new Map<string, InfractionSchemaRow>(
+        (data || []).map((row) => [
+          String((row as InfractionSchemaRow).id),
+          row as InfractionSchemaRow,
+        ])
+      );
+      const rows = (data || []) as InfractionSchemaRow[];
+
+      const byExpedientId: Record<string, InfractionSchemaRow | null> = {};
+      for (const exp of expedients) {
+        const expInfractionId = exp.infractionId ? String(exp.infractionId) : '';
+        const expEvidenceId = exp.evidenceId ? String(exp.evidenceId) : '';
+        const expPlate = String(exp.licensePlate || '').toUpperCase();
+        const expTs = Number(exp.timestamp || 0);
+
+        // 1) Direct match by infraction ID
+        let match: InfractionSchemaRow | null =
+          expInfractionId && rowsByInfractionId.has(expInfractionId)
+            ? rowsByInfractionId.get(expInfractionId) || null
+            : null;
+
+        // 2) Match by evidence_id
+        if (!match && expEvidenceId) {
+          match = rows.find((r) => String(r.evidence_id || '') === expEvidenceId) || null;
+        }
+
+        // 3) Match by plate + closest timestamp (fallback)
+        if (!match && expPlate) {
+          const plateRows = rows.filter((r) => String(r.plate || '').toUpperCase() === expPlate);
+          if (plateRows.length) {
+            match =
+              plateRows
+                .map((r) => {
+                  const rowTs = r.created_at ? new Date(r.created_at).getTime() : 0;
+                  return { row: r, delta: Math.abs(rowTs - expTs) };
+                })
+                .sort((a, b) => a.delta - b.delta)[0]?.row || null;
+          }
+        }
+
+        // 4) Final fallback: evidence_id/plate pools from current batch
+        if (!match) {
+          match =
+            rows.find(
+              (r) =>
+                (infractionIds.length ? infractionIds.includes(String(r.id)) : false) ||
+                (evidenceIds.length ? evidenceIds.includes(String(r.evidence_id || '')) : false) ||
+                (plates.length ? plates.includes(String(r.plate || '').toUpperCase()) : false)
+            ) || null;
+        }
+
+        byExpedientId[exp.id] = match;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        infractionRowsByExpedientId: byExpedientId,
+      }));
+    } catch (err) {
+      console.warn('[EXPEDIENT_PAGE] Unexpected infraction row load failure:', err);
+    } finally {
+      infractionLoadInFlightRef.current = false;
+    }
+  };
+
   return (
     <div className="expedient-list-page">
       {/* Animated Background */}
       <div className="absolute inset-0 hud-grid opacity-20 pointer-events-none" />
       <div className="scanline" />
-      <div className="shield-glow-bg" />
 
       {/* Header */}
       <div className="page-header">
-        <h1>Expedientes de Infracción</h1>
+        <div className="page-title-wrap">
+          <div className="forense-brand">
+            <img src="/LOGO.png" alt="Escudo del Ayuntamiento" className="brand-crest" />
+            <div className="brand-copy">
+              <div className="brand-line-main">
+                <h1>
+                  <span className="brand-fore">FORENSE</span>
+                  <span className="brand-ai">AI</span>
+                </h1>
+                <span className="brand-version">v1.0</span>
+              </div>
+              <p className="page-subtitle">UNIDAD AUDITORA</p>
+            </div>
+          </div>
+        </div>
+        <div className="header-metrics">
+          <div className="metric-pill">
+            <span className="metric-label">Detectados</span>
+            <strong>{detectedCount}</strong>
+          </div>
+          <div className="metric-pill">
+            <span className="metric-label">Revisión</span>
+            <strong>{reviewCount}</strong>
+          </div>
+          <div className="metric-pill">
+            <span className="metric-label">Firmados</span>
+            <strong>{signedCount}</strong>
+          </div>
+        </div>
         <div className="user-info">
-          <span>{state.currentUser.name}</span>
+          <span className="operator-name">{state.currentUser.name}</span>
           <span className="role-badge">{state.currentUser.role}</span>
         </div>
       </div>
@@ -247,17 +714,13 @@ export const ExpedientListPage: React.FC = () => {
       {state.error && (
         <div className="alert alert-error">
           <p>{state.error}</p>
-          <button onClick={() => setState((prev) => ({ ...prev, error: null }))}>
-            ✕
-          </button>
+          <button onClick={() => setState((prev) => ({ ...prev, error: null }))}>✕</button>
         </div>
       )}
       {state.success && (
         <div className="alert alert-success">
           <p>✓ {state.success}</p>
-          <button onClick={() => setState((prev) => ({ ...prev, success: null }))}>
-            ✕
-          </button>
+          <button onClick={() => setState((prev) => ({ ...prev, success: null }))}>✕</button>
         </div>
       )}
 
@@ -267,59 +730,200 @@ export const ExpedientListPage: React.FC = () => {
         <div className="left-panel">
           <div className="panel-header">
             <h2>
-              Pendientes
+              Cola de Expedientes
               {!state.loading && <span className="count">{state.expedients.length}</span>}
             </h2>
-            <button onClick={loadPendingExpedients} disabled={state.loading} className="btn-refresh">
-              {state.loading ? '⟳ Cargando...' : '⟳ Actualizar'}
+            <button
+              onClick={() => loadPendingExpedients({ silent: false, manual: true })}
+              disabled={state.loading}
+              className="btn-refresh"
+            >
+              {state.loading
+                ? 'Cargando...'
+                : state.manualRefreshing
+                  ? 'Actualizando...'
+                  : 'Actualizar'}
             </button>
           </div>
 
           <div className="expedient-list">
             {state.loading ? (
               <div className="loading-state">
-                <p>Cargando expedientes...</p>
+                <p>Cargando expedientes e infracciones...</p>
               </div>
-            ) : state.expedients.length === 0 ? (
-              <div className="empty-state">
-                <p>No hay expedientes pendientes</p>
-              </div>
+            ) : state.expedients.length === 0 && state.infractions.length === 0 ? (
+              <div className="empty-state" />
             ) : (
-              state.expedients.map((expedient) => (
-                <div
-                  key={expedient.id}
-                  className={`expedient-item ${
-                    state.selectedExpedientId === expedient.id ? 'selected' : ''
-                  }`}
-                  onClick={() => setState((prev) => ({ ...prev, selectedExpedientId: expedient.id }))}
-                >
-                  <div className="expedient-header">
-                    <span className="plate">{expedient.licensePlate}</span>
-                    <span className={`state-badge state-${expedient.state.toLowerCase()}`}>
-                      {getStateLabel(expedient.state)}
-                    </span>
+              <>
+                {/* Expedientes */}
+                {state.expedients.map((expedient) => (
+                  <div
+                    key={`exp-${expedient.id}`}
+                    className={`expedient-item ${
+                      state.selectedType === 'expedient' && state.selectedExpedientId === expedient.id ? 'selected' : ''
+                    }`}
+                    onClick={() =>
+                      setState((prev) => ({
+                        ...prev,
+                        selectedExpedientId: expedient.id,
+                        selectedInfractionId: null,
+                        selectedType: 'expedient',
+                      }))
+                    }
+                  >
+                    <div className="expedient-header">
+                      <span className="plate">{expedient.licensePlate}</span>
+                      <span className={`state-badge state-${expedient.state.toLowerCase()}`}>
+                        {getStateLabel(expedient.state)}
+                      </span>
+                    </div>
+                    <div className="expedient-details">
+                      <p className="violation">{traducirTipoInfraccion(expedient.violationType)}</p>
+                      <div className="detail-grid">
+                        <div className="detail-item">
+                          <span className="detail-label">Ubicación:</span>
+                          <span className="detail-value">{expedient.location}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Vehículo:</span>
+                          <span className="detail-value">
+                            {expedient.marca || expedient.makeModel || '—'}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Fecha/Hora:</span>
+                          <span className="detail-value">
+                            {new Date(expedient.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        {expedient.gravedad && (
+                          <div className="detail-item">
+                            <span className="detail-label">Gravedad:</span>
+                            <span
+                              className={`detail-value severity-${expedient.gravedad.toLowerCase().replace(' ', '-')}`}
+                            >
+                              {expedient.gravedad}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {expedient.normaSancionadoraNombre && (
+                        <div className="legal-summary">
+                          <div className="legal-item">
+                            <span className="legal-label">Norma:</span>
+                            <span className="legal-value">{expedient.normaSancionadoraNombre}</span>
+                          </div>
+                          {expedient.articuloSancionador && (
+                            <div className="legal-item">
+                              <span className="legal-label">Art.</span>
+                              <span className="legal-value">{expedient.articuloSancionador}</span>
+                            </div>
+                          )}
+                          {expedient.codigoSenal && (
+                            <div className="legal-item">
+                              <span className="legal-label">Signal:</span>
+                              <span className="legal-value">{expedient.codigoSenal}</span>
+                            </div>
+                          )}
+                          {expedient.fineAmount && (
+                            <div className="legal-item fine">
+                              <span className="legal-label">Sanción:</span>
+                              <span className="legal-value">{expedient.fineAmount}€</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="expedient-details">
-                    <p className="violation">{expedient.violationType}</p>
-                    <p className="location">{expedient.location}</p>
-                    <p className="time">
-                      {new Date(expedient.timestamp).toLocaleString()}
-                    </p>
+                ))}
+
+                {/* Infracciones sin expediente */}
+                {state.infractions.map((infraction) => (
+                  <div
+                    key={`inf-${infraction.id}`}
+                    className={`expedient-item ${
+                      state.selectedType === 'infraction' && state.selectedInfractionId === infraction.id ? 'selected' : ''
+                    }`}
+                    onClick={() =>
+                      setState((prev) => ({
+                        ...prev,
+                        selectedExpedientId: null,
+                        selectedInfractionId: infraction.id,
+                        selectedType: 'infraction',
+                      }))
+                    }
+                  >
+                    <div className="expedient-header">
+                      <span className="plate">{infraction.plate || 'SENT_IA'}</span>
+                      <span className={`state-badge state-detected`}>
+                        DETECTADA
+                      </span>
+                    </div>
+                    <div className="expedient-details">
+                      <p className="violation">{infraction.ruleCategory || 'Infracción IA'}</p>
+                      <div className="detail-grid">
+                        <div className="detail-item">
+                          <span className="detail-label">Vehículo:</span>
+                          <span className="detail-value">
+                            {infraction.makeModel || '—'}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Color:</span>
+                          <span className="detail-value">{infraction.color || '—'}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Hora:</span>
+                          <span className="detail-value">{infraction.time || '—'}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Gravedad:</span>
+                          <span className="detail-value">{infraction.severity || '—'}</span>
+                        </div>
+                      </div>
+                      {infraction.description && (
+                        <div className="legal-summary">
+                          <div className="legal-item">
+                            <span className="legal-label">Descripción:</span>
+                            <span className="legal-value">{infraction.description}</span>
+                          </div>
+                          {infraction.fineAmount && (
+                            <div className="legal-item fine">
+                              <span className="legal-label">Multa:</span>
+                              <span className="legal-value">{infraction.fineAmount}€</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             )}
+          </div>
+
+          <div className="mt-3 p-3 pt-0">
+            <button
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('sentinel:set-view', { detail: 'detection' }))
+              }
+              className="w-full py-3 text-[10px] font-bold uppercase tracking-widest transition-colors border border-blue-500/60 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+            >
+              MODULO DE DETECCION
+            </button>
           </div>
         </div>
 
-        {/* Right Panel: Workflow Details */}
+        {/* Right Panel: Workflow Details, Infraction Modal, or Infractions Table */}
         <div className="right-panel">
-          {selectedExpedient ? (
+          {state.selectedType === 'expedient' && selectedExpedient ? (
             <>
               <ExpedientWorkflow
                 expedient={selectedExpedient}
                 onStateChange={handleStateChange}
                 currentUser={state.currentUser}
+                infractionRow={selectedInfractionRow}
+                expedientImages={state.expedientImagesByExpedientId[selectedExpedient.id] || []}
               />
 
               {/* Export Buttons - PHASE 1b: Enforce validation */}
@@ -339,7 +943,11 @@ export const ExpedientListPage: React.FC = () => {
                   onClick={handleExportPDF}
                   disabled={!canExportOfficialPDF || state.loading}
                   className="btn-export"
-                  title={!canExportOfficialPDF ? 'Reporte oficial disponible solo después de firma digital' : 'Descargar reporte OFICIAL'}
+                  title={
+                    !canExportOfficialPDF
+                      ? 'Reporte oficial disponible solo después de firma digital'
+                      : 'Descargar reporte OFICIAL'
+                  }
                 >
                   📥 Descargar Reporte Oficial (PDF)
                 </button>
@@ -354,6 +962,15 @@ export const ExpedientListPage: React.FC = () => {
                   📊 Descargar Excel (Datos + Imágenes)
                 </button>
 
+                <button
+                  onClick={handleDeleteExpedient}
+                  disabled={state.loading}
+                  className="btn-export btn-delete"
+                  title="Eliminar expediente permanentemente"
+                >
+                  🗑 Eliminar Expediente
+                </button>
+
                 {!canExportOfficialPDF && (
                   <p className="export-help">
                     ⓘ Reporte oficial disponible solo después de:
@@ -362,29 +979,51 @@ export const ExpedientListPage: React.FC = () => {
                 )}
               </div>
             </>
+          ) : state.selectedType === 'infraction' && selectedInfraction ? (
+            <InfractionModal
+              log={selectedInfraction}
+              onClose={() =>
+                setState((prev) => ({
+                  ...prev,
+                  selectedInfractionId: null,
+                  selectedType: null,
+                }))
+              }
+            />
           ) : (
-            <div className="empty-selection">
-              <div style={{ position: 'absolute', width: 280, height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(59, 130, 246, 0.2)', animation: 'spin 3s linear infinite' }} />
-                <img src="/ESCUDO.png?v=11" alt="Sentinel Logo" style={{ width: '65%', height: '65%', objectFit: 'contain', filter: 'drop-shadow(0 0 25px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6))', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 5 }} />
+            <div className="empty-selection p-8 flex flex-col items-center justify-center gap-4">
+              <div className="text-slate-400 text-center">
+                <p className="text-sm uppercase tracking-widest font-bold">Sin selección</p>
+                <p className="text-xs text-slate-500 mt-2">Selecciona una infracción o expediente de la lista izquierda para ver los detalles</p>
               </div>
-              <p className="empty-text">Selecciona un expediente para revisar</p>
             </div>
           )}
         </div>
       </div>
 
       <style>{`
-        /* DARK THEME - Unified with SENTINEL.AI Detection Screen Design */
+        :root {
+          --exp-bg: #0d0d0f;
+          --exp-panel: #0f1115;
+          --exp-card: #0f1115;
+          --exp-card-hover: #121723;
+          --exp-border-soft: rgba(255, 255, 255, 0.06);
+          --exp-border-mid: rgba(255, 255, 255, 0.08);
+          --exp-border-blue: rgba(255, 255, 255, 0.18);
+          --exp-text-dim: #7f8ea8;
+          --exp-text-mid: #93a2bc;
+        }
+
+        /* Expedients Theme - Dark slate/blue panels */
         .expedient-list-page {
           position: relative;
           width: 100%;
           height: 100%;
           display: flex;
           flex-direction: column;
-          background: #01030d;
-          font-family: 'Share Tech Mono', 'Courier New', monospace;
-          color: #ecf0f1;
+          background: #06080d;
+          font-family: 'Rajdhani', 'Inter', sans-serif;
+          color: #edf2ff;
           overflow: hidden;
         }
 
@@ -394,21 +1033,128 @@ export const ExpedientListPage: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 16px 24px;
-          background: rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(8px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          gap: 12px;
+          padding: 16px 22px;
+          background: linear-gradient(90deg, rgba(13, 21, 42, 0.94), rgba(10, 18, 35, 0.9));
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .page-title-wrap {
+          min-width: 220px;
+        }
+
+        .forense-brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .brand-crest {
+          width: 48px;
+          height: 48px;
+          object-fit: contain;
+          filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.28));
+        }
+
+        .brand-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .brand-line-main {
+          display: flex;
+          align-items: flex-end;
+          gap: 7px;
         }
 
         .page-header h1 {
           margin: 0;
-          font-size: 18px;
+          font-size: 28px;
           font-weight: 900;
-          color: #00d9ff;
-          text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+          font-style: italic;
+          color: #f8fafc;
+          letter-spacing: -0.02em;
+          text-transform: uppercase;
+          line-height: 1;
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+          font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+
+        .brand-fore {
+          color: #f8fafc;
+        }
+
+        .brand-ai {
+          color: #ef4444;
+        }
+
+        .brand-version {
+          color: #ef4444;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+          line-height: 1;
+          margin-bottom: 1px;
+          opacity: 0.65;
+        }
+
+        .page-subtitle {
+          margin: 0;
+          font-size: 10px;
+          color: #ef4444;
           letter-spacing: 0.15em;
           text-transform: uppercase;
+          font-weight: 700;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .page-subtitle::before,
+        .page-subtitle::after {
+          content: '';
+          width: 34px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 0%, rgba(239, 68, 68, 0.8) 100%);
+        }
+
+        .page-subtitle::after {
+          background: linear-gradient(90deg, rgba(239, 68, 68, 0.8) 0%, transparent 100%);
+        }
+
+        .header-metrics {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 1;
+        }
+
+        .metric-pill {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          background: rgba(10, 17, 33, 0.92);
+          border: 1px solid rgba(59, 130, 246, 0.22);
+          border-radius: 12px;
+          padding: 8px 12px;
+          min-width: 106px;
+        }
+
+        .metric-label {
+          font-size: 10px;
+          color: #94a3b8;
+          text-transform: uppercase;
+        }
+
+        .metric-pill strong {
+          font-size: 14px;
+          color: #fde68a;
         }
 
         .user-info {
@@ -417,7 +1163,14 @@ export const ExpedientListPage: React.FC = () => {
           gap: 12px;
           font-size: 11px;
           color: #94a3b8;
-          font-family: monospace;
+          font-family: 'Share Tech Mono', monospace;
+        }
+
+        .operator-name {
+          max-width: 180px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .role-badge {
@@ -483,15 +1236,15 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .left-panel {
-          flex: 0 0 320px;
+          flex: 0 0 360px;
           display: flex;
           flex-direction: column;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 6px;
+          background: #06080d;
+          border: 1px solid var(--exp-border-soft);
+          border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           backdrop-filter: blur(10px);
+          box-shadow: none;
         }
 
         .left-panel::before {
@@ -501,7 +1254,7 @@ export const ExpedientListPage: React.FC = () => {
           left: 0;
           right: 0;
           bottom: 0;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+          background: transparent;
           pointer-events: none;
           border-radius: 6px;
         }
@@ -511,42 +1264,41 @@ export const ExpedientListPage: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 12px 14px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          background: rgba(59, 130, 246, 0.05);
+          padding: 12px;
+          border-bottom: 1px solid var(--exp-border-soft);
+          background: #12141b;
         }
 
         .panel-header h2 {
           margin: 0;
-          font-size: 12px;
-          font-weight: 900;
-          color: #3b82f6;
+          font-size: 13px;
+          font-weight: 800;
+          color: #a6b2c4;
           display: flex;
           align-items: center;
           gap: 8px;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.14em;
         }
 
         .count {
-          background: rgba(59, 130, 246, 0.15);
-          border: 1px solid rgba(59, 130, 246, 0.3);
-          color: #3b82f6;
+          background: #151a26;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          color: #a9b5c8;
           padding: 3px 8px;
-          border-radius: 3px;
+          border-radius: 6px;
           font-size: 10px;
           font-weight: 700;
-          box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
         }
 
         .btn-refresh {
-          padding: 6px 10px;
-          background: rgba(59, 130, 246, 0.1);
-          border: 1px solid rgba(59, 130, 246, 0.3);
-          border-radius: 3px;
+          padding: 8px 14px;
+          background: #151a26;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 10px;
           cursor: pointer;
-          font-size: 10px;
-          color: #3b82f6;
+          font-size: 11px;
+          color: var(--exp-text-mid);
           transition: all 0.2s;
           font-weight: 700;
           text-transform: uppercase;
@@ -554,9 +1306,9 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .btn-refresh:hover:not(:disabled) {
-          background: rgba(59, 130, 246, 0.2);
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
-          border-color: rgba(59, 130, 246, 0.5);
+          background: #1a2030;
+          border-color: rgba(255, 255, 255, 0.24);
+          color: #b7c6de;
         }
 
         .btn-refresh:disabled {
@@ -567,8 +1319,9 @@ export const ExpedientListPage: React.FC = () => {
         .expedient-list {
           flex: 1;
           overflow-y: auto;
-          padding: 8px;
-          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+          padding: 10px;
+          background: #0d0d0f;
+          scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
           scrollbar-width: thin;
         }
 
@@ -581,12 +1334,12 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-list::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.2);
+          background: rgba(255, 255, 255, 0.14);
           border-radius: 3px;
         }
 
         .expedient-list::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.4);
+          background: rgba(255, 255, 255, 0.22);
         }
 
         .loading-state,
@@ -602,11 +1355,11 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-item {
-          padding: 10px;
-          margin-bottom: 6px;
-          background: rgba(59, 130, 246, 0.05);
-          border: 1px solid rgba(59, 130, 246, 0.15);
-          border-radius: 4px;
+          padding: 12px 12px;
+          margin-bottom: 10px;
+          background: #151821;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 14px;
           cursor: pointer;
           transition: all 0.25s ease-out;
           position: relative;
@@ -617,15 +1370,15 @@ export const ExpedientListPage: React.FC = () => {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+          background: transparent;
           opacity: 0;
           transition: opacity 0.25s;
         }
 
         .expedient-item:hover {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: rgba(59, 130, 246, 0.3);
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+          background: #1a1f2d;
+          border-color: rgba(255, 255, 255, 0.18);
+          transform: translateY(-1px);
         }
 
         .expedient-item:hover::before {
@@ -633,37 +1386,38 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .expedient-item.selected {
-          background: rgba(59, 130, 246, 0.15);
-          border-color: rgba(59, 130, 246, 0.5);
-          box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
+          background: #1a2230;
+          border-color: #2f7fff;
+          border-radius: 16px;
+          box-shadow: inset 0 0 0 1px rgba(47, 127, 255, 0.38);
         }
 
         .expedient-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
           position: relative;
           z-index: 1;
         }
 
         .plate {
-          font-weight: 900;
+          font-weight: 800;
           font-family: 'OCR A', monospace;
-          font-size: 12px;
-          color: #3b82f6;
-          letter-spacing: 0.1em;
+          font-size: 14px;
+          color: #e7edf8;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
         }
 
         .state-badge {
-          font-size: 9px;
-          padding: 3px 7px;
-          border-radius: 2px;
+          font-size: 10px;
+          padding: 4px 8px;
+          border-radius: 4px;
           color: white;
-          font-weight: 700;
+          font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.06em;
           box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
         }
 
@@ -675,39 +1429,115 @@ export const ExpedientListPage: React.FC = () => {
 
         .expedient-details {
           font-size: 10px;
-          color: #94a3b8;
+          color: var(--exp-text-dim);
           position: relative;
           z-index: 1;
         }
 
         .violation {
-          margin: 2px 0;
+          margin: 3px 0;
+          font-weight: 800;
+          color: #dce7f8;
+          font-size: 13px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          line-height: 1.05;
+          font-family: 'Rajdhani', 'Share Tech Mono', monospace;
+        }
+
+        .detail-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 3px;
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .detail-item {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11px;
+          line-height: 1.32;
+        }
+
+        .detail-label {
+          color: #6f7f98;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+        }
+
+        .detail-value {
+          color: var(--exp-text-mid);
+          text-align: right;
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .detail-value.severity-leve { color: #22c55e; }
+        .detail-value.severity-grave { color: #f59e0b; }
+        .detail-value.severity-muy-grave { color: #ef4444; }
+
+        .legal-summary {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .legal-item {
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          padding: 3px 6px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 6px;
+          font-size: 8px;
+        }
+
+        .legal-item.fine {
+          background: rgba(16, 185, 129, 0.12);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .legal-label {
+          color: #7c8da8;
+          text-transform: uppercase;
           font-weight: 600;
-          color: #e2e8f0;
+          letter-spacing: 0.03em;
         }
 
-        .location {
-          margin: 2px 0;
-          color: #64748b;
-          font-size: 9px;
+        .legal-value {
+          color: var(--exp-text-mid);
+          font-weight: 500;
         }
 
-        .time {
-          margin: 4px 0 0 0;
-          color: #475569;
-          font-size: 9px;
+        .legal-item.fine .legal-value {
+          color: #34d399;
         }
 
         .right-panel {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 6px;
+          background: #06080d;
+          border: 1px solid var(--exp-border-soft);
+          border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           backdrop-filter: blur(10px);
+          min-height: 0;
+          box-shadow: none;
+        }
+
+        .right-panel > div:first-child {
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
         }
 
         .right-panel::before {
@@ -717,74 +1547,19 @@ export const ExpedientListPage: React.FC = () => {
           left: 0;
           right: 0;
           bottom: 0;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+          background: transparent;
           pointer-events: none;
           border-radius: 6px;
         }
 
+
         .empty-selection {
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: center;
           height: 100%;
-          color: #64748b;
-          font-size: 12px;
-          letter-spacing: 0.05em;
-          position: relative;
-          gap: 32px;
-        }
-
-        .empty-selection::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 240px;
-          height: 240px;
-          background: url('/ESCUDO.png?v=11') center/contain no-repeat;
-          filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.4));
-          animation: escudo-glow-pulse 4s ease-in-out infinite;
-          z-index: 5;
-        }
-
-        .empty-selection::after {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 300px;
-          height: 300px;
-          border: 2px solid rgba(59, 130, 246, 0.2);
-          border-radius: 50%;
-          animation: escudo-ring-outer 3s linear infinite;
-          z-index: 2;
-          pointer-events: none;
-        }
-
-        .empty-selection .empty-text {
-          position: relative;
-          z-index: 10;
-          margin: 0;
-          text-align: center;
-        }
-
-        @keyframes escudo-ring-outer {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-
-        @keyframes escudo-glow-pulse {
-          0%, 100% {
-            opacity: 0.9;
-            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.4));
-          }
-          50% {
-            opacity: 1;
-            filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6));
-          }
+          background: transparent;
+          min-height: 0;
+          overflow: hidden;
         }
 
         .expedient-workflow {
@@ -814,33 +1589,40 @@ export const ExpedientListPage: React.FC = () => {
 
         .export-section {
           padding: 12px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-          background: rgba(59, 130, 246, 0.05);
-          display: flex;
-          flex-direction: column;
+          border-top: 1px solid var(--exp-border-soft);
+          background: #12151d;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          align-items: stretch;
           gap: 8px;
           margin: 0;
+          overflow: hidden;
         }
 
         .btn-export {
           width: 100%;
-          padding: 10px;
-          background: rgba(34, 197, 94, 0.2);
-          border: 1px solid rgba(34, 197, 94, 0.4);
-          color: #86efac;
-          border-radius: 4px;
+          min-width: 0;
+          padding: 10px 12px;
+          background: #161b27;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: #8ea0bf;
+          border-radius: 8px;
           cursor: pointer;
-          font-weight: 700;
+          font-weight: 800;
           font-size: 11px;
           transition: all 0.2s;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.08em;
+          white-space: normal;
+          line-height: 1.25;
+          text-align: center;
+          font-family: 'Share Tech Mono', 'Courier New', monospace;
         }
 
         .btn-export:hover:not(:disabled) {
-          background: rgba(34, 197, 94, 0.3);
-          border-color: rgba(34, 197, 94, 0.6);
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
+          background: #1b2232;
+          border-color: var(--exp-border-blue);
+          color: #b8c8e2;
         }
 
         .btn-export:disabled {
@@ -852,20 +1634,20 @@ export const ExpedientListPage: React.FC = () => {
         }
 
         .btn-preinforme {
-          background: rgba(34, 211, 238, 0.2);
-          border-color: rgba(34, 211, 238, 0.4);
+          background: rgba(8, 47, 73, 0.68);
+          border-color: rgba(34, 211, 238, 0.45);
           color: #a5f3fc;
         }
 
         .btn-preinforme:hover:not(:disabled) {
-          background: rgba(34, 211, 238, 0.3);
-          border-color: rgba(34, 211, 238, 0.6);
+          background: rgba(8, 78, 104, 0.6);
+          border-color: rgba(34, 211, 238, 0.7);
           box-shadow: 0 0 12px rgba(34, 211, 238, 0.2);
         }
 
         .btn-excel {
-          background: rgba(59, 130, 246, 0.2);
-          border-color: rgba(59, 130, 246, 0.4);
+          background: rgba(30, 64, 175, 0.35);
+          border-color: rgba(59, 130, 246, 0.55);
           color: #93c5fd;
         }
 
@@ -875,8 +1657,21 @@ export const ExpedientListPage: React.FC = () => {
           box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
         }
 
+        .btn-delete {
+          background: rgba(127, 29, 29, 0.42);
+          border-color: rgba(239, 68, 68, 0.45);
+          color: #fca5a5;
+        }
+
+        .btn-delete:hover:not(:disabled) {
+          background: rgba(239, 68, 68, 0.28);
+          border-color: rgba(239, 68, 68, 0.7);
+          box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+        }
+
         .export-help {
-          margin-top: 8px;
+          grid-column: 1 / -1;
+          margin-top: 2px;
           padding: 10px;
           background: rgba(59, 130, 246, 0.1);
           border-left: 3px solid rgba(59, 130, 246, 0.4);
@@ -891,7 +1686,36 @@ export const ExpedientListPage: React.FC = () => {
           color: #bfdbfe;
         }
 
+        @media (max-width: 1440px) {
+          .export-section {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
         @media (max-width: 1024px) {
+          .page-header h1 {
+            font-size: 22px;
+          }
+
+          .brand-version {
+            font-size: 8px;
+            margin-bottom: 2px;
+          }
+
+          .page-subtitle {
+            font-size: 9px;
+          }
+
+          .page-subtitle::before,
+          .page-subtitle::after {
+            width: 24px;
+          }
+
+          .brand-crest {
+            width: 36px;
+            height: 36px;
+          }
+
           .page-content {
             flex-direction: column;
           }
@@ -904,6 +1728,10 @@ export const ExpedientListPage: React.FC = () => {
           .right-panel {
             flex: 1;
             min-height: 0;
+          }
+
+          .export-section {
+            grid-template-columns: 1fr;
           }
         }
 
@@ -933,6 +1761,7 @@ export const ExpedientListPage: React.FC = () => {
             filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 50px rgba(34, 211, 238, 0.6));
           }
         }
+
       `}</style>
     </div>
   );
@@ -949,4 +1778,26 @@ function getStateLabel(state: string): string {
     ARCHIVED: 'Archivada',
   };
   return labels[state] || state;
+}
+
+function traducirTipoInfraccion(tipo?: string): string {
+  const map: Record<string, string> = {
+    STOP_NO_DETENCION: 'STOP - NO DETENCIÓN',
+    CEDA_NO_RESPETADO: 'CEDA EL PASO NO RESPETADO',
+    PRIORIDAD_PEATONAL: 'PRIORIDAD PEATONAL',
+    SEMAFORO_ROJO: 'SEMÁFORO EN ROJO',
+    GIRO_PROHIBIDO: 'GIRO PROHIBIDO',
+    DIRECCION_OBLIGATORIA_INCUMPLIDA: 'DIRECCIÓN OBLIGATORIA INCUMPLIDA',
+    SENTIDO_CONTRARIO: 'SENTIDO CONTRARIO',
+    DOBLE_FILA: 'DOBLE FILA',
+    BLOQUEO_INTERSECCION: 'BLOQUEO DE INTERSECCIÓN',
+    CARRIL_BUS: 'CARRIL BUS / TAXI',
+    INVASION_ARCEN: 'INVASIÓN DE ARCÉN',
+    LINEA_CONTINUA: 'LÍNEA CONTINUA',
+    FORBIDDEN_TURN: 'GIRO PROHIBIDO',
+    STOP: 'STOP - NO DETENCIÓN',
+    SPEED_VIOLATION: 'EXCESO DE VELOCIDAD',
+    OTHER: 'OTRA INFRACCIÓN',
+  };
+  return map[String(tipo || '').toUpperCase()] || String(tipo || 'OTRA INFRACCIÓN');
 }

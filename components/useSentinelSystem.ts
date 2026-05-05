@@ -12,7 +12,7 @@ import {
 import type { GeometryResponse } from '../services/aiService';
 import { logger } from '../services/logger';
 
-const MAX_LOGS = 50;
+const MAX_LOGS = 500;
 
 /**
  * Sentinel System Logic Hook.
@@ -71,7 +71,8 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
           {
             id: `log_${Math.random().toString(36).substring(2, 11)}`,
             timestamp: new Date(entry.timestamp).toLocaleTimeString(),
-            type: entry.level === 'DEBUG' || entry.level === 'SUCCESS' ? 'INFO' : entry.level,
+            type: entry.level,
+            category: entry.category,
             content: entry.message,
           },
           ...prev,
@@ -90,6 +91,31 @@ export const useSentinelSystem = (hasApiKey: boolean) => {
 
     return unsubscribe;
   }, [hasApiKey]);
+
+  // Daily reset for detections at local 00:00.
+  useEffect(() => {
+    const schedule = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 0, 0);
+      return next.getTime() - now.getTime();
+    };
+
+    let intervalId: number | null = null;
+    const timeoutId = window.setTimeout(() => {
+      setStats((prev) => ({ ...prev, det: 0 }));
+      logger.info('SYSTEM', 'Reset diario de detecciones aplicado (00:00).');
+      intervalId = window.setInterval(() => {
+        setStats((prev) => ({ ...prev, det: 0 }));
+        logger.info('SYSTEM', 'Reset diario de detecciones aplicado (00:00).');
+      }, 24 * 60 * 60 * 1000);
+    }, schedule());
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId !== null) window.clearInterval(intervalId);
+    };
+  }, []);
 
   /**
    * Triggers AI Geometry Generation via Gemini.

@@ -9,13 +9,7 @@
 
 import { logger } from './logger';
 import { AppConfig } from './appConfig';
-import {
-  ServiceResult,
-  ok,
-  err,
-  RetryPolicy,
-  DefaultRetryPolicy,
-} from './serviceTypes';
+import { ServiceResult, ok, err, RetryPolicy, DefaultRetryPolicy } from './serviceTypes';
 
 /**
  * Base class for all services with common utilities
@@ -58,7 +52,11 @@ export abstract class BaseService {
           );
           await this.delay(delayMs);
         } else {
-          logger.error(this.name, `${operationName} falló después de ${policy.maxAttempts} intentos`, error);
+          logger.error(
+            this.name,
+            `${operationName} falló después de ${policy.maxAttempts} intentos`,
+            error
+          );
         }
       }
     }
@@ -82,7 +80,10 @@ export abstract class BaseService {
       const result = await Promise.race([
         operation,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`${operationName} timeout after ${timeoutMs}ms`)), timeoutMs)
+          setTimeout(
+            () => reject(new Error(`${operationName} timeout after ${timeoutMs}ms`)),
+            timeoutMs
+          )
         ),
       ]);
       return ok(result);
@@ -128,10 +129,7 @@ export abstract class BaseService {
   /**
    * Safe JSON parsing with error handling
    */
-  protected safeJsonParse<T>(
-    jsonString: string,
-    fallback?: T
-  ): ServiceResult<T> {
+  protected safeJsonParse<T>(jsonString: string, fallback?: T): ServiceResult<T> {
     try {
       const parsed = JSON.parse(jsonString) as T;
       return ok(parsed);

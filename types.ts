@@ -79,12 +79,14 @@ export interface IKalman {
  */
 export interface Track {
   id: number;
+  globalId?: string; // Globally unique track ID (from GlobalTrackRegistry)
   bbox: TrackBBox;
   label: string;
   conf?: number;
   hits?: number;
   age?: number;
   tail: { x: number; y: number }[];
+  _tailIndex?: number; // Circular buffer index for tail (internal)
   snapshots?: string[];
   contextSnapshots?: string[];
   zoomSnapshots?: string[];
@@ -216,6 +218,7 @@ export interface SystemLog {
   id: string;
   timestamp: string;
   type: LogType;
+  category?: string;
   content: string;
 }
 
@@ -228,6 +231,10 @@ export interface SystemStatus {
   bionics: 'ready' | 'pending';
   vector: 'ready' | 'pending';
   mediapipeReady: boolean;
+  ocrAutoPipeline: boolean;
+  ocrImageEnhancement: boolean;
+  ocrPlateCropFallback: boolean;
+  ocrGeminiConfirmation: boolean;
 }
 
 /**

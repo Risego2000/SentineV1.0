@@ -119,11 +119,7 @@ class TacticalLogger {
   /**
    * Logging para servidor (JSON estructurado)
    */
-  public errorWithContext(
-    context: string,
-    error: unknown,
-    metadata?: Record<string, any>
-  ) {
+  public errorWithContext(context: string, error: unknown, metadata?: Record<string, any>) {
     const err = error instanceof Error ? error : new Error(String(error));
     const entry = {
       level: 'ERROR',
@@ -131,7 +127,7 @@ class TacticalLogger {
       message: err.message,
       stack: err.stack,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     };
 
     // En servidor: logging a stdout para centralized logging
@@ -147,12 +143,7 @@ class TacticalLogger {
   /**
    * Logging de acceso API (auditoría)
    */
-  public auditLog(
-    method: string,
-    path: string,
-    status: number,
-    metadata?: Record<string, any>
-  ) {
+  public auditLog(method: string, path: string, status: number, metadata?: Record<string, any>) {
     const entry = {
       level: 'INFO',
       context: 'API_AUDIT',
@@ -160,7 +151,7 @@ class TacticalLogger {
       path,
       status,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     };
 
     if (typeof window === 'undefined') {
@@ -175,16 +166,11 @@ class TacticalLogger {
   /**
    * Logging de validación fallida
    */
-  public validationError(
-    context: string,
-    field: string,
-    reason: string,
-    value?: unknown
-  ) {
+  public validationError(context: string, field: string, reason: string, value?: unknown) {
     this.warn(context, `Validación fallida: ${field} - ${reason}`, {
       field,
       reason,
-      value: typeof value === 'object' ? '[object]' : value
+      value: typeof value === 'object' ? '[object]' : value,
     });
   }
 
@@ -195,7 +181,7 @@ class TacticalLogger {
     const cutoffTime = Date.now() - maxAgeHours * 60 * 60 * 1000;
     const initialCount = this.logs.length;
 
-    this.logs = this.logs.filter(log => {
+    this.logs = this.logs.filter((log) => {
       const logTime = new Date(log.timestamp).getTime();
       return logTime > cutoffTime;
     });

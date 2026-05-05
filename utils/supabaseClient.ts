@@ -3,26 +3,17 @@
  * Initialize Supabase connection for persistence layer
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase';
 
 // Environment variables (use .env.local for credentials)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://example.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 /**
- * Initialize Supabase client
- * Use anonymous key for client-side code
- * Use service role key only on backend
+ * Shared Supabase client.
+ * Keep this module as a compatibility layer for older imports.
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  db: {
-    schema: 'public',
-  },
-});
+export { supabase };
 
 /**
  * Check if Supabase is configured

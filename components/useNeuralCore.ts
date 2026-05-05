@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-import {
-  MEDIAPIPE_WASM_PATH,
-  MEDIAPIPE_POSE_PATH,
-  RELEVANT_CLASSES,
-} from '../constants';
+import { MEDIAPIPE_WASM_PATH, MEDIAPIPE_POSE_PATH, RELEVANT_CLASSES } from '../constants';
 import { logger } from '../services/logger';
 import { StandardDetection, PoseResult, LogType } from '../types';
 import { TensorFlowDetector } from '../services/TensorFlowDetector';
@@ -64,12 +60,18 @@ export const useNeuralCore = ({
       // Initialize TensorFlow COCO-SSD detector
       if (!tensorFlowRef.current) {
         setStatusLabel('VINCULANDO_DETECTOR...');
-        logger.core('NEURAL_CORE', 'Inicializando TensorFlow COCO-SSD (90 clases, aceleración GPU)...');
+        logger.core(
+          'NEURAL_CORE',
+          'Inicializando TensorFlow COCO-SSD (90 clases, aceleración GPU)...'
+        );
         tensorFlowRef.current = new TensorFlowDetector({
           confidenceThreshold: 0.25,
         });
         await tensorFlowRef.current.init();
-        logger.ai('NEURAL_CORE', 'COCO-SSD Detector Calibrado y Activo (Detección en Tiempo Real, GPU).');
+        logger.ai(
+          'NEURAL_CORE',
+          'COCO-SSD Detector Calibrado y Activo (Detección en Tiempo Real, GPU).'
+        );
       }
 
       setStatusLabel('NEURAL_SENTINEL_COCO');
@@ -156,7 +158,9 @@ export const useNeuralCore = ({
         // Apply dynamic threshold for vulnerable road users
         return detections
           .map((d) => {
-            const isVulnerable = ['person', 'bicycle', 'motorcycle'].includes(d.label.toLowerCase());
+            const isVulnerable = ['person', 'bicycle', 'motorcycle'].includes(
+              d.label.toLowerCase()
+            );
             const dynamicThreshold = isVulnerable
               ? Math.min(0.45, confidenceThreshold)
               : confidenceThreshold;

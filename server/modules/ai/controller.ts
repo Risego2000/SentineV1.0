@@ -13,17 +13,64 @@ export class AIController {
    */
   static async analyzeInfraction(req: Request, res: Response): Promise<void> {
     try {
-      const request: InfractionAnalysisRequest = req.body;
+      const body: any = req.body || {};
+      let request: InfractionAnalysisRequest;
+
+      // Frontend forensic payload compatibility:
+      // { track, line, directives, auditPreset }
+      if (body.track && body.line) {
+        const speed = Number(body.track?.avgVelocity) || Number(body.track?.velocity) || 0;
+        request = {
+          infractionType:
+            body.line?.violationKind || body.line?.label || body.line?.type || 'UNKNOWN',
+          vehicleData: {
+            plate: body.track?.plateOcr || body.track?.plate || 'DESCONOCIDO',
+            type: body.track?.label || 'vehicle',
+          },
+          geometryData: {
+            speed,
+            angle: Number(body.track?.heading) || 0,
+            coordinates: body.track?.tail || [],
+          },
+          timestamp: new Date().toISOString(),
+          directives: typeof body.directives === 'string' ? body.directives : '',
+          lineLabel: body.line?.label,
+          lineType: body.line?.type,
+        };
+      } else {
+        request = body as InfractionAnalysisRequest;
+      }
 
       if (!request.infractionType) {
-        res.status(400).json({ error: 'Missing infractionType' });
+        res.status(400).json({ error: 'Missing infractionType or compatible track/line payload' });
         return;
       }
 
       const aiService = getAIService();
       const analysis = await aiService.analyzeInfraction(request);
 
-      res.json(analysis);
+      // Adapt response shape expected by frontend AuditResponse
+      res.json({
+        infraction: analysis.confirmed,
+        confidence: analysis.confidence,
+        severity:
+          analysis.severity === 'critical'
+            ? 'CRITICAL'
+            : analysis.severity === 'high'
+              ? 'HIGH'
+              : analysis.severity === 'low'
+                ? 'LOW'
+                : 'MEDIUM',
+        description: analysis.analysis,
+        reasoning: [analysis.analysis, analysis.evidenceSummary || 'Sin resumen de evidencia'],
+        legalBase: analysis.legalBasis || '',
+        ruleCategory: request.infractionType || 'UNKNOWN',
+        plate: request.vehicleData?.plate || 'DESCONOCIDO',
+        makeModel: request.vehicleData?.type || 'DESCONOCIDO',
+        color: request.vehicleData?.color || 'DESCONOCIDO',
+        videoTimeCode: request.timestamp || new Date().toISOString(),
+        recommendedAction: analysis.recommendedAction,
+      });
     } catch (error) {
       logger.error('AI_CONTROLLER', 'Infraction analysis failed', error);
       res.status(500).json({
@@ -42,7 +89,9 @@ export class AIController {
       const request: GeometryAnalysisRequest = req.body;
 
       if (!request.infractionType || !request.trajectoryPoints) {
-        res.status(400).json({ error: 'Missing required fields: infractionType, trajectoryPoints' });
+        res
+          .status(400)
+          .json({ error: 'Missing required fields: infractionType, trajectoryPoints' });
         return;
       }
 

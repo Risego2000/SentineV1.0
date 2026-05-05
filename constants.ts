@@ -518,7 +518,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.25,
       nmsThreshold: 0.3,
-      detectionSkip: 3,
+      detectionSkip: 1,
       persistence: 30,
       predictionLookahead: 5,
     },
@@ -551,7 +551,7 @@ export const DETECTION_PRESETS: Record<PresetType, DetectionPresetData> = {
     config: {
       confidenceThreshold: 0.2,
       nmsThreshold: 0.25,
-      detectionSkip: 3,
+      detectionSkip: 1,
       persistence: 120,
       predictionLookahead: 20,
     },
@@ -562,22 +562,26 @@ export const AUDIT_PRESETS: Record<AuditPresetType, AuditPresetData> = {
   standard: {
     label: 'Estándar',
     description: 'OCR mejorado (+15-25%), auditoría equilibrada.',
-    instructions: 'Analyze common traffic violations with standard rigor using enhanced OCR with automatic plate cropping.',
+    instructions:
+      'Analyze common traffic violations with standard rigor using enhanced OCR with automatic plate cropping.',
   },
   flash: {
     label: 'Flash 2.0',
     description: 'OCR ultrarrápido con crop automático de matrícula.',
-    instructions: 'High-speed plate detection with automatic cropping region for rapid identification.',
+    instructions:
+      'High-speed plate detection with automatic cropping region for rapid identification.',
   },
   tactical: {
     label: 'Táctico Pro',
     description: 'Análisis cinemático + OCR mejorado para maniobras.',
-    instructions: 'Detailed behavioral and kinetic analysis with enhanced OCR precision on license plates.',
+    instructions:
+      'Detailed behavioral and kinetic analysis with enhanced OCR precision on license plates.',
   },
   full: {
     label: 'Jurídico Premium',
     description: 'Expediente RGC completo con OCR 20% más preciso.',
-    instructions: 'Full legal audit according to RGC standards with AI-enhanced plate recognition and detailed article citations.',
+    instructions:
+      'Full legal audit according to RGC standards with AI-enhanced plate recognition and detailed article citations.',
   },
   neural: {
     label: 'Motor Neural',

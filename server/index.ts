@@ -57,7 +57,7 @@ async function startServer(): Promise<{ app: Express; config: ServerConfig }> {
     app.use(createCamerasRouter(config));
     app.use(createEvidenceRouter(config));
 
-    logger.info('SERVER', 'All service modules mounted (7/7)')
+    logger.info('SERVER', 'All service modules mounted (7/7)');
 
     // Fallback for routes not yet refactored: proxy to old server.js
     app.use((req: Request, res: Response) => {

@@ -3,8 +3,6 @@ import { AlertTriangle, CheckCircle, Ban, Clock, AlertCircle, Shield, Zap } from
 import { useSentinel } from '../../hooks/useSentinel';
 import { useHelp } from '../../hooks/useHelp';
 
-import { TacticalMetrics } from './TacticalMetrics';
-
 export const InfractionFeed = () => {
   const { logs, setSelectedLog, hasApiKey, isBatchMode, videoQueue, currentQueueIndex } =
     useSentinel();
@@ -77,7 +75,7 @@ export const InfractionFeed = () => {
     <>
       {!hasApiKey && (
         <div
-          className="p-4 border-b border-amber-500/20 bg-amber-500/5 text-amber-200/80 flex gap-3 items-start"
+          className="m-4 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-200/80 flex gap-3 items-start"
           role="alert"
         >
           <AlertTriangle className="text-amber-500 shrink-0" size={16} />
@@ -93,7 +91,7 @@ export const InfractionFeed = () => {
       )}
 
       {isBatchMode && videoQueue.length > 0 && (
-        <div className="px-4 py-3 border-b border-white/5 bg-blue-500/5 flex justify-between items-center">
+        <div className="mx-4 mb-3 px-4 py-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 flex justify-between items-center">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
               Análisis en cola
@@ -130,14 +128,9 @@ export const InfractionFeed = () => {
         </div>
       )}
 
-      <TacticalMetrics />
-
-      <div
-        className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 min-h-0 bg-black/20"
-        role="list"
-      >
+      <div className="p-4 space-y-4" role="list">
         {logs.length === 0 ? (
-          <div className="p-8 text-center border border-dashed border-white/5 rounded-lg bg-white/[0.01]">
+          <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl bg-[#020617]/40">
             <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest block">
               Scanner en Espera
             </span>
@@ -150,7 +143,7 @@ export const InfractionFeed = () => {
               tabIndex={0}
               onClick={() => setSelectedLog(log)}
               onKeyDown={handleLogKeyDown(log)}
-              className="group cursor-pointer horizon-card hover:border-blue-500/40 rounded-lg overflow-hidden transition-all shadow-lg active:scale-[0.98] focus:outline-none"
+              className="group cursor-pointer horizon-card hover:border-red-500/35 rounded-2xl overflow-hidden transition-all shadow-lg active:scale-[0.98] focus:outline-none"
               {...helpProps(
                 `Vehículo ${log.plate || 'desconocido'}. Pulsa para abrir peritaje completo.`
               )}
@@ -227,7 +220,9 @@ export const InfractionFeed = () => {
                 {log.pointsDeducted && (
                   <div className="flex justify-between items-center text-[9px]">
                     <span className="text-orange-400/70">Puntos:</span>
-                    <span className="font-mono font-bold text-orange-300">-{Math.abs(log.pointsDeducted)}</span>
+                    <span className="font-mono font-bold text-orange-300">
+                      -{Math.abs(log.pointsDeducted)}
+                    </span>
                   </div>
                 )}
               </div>

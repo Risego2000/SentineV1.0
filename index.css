@@ -13,6 +13,7 @@
     --horizon-border: rgba(255, 255, 255, 0.08);
     --horizon-text-main: #e2e8f0;
     --horizon-text-muted: #94a3b8;
+    --app-radius: 9px;
   }
 
   body {
@@ -26,15 +27,26 @@
   .horizon-card {
     background: var(--horizon-card);
     border: 1px solid var(--horizon-border);
+    border-radius: var(--app-radius) !important;
     box-shadow:
       0 4px 6px -1px rgba(0, 0, 0, 0.1),
       0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  button,
+  [role='button'] {
+    border-radius: var(--app-radius) !important;
+  }
+
+  .sidebar-unified *:not(.rounded-full):not([class*='rounded-full']) {
+    border-radius: var(--app-radius) !important;
   }
 
   .horizon-glass {
     background: rgba(18, 18, 22, 0.8);
     backdrop-filter: blur(8px);
     border: 1px solid var(--horizon-border);
+    border-radius: var(--app-radius) !important;
   }
 
   .hud-grid {
@@ -344,63 +356,216 @@
   perspective: 1000px;
 }
 
-  @keyframes shield-glow-pulse {
-    0%,
-    100% {
-      box-shadow:
-        0 0 20px rgba(59, 130, 246, 0.3),
-        0 0 40px rgba(59, 130, 246, 0.2),
-        0 0 80px rgba(59, 130, 246, 0.1),
-        inset 0 0 20px rgba(59, 130, 246, 0.1);
-    }
-    50% {
-      box-shadow:
-        0 0 40px rgba(59, 130, 246, 0.6),
-        0 0 80px rgba(59, 130, 246, 0.4),
-        0 0 120px rgba(59, 130, 246, 0.2),
-        inset 0 0 30px rgba(59, 130, 246, 0.2);
-    }
+@keyframes shield-glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px rgba(59, 130, 246, 0.3),
+      0 0 40px rgba(59, 130, 246, 0.2),
+      0 0 80px rgba(59, 130, 246, 0.1),
+      inset 0 0 20px rgba(59, 130, 246, 0.1);
   }
+  50% {
+    box-shadow:
+      0 0 40px rgba(59, 130, 246, 0.6),
+      0 0 80px rgba(59, 130, 246, 0.4),
+      0 0 120px rgba(59, 130, 246, 0.2),
+      inset 0 0 30px rgba(59, 130, 246, 0.2);
+  }
+}
 
-  @keyframes shield-rotate {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
+@keyframes shield-rotate {
+  from {
+    transform: rotate(0deg);
   }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-  .shield-glow-bg {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 400px;
-    height: 400px;
-    pointer-events: none;
-    z-index: 0;
-  }
+.shield-glow-bg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  pointer-events: none;
+  z-index: 0;
+}
 
-  .shield-glow-bg::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle at center,
-      rgba(59, 130, 246, 0.1) 0%,
-      rgba(59, 130, 246, 0.05) 50%,
-      transparent 100%
-    );
-    animation: shield-glow-pulse 4s ease-in-out infinite;
-  }
+.shield-glow-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(59, 130, 246, 0.1) 0%,
+    rgba(59, 130, 246, 0.05) 50%,
+    transparent 100%
+  );
+  animation: shield-glow-pulse 4s ease-in-out infinite;
+}
 
-  .shield-glow-bg::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 2px solid rgba(59, 130, 246, 0.3);
-    animation: shield-glow-pulse 4s ease-in-out infinite;
-  }
+.shield-glow-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  animation: shield-glow-pulse 4s ease-in-out infinite;
+}
+
+/* Expedient Workflow Styles */
+.expedient-workflow {
+  @apply space-y-6 p-6 bg-[#121216] rounded-lg border border-white/10;
+}
+
+.workflow-header {
+  @apply flex justify-between items-center pb-4 border-b border-white/10;
+}
+
+.workflow-header h2 {
+  @apply text-xl font-bold text-white;
+}
+
+.state-badge {
+  @apply px-3 py-1 rounded-full text-sm font-semibold text-white;
+}
+
+.workflow-info {
+  @apply space-y-3 bg-black/40 p-4 rounded-lg;
+}
+
+.info-row {
+  @apply flex gap-4 items-start;
+}
+
+.info-row.full-width {
+  @apply flex-col;
+}
+
+.info-row .label {
+  @apply font-semibold text-slate-300 min-w-[150px];
+}
+
+.info-row .value {
+  @apply text-slate-200 flex-1;
+}
+
+.severity-critical {
+  @apply text-red-500 font-bold;
+}
+
+.severity-high {
+  @apply text-orange-500 font-bold;
+}
+
+.severity-medium {
+  @apply text-yellow-500 font-bold;
+}
+
+.severity-low {
+  @apply text-green-500 font-bold;
+}
+
+.reasoning-list {
+  @apply list-disc list-inside space-y-1 text-slate-200;
+}
+
+.workflow-media {
+  @apply space-y-4 bg-black/40 p-4 rounded-lg;
+}
+
+.workflow-media h3 {
+  @apply text-lg font-bold text-blue-400;
+}
+
+.workflow-media h4 {
+  @apply text-base font-semibold text-slate-300 mb-3;
+}
+
+.media-item {
+  @apply space-y-2;
+}
+
+.photos-grid {
+  @apply grid grid-cols-1 md:grid-cols-3 gap-4;
+}
+
+.photo-item {
+  @apply border border-white/10 rounded-lg overflow-hidden bg-black/60 p-2;
+}
+
+.photo-item img {
+  @apply w-full h-auto rounded;
+}
+
+.photo-item .caption {
+  @apply text-xs text-slate-400 text-center mt-2;
+}
+
+.hash-section code {
+  @apply block p-3 bg-black/60 border border-white/10 rounded text-xs text-slate-300 font-mono;
+}
+
+.workflow-actions {
+  @apply flex gap-3 justify-center pt-4 border-t border-white/10;
+}
+
+.btn {
+  @apply px-4 py-2 rounded font-semibold transition-colors disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-success {
+  @apply bg-green-600 text-white hover:bg-green-700;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
+
+.btn-secondary {
+  @apply bg-slate-600 text-white hover:bg-slate-700;
+}
+
+.alert {
+  @apply p-4 rounded border;
+}
+
+.alert-error {
+  @apply bg-red-500/20 border-red-500/50 text-red-200;
+}
+
+.alert-success {
+  @apply bg-green-500/20 border-green-500/50 text-green-200;
+}
+
+.modal-overlay {
+  @apply fixed inset-0 bg-black/80 flex items-center justify-center z-50;
+}
+
+.modal-content {
+  @apply bg-[#121216] border border-white/10 rounded-lg p-6 max-w-md w-full space-y-4;
+}
+
+.modal-textarea {
+  @apply w-full bg-black/60 border border-white/10 rounded p-3 text-slate-200 focus:outline-none focus:border-blue-500;
+}
+
+.modal-actions {
+  @apply flex gap-3 justify-end;
+}
+
+.workflow-history {
+  @apply space-y-3 bg-black/40 p-4 rounded-lg;
+}
+
+.history-list {
+  @apply space-y-2;
+}

@@ -104,13 +104,7 @@ export class OptimizedRenderer {
     const startTime = performance.now();
 
     try {
-      const {
-        video,
-        targetCanvas,
-        tracks,
-        geometry,
-        options: taskOptions = {},
-      } = task;
+      const { video, targetCanvas, tracks, geometry, options: taskOptions = {} } = task;
 
       // Get dimensions from source video
       const width = video.videoWidth;
@@ -132,7 +126,8 @@ export class OptimizedRenderer {
       ctx.drawImage(video, 0, 0, width, height);
 
       // Draw geometry and tracks
-      const isMeshRenderEnabled = options.isMeshRenderEnabled ?? taskOptions.isMeshRenderEnabled ?? false;
+      const isMeshRenderEnabled =
+        options.isMeshRenderEnabled ?? taskOptions.isMeshRenderEnabled ?? false;
       const showDetections = options.showDetections ?? taskOptions.showDetections ?? true;
       const showROIs = options.showROIs ?? taskOptions.showROIs ?? true;
 

@@ -15,7 +15,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-def enhance_for_ocr(image_b64, target_height=600):
+def enhance_for_ocr(image_b64, target_height=1200, profile="forensic_safe"):
     """
     Pipeline completo de mejora de imagen para OCR de alta precisión.
 
@@ -69,8 +69,8 @@ def enhance_for_ocr(image_b64, target_height=600):
         if original_height < target_height:
             scale = target_height / original_height
             new_width = int(original_width * scale)
-            # Usar INTER_CUBIC para mejor calidad que INTER_LINEAR
-            img = cv2.resize(img, (new_width, target_height), interpolation=cv2.INTER_CUBIC)
+            # LANCZOS4 conserva mejor detalle fino (bordes de caracteres) en upscaling.
+            img = cv2.resize(img, (new_width, target_height), interpolation=cv2.INTER_LANCZOS4)
             upsampling_factor = scale
 
             # Super-resolution sharpening post-upsampling
@@ -84,12 +84,16 @@ def enhance_for_ocr(image_b64, target_height=600):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
 
-        # 3.1 CONTRAST ENHANCEMENT - CLAHE (Contrast Limited Adaptive Histogram Equalization)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        # 3.1 CONTRAST ENHANCEMENT - profile-aware
+        if profile == "visual_aggressive":
+            clahe = cv2.createCLAHE(clipLimit=4.2, tileGridSize=(8, 8))
+        else:
+            clahe = cv2.createCLAHE(clipLimit=2.4, tileGridSize=(8, 8))
         v_enhanced = clahe.apply(v)
 
         # 3.2 Saturación
-        s = cv2.multiply(s, 1.1)  # +10% saturación para texto más legible
+        sat_boost = 1.16 if profile == "visual_aggressive" else 1.05
+        s = cv2.multiply(s, sat_boost)
         s = np.clip(s, 0, 255).astype(np.uint8)
 
         # Recombinar HSV
@@ -100,11 +104,18 @@ def enhance_for_ocr(image_b64, target_height=600):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # 5. DENOISING (Bilateral Filter - preserva bordes)
-        denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+        if profile == "visual_aggressive":
+            denoised = cv2.bilateralFilter(gray, 7, 60, 60)
+        else:
+            denoised = cv2.bilateralFilter(gray, 9, 85, 85)
 
         # 6. SHARPENING (Unsharp Mask)
-        gaussian = cv2.GaussianBlur(denoised, (0, 0), 2.0)
-        sharpened = cv2.addWeighted(denoised, 1.5, gaussian, -0.5, 0)
+        if profile == "visual_aggressive":
+            gaussian = cv2.GaussianBlur(denoised, (0, 0), 1.6)
+            sharpened = cv2.addWeighted(denoised, 1.7, gaussian, -0.7, 0)
+        else:
+            gaussian = cv2.GaussianBlur(denoised, (0, 0), 1.2)
+            sharpened = cv2.addWeighted(denoised, 1.35, gaussian, -0.35, 0)
 
         # 7. MORPHOLOGICAL OPERATIONS (limpieza)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
@@ -113,8 +124,14 @@ def enhance_for_ocr(image_b64, target_height=600):
 
         # 8. ADAPTIVE THRESHOLD (para OCR - opcional)
         # Convertir a binary adaptativa para mejor OCR (PaddleOCR puede procesar bien)
-        binary = cv2.adaptiveThreshold(morph, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                       cv2.THRESH_BINARY, 11, 2)
+        if profile == "visual_aggressive":
+            binary = cv2.adaptiveThreshold(
+                morph, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 1
+            )
+        else:
+            binary = cv2.adaptiveThreshold(
+                morph, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 13, 3
+            )
 
         # 9. ENCODE resultado mejorado como JPEG
         success, enhanced_b64 = cv2.imencode('.jpg', binary, [cv2.IMWRITE_JPEG_QUALITY, 95])
@@ -132,6 +149,7 @@ def enhance_for_ocr(image_b64, target_height=600):
         enhanced_shape = binary.shape
 
         metadata = {
+            "profile": profile,
             "original_size": [original_width, original_height],
             "enhanced_size": [enhanced_shape[1], enhanced_shape[0]],
             "upsampling_factor": round(upsampling_factor, 2),
@@ -199,7 +217,7 @@ def calculate_contrast_improvement(original, enhanced):
         return 100.0
 
 
-def process_batch(images_b64, target_height=600):
+def process_batch(images_b64, target_height=1200):
     """
     Procesa batch de imágenes.
 
@@ -221,7 +239,7 @@ def process_batch(images_b64, target_height=600):
     failure_count = 0
 
     for img_b64 in images_b64:
-        result = enhance_for_ocr(img_b64, target_height)
+        result = enhance_for_ocr(img_b64, target_height, "forensic_safe")
         if result.get("enhanced"):
             enhanced_images.append(result["enhanced"])
             metadata_list.append(result.get("metadata"))
@@ -249,14 +267,15 @@ def main():
         if operation == "enhance_single":
             result = enhance_for_ocr(
                 request.get("image", ""),
-                request.get("target_height", 600)
+                request.get("target_height", 1200),
+                request.get("profile", "forensic_safe")
             )
             print(json.dumps(result))
 
         elif operation == "enhance_batch":
             result = process_batch(
                 request.get("images", []),
-                request.get("target_height", 600)
+                request.get("target_height", 1200)
             )
             print(json.dumps(result))
 

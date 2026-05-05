@@ -30,10 +30,19 @@ const formatTimestamp = (date = new Date()): string =>
 
 const parseMaybeDate = (value?: string): Date | null => {
   if (!value) return null;
-  const spanishMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  const spanishMatch = value.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
   if (spanishMatch) {
     const [, dd, mm, yyyy, hh = '0', min = '0', ss = '0'] = spanishMatch;
-    const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+    const date = new Date(
+      Number(yyyy),
+      Number(mm) - 1,
+      Number(dd),
+      Number(hh),
+      Number(min),
+      Number(ss)
+    );
     return Number.isNaN(date.getTime()) ? null : date;
   }
   const normalized = value.replace(' ', 'T');
@@ -125,13 +134,26 @@ const inferVehicleType = (makeModel?: string): string => {
 
 // ===== PDF DRAWING HELPERS =====
 
-const drawLine = (doc: InstanceType<JsPDFType>, x: number, y: number, width: number, color: [number, number, number] = [190, 200, 215]) => {
+const drawLine = (
+  doc: InstanceType<JsPDFType>,
+  x: number,
+  y: number,
+  width: number,
+  color: [number, number, number] = [190, 200, 215]
+) => {
   doc.setDrawColor(...color);
   doc.setLineWidth(0.25);
   doc.line(x, y, x + width, y);
 };
 
-const drawFieldLine = (doc: InstanceType<JsPDFType>, x: number, y: number, width: number, label: string, value: string) => {
+const drawFieldLine = (
+  doc: InstanceType<JsPDFType>,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  value: string
+) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5.8);
   doc.setTextColor(70, 70, 70);
@@ -187,15 +209,31 @@ const drawHeader = async (doc: InstanceType<JsPDFType>, pageNumber: number, tota
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(5.5);
   doc.setTextColor(235, 240, 248);
-  doc.text('Documento de trabajo validado por operador · Pendiente de tramitación administrativa formal', 17, FOOTER_Y + 3.4);
-  doc.text('Modelo Normalizado · Jefatura de Policía Local · Glorieta de Alcalá s/n · 28814 Daganzo de Arriba (Madrid) · policia@ayto-daganzo.org · Tel. 91 887 59 19 · www.ayto-daganzo.org', 17, FOOTER_Y + 6.2);
+  doc.text(
+    'Documento de trabajo validado por operador · Pendiente de tramitación administrativa formal',
+    17,
+    FOOTER_Y + 3.4
+  );
+  doc.text(
+    'Modelo Normalizado · Jefatura de Policía Local · Glorieta de Alcalá s/n · 28814 Daganzo de Arriba (Madrid) · policia@ayto-daganzo.org · Tel. 91 887 59 19 · www.ayto-daganzo.org',
+    17,
+    FOOTER_Y + 6.2
+  );
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text(`Pag. ${pad(pageNumber)}/${pad(totalPages)}`, PAGE_W - 17, FOOTER_Y + 5.5, { align: 'right' });
+  doc.text(`Pag. ${pad(pageNumber)}/${pad(totalPages)}`, PAGE_W - 17, FOOTER_Y + 5.5, {
+    align: 'right',
+  });
   doc.setTextColor(0, 0, 0);
 };
 
-const drawSectionTitle = (doc: InstanceType<JsPDFType>, index: string, title: string, y: number, subtitle?: string): number => {
+const drawSectionTitle = (
+  doc: InstanceType<JsPDFType>,
+  index: string,
+  title: string,
+  y: number,
+  subtitle?: string
+): number => {
   doc.setFillColor(33, 65, 105);
   doc.rect(12, y, PAGE_W - 24, 6, 'F');
   doc.setFillColor(64, 97, 138);
@@ -214,7 +252,15 @@ const drawSectionTitle = (doc: InstanceType<JsPDFType>, index: string, title: st
   return y + 7;
 };
 
-const drawParagraphBox = (doc: InstanceType<JsPDFType>, x: number, y: number, width: number, height: number, title: string, text: string) => {
+const drawParagraphBox = (
+  doc: InstanceType<JsPDFType>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  title: string,
+  text: string
+) => {
   doc.setDrawColor(200, 210, 224);
   doc.setLineWidth(0.25);
   doc.rect(x, y, width, height);
@@ -230,7 +276,16 @@ const drawParagraphBox = (doc: InstanceType<JsPDFType>, x: number, y: number, wi
   doc.setTextColor(0, 0, 0);
 };
 
-const drawLabeledImage = (doc: InstanceType<JsPDFType>, imgData: string | null, x: number, y: number, w: number, h: number, label: string, caption?: string) => {
+const drawLabeledImage = (
+  doc: InstanceType<JsPDFType>,
+  imgData: string | null,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  label: string,
+  caption?: string
+) => {
   doc.setDrawColor(30, 30, 30);
   doc.setLineWidth(0.5);
   doc.rect(x, y, w, h);
@@ -293,7 +348,14 @@ const buildInfractionPages = async (
   drawFieldLine(doc, 16, y, 30, 'Expediente Nº', exp);
   drawFieldLine(doc, 50, y, 30, 'Fecha Emisión', formatDate(new Date()));
   drawFieldLine(doc, 84, y, 30, 'Fecha Denuncia', formatDate(infractionDate));
-  drawFieldLine(doc, 118, y, 30, 'Hora Infracción', log.videoTimeCode || formatTime(infractionDate));
+  drawFieldLine(
+    doc,
+    118,
+    y,
+    30,
+    'Hora Infracción',
+    log.videoTimeCode || formatTime(infractionDate)
+  );
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
@@ -306,7 +368,14 @@ const buildInfractionPages = async (
   y = drawSectionTitle(doc, '01', 'Lugar y Circunstancias de la Infracción', y);
 
   drawFieldLine(doc, 16, y + 2, 108, 'Vía / Calle / Carretera', 'Casco urbano / vía pública');
-  drawFieldLine(doc, 128, y + 2, 64, 'KM / Nº / Punto Kilométrico', log.playbackTime != null ? `Playback ${log.playbackTime.toFixed(2)} s` : 'N/D');
+  drawFieldLine(
+    doc,
+    128,
+    y + 2,
+    64,
+    'KM / Nº / Punto Kilométrico',
+    log.playbackTime != null ? `Playback ${log.playbackTime.toFixed(2)} s` : 'N/D'
+  );
   drawFieldLine(doc, 16, y + 16, 56, 'Término Municipal', 'Daganzo de Arriba');
   drawFieldLine(doc, 75, y + 16, 26, 'Provincia', 'Madrid');
   drawFieldLine(doc, 128, y + 16, 64, 'Coordenadas GPS (Lat / Long)', log.visualTimestamp || '');
@@ -335,7 +404,12 @@ const buildInfractionPages = async (
   doc.setTextColor(0, 0, 0);
 
   y += 25;
-  y = drawSectionTitle(doc, '3B', 'Diligencia de Identificación del Conductor (Art. 9 BIS TRLTSV)', y);
+  y = drawSectionTitle(
+    doc,
+    '3B',
+    'Diligencia de Identificación del Conductor (Art. 9 BIS TRLTSV)',
+    y
+  );
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6);
@@ -376,7 +450,12 @@ const buildInfractionPages = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4);
   doc.setTextColor(100, 100, 100);
-  doc.text('REGISTRO: Análisis asistido por software. La validez administrativa requiere revisión, custodia y tramitación por el órgano competente.', 16, 272, { maxWidth: 178 });
+  doc.text(
+    'REGISTRO: Análisis asistido por software. La validez administrativa requiere revisión, custodia y tramitación por el órgano competente.',
+    16,
+    272,
+    { maxWidth: 178 }
+  );
   doc.setTextColor(0, 0, 0);
 
   // ===== PAGE 2: SANCIONES AND PHOTOS =====
@@ -419,7 +498,12 @@ const buildInfractionPages = async (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5.2);
   doc.setTextColor(120, 30, 30);
-  doc.text('PLAZO: 20 días naturales para pago con reducción del 50% desde el día siguiente a notificación. Art. 94.4: No aplica a infracciones muy graves.', 21, y + 26.2, { maxWidth: 160 });
+  doc.text(
+    'PLAZO: 20 días naturales para pago con reducción del 50% desde el día siguiente a notificación. Art. 94.4: No aplica a infracciones muy graves.',
+    21,
+    y + 26.2,
+    { maxWidth: 160 }
+  );
   doc.setTextColor(0, 0, 0);
 
   y += 33;
@@ -440,7 +524,13 @@ const buildInfractionPages = async (
   doc.setTextColor(0, 0, 0);
 
   y += 35;
-  y = drawSectionTitle(doc, '07', 'Registro Fotográfico de la Infracción', y, 'Art. 23.3 TRLTSV - Imágenes como prueba');
+  y = drawSectionTitle(
+    doc,
+    '07',
+    'Registro Fotográfico de la Infracción',
+    y,
+    'Art. 23.3 TRLTSV - Imágenes como prueba'
+  );
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
@@ -449,17 +539,82 @@ const buildInfractionPages = async (
   doc.text('IMÁGENES DE DETALLE - MATRÍCULA', 107, y + 3);
   doc.setTextColor(0, 0, 0);
 
-  const contextImages = (log.extraSnapshots || []).slice(0, 3).map(withImagePrefix);
-  const detailImages = [withImagePrefix(log.image), ...(log.zoomSnapshots || []).slice(0, 2).map(withImagePrefix)];
+  const pickDistinctTriplet = (frames: string[] = [], fallbackPool: string[] = []): string[] => {
+    const clean = frames.filter((f) => !!f && typeof f === 'string');
+    if (!clean.length) return [];
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const f of clean) {
+      if (seen.has(f)) continue;
+      seen.add(f);
+      unique.push(f);
+    }
+    if (unique.length >= 3) {
+      const mid = Math.floor((unique.length - 1) / 2);
+      return [unique[0], unique[mid], unique[unique.length - 1]];
+    }
+    for (const f of fallbackPool) {
+      if (!f || seen.has(f)) continue;
+      seen.add(f);
+      unique.push(f);
+      if (unique.length >= 3) break;
+    }
+    if (unique.length >= 3) return [unique[0], unique[1], unique[2]];
+    if (unique.length === 2) return [unique[0], unique[1], unique[1]];
+    return [unique[0], unique[0], unique[0]];
+  };
+
+  const contextPool = [
+    ...(log.extraSnapshots || []),
+    ...(log.zoomSnapshots || []),
+    ...(log.image ? [log.image] : []),
+  ];
+  const detailSource = [
+    ...(log.zoomSnapshots || []),
+    ...(log.extraSnapshots || []),
+    ...(log.image ? [log.image] : []),
+  ];
+  const contextImages = pickDistinctTriplet(log.extraSnapshots || [], contextPool).map(
+    withImagePrefix
+  );
+  const detailImages = pickDistinctTriplet(detailSource, contextPool).map(withImagePrefix);
   const rowYs = [y + 7, y + 90];
   const boxH = 80;
 
   rowYs.forEach((rowY, idx) => {
-    const captionContext = idx === 0 ? undefined : (idx === 1 && log.videoTimeCode ? `Hora ${log.videoTimeCode}` : undefined);
-    const captionDetail = idx === 0 && log.plate ? `Matrícula: ${log.plate}` : (log.ocrResults?.[idx] ? `OCR: ${log.ocrResults[idx]}` : undefined);
+    const captionContext =
+      idx === 0
+        ? undefined
+        : idx === 1 && log.videoTimeCode
+          ? `Hora ${log.videoTimeCode}`
+          : undefined;
+    const captionDetail =
+      idx === 0 && log.plate
+        ? `Matrícula: ${log.plate}`
+        : log.ocrResults?.[idx]
+          ? `OCR: ${log.ocrResults[idx]}`
+          : undefined;
 
-    drawLabeledImage(doc, contextImages[idx] || null, 12, rowY, 90, boxH, `CONTEXTO 0${idx + 1}`, captionContext);
-    drawLabeledImage(doc, detailImages[idx] || null, 107, rowY, 90, boxH, `DETALLE 0${idx + 1}`, captionDetail);
+    drawLabeledImage(
+      doc,
+      contextImages[idx] || null,
+      12,
+      rowY,
+      90,
+      boxH,
+      `CONTEXTO 0${idx + 1}`,
+      captionContext
+    );
+    drawLabeledImage(
+      doc,
+      detailImages[idx] || null,
+      107,
+      rowY,
+      90,
+      boxH,
+      `DETALLE 0${idx + 1}`,
+      captionDetail
+    );
   });
 
   // ===== PAGE 3: CITIZEN INFORMATION =====
@@ -467,32 +622,87 @@ const buildInfractionPages = async (
   await drawHeader(doc, 3, totalPages);
 
   y = 32;
-  y = drawSectionTitle(doc, '08', 'Plazo para Actuar — 20 Días Naturales desde Notificación', y, 'Art. 94 TRLTSV · Art. 79.1 Ley 39/2015');
+  y = drawSectionTitle(
+    doc,
+    '08',
+    'Plazo para Actuar — 20 Días Naturales desde Notificación',
+    y,
+    'Art. 94 TRLTSV · Art. 79.1 Ley 39/2015'
+  );
 
-  drawParagraphBox(doc, 16, y + 1, 88, 35, 'OPCIÓN A — PAGO CON REDUCCIÓN 50%',
-    `• Pago voluntario en 20 días produce:\n• Reducción del 50% de sanción\n• Renuncia a formular alegaciones\n• Terminación sin resolución expresa\n\nATENCIÓN: No aplica a infracciones muy graves ni saldo < 8 puntos (Art. 94.4 TRLTSV).`);
+  drawParagraphBox(
+    doc,
+    16,
+    y + 1,
+    88,
+    35,
+    'OPCIÓN A — PAGO CON REDUCCIÓN 50%',
+    `• Pago voluntario en 20 días produce:\n• Reducción del 50% de sanción\n• Renuncia a formular alegaciones\n• Terminación sin resolución expresa\n\nATENCIÓN: No aplica a infracciones muy graves ni saldo < 8 puntos (Art. 94.4 TRLTSV).`
+  );
 
-  drawParagraphBox(doc, 107, y + 1, 85, 35, 'OPCIÓN B — FORMULAR ALEGACIONES',
-    `• Dispone 20 días para presentar alegaciones y pruebas\n• Dirigidas al órgano instructor\n• Debe incluir: expediente, DNI, domicilio, fundamentos\n\n(Art. 22 RD 320/1994)`);
+  drawParagraphBox(
+    doc,
+    107,
+    y + 1,
+    85,
+    35,
+    'OPCIÓN B — FORMULAR ALEGACIONES',
+    `• Dispone 20 días para presentar alegaciones y pruebas\n• Dirigidas al órgano instructor\n• Debe incluir: expediente, DNI, domicilio, fundamentos\n\n(Art. 22 RD 320/1994)`
+  );
 
   y += 40;
   y = drawSectionTitle(doc, '09', 'Formas de Pago', y);
 
-  drawParagraphBox(doc, 16, y + 1, 56, 20, 'PAGO ONLINE',
-    'www.ayto-daganzo.org → Sede Electrónica → Pago Multas. Nº expediente completo.');
+  drawParagraphBox(
+    doc,
+    16,
+    y + 1,
+    56,
+    20,
+    'PAGO ONLINE',
+    'www.ayto-daganzo.org → Sede Electrónica → Pago Multas. Nº expediente completo.'
+  );
 
-  drawParagraphBox(doc, 74, y + 1, 56, 20, 'PAGO PRESENCIAL',
-    'Plaza de la Villa 1, 28814 Daganzo. Tel. 91 884 52 59. L-V 08:00-15:00');
+  drawParagraphBox(
+    doc,
+    74,
+    y + 1,
+    56,
+    20,
+    'PAGO PRESENCIAL',
+    'Plaza de la Villa 1, 28814 Daganzo. Tel. 91 884 52 59. L-V 08:00-15:00'
+  );
 
-  drawParagraphBox(doc, 132, y + 1, 70, 20, 'TRANSFERENCIA BANCARIA',
-    'IBAN: ES12 3456 7890 1234 5678 9012. Concepto: expediente completo.');
+  drawParagraphBox(
+    doc,
+    132,
+    y + 1,
+    70,
+    20,
+    'TRANSFERENCIA BANCARIA',
+    'IBAN: ES12 3456 7890 1234 5678 9012. Concepto: expediente completo.'
+  );
 
   y += 25;
-  drawParagraphBox(doc, 16, y, 88, 18, '10. TRAMITACIÓN',
-    'Conforme RD 320/1994 y Ley 39/2015. Órgano instructor realizará actuaciones necesarias. Plazo máximo resolver: 1 año.');
+  drawParagraphBox(
+    doc,
+    16,
+    y,
+    88,
+    18,
+    '10. TRAMITACIÓN',
+    'Conforme RD 320/1994 y Ley 39/2015. Órgano instructor realizará actuaciones necesarias. Plazo máximo resolver: 1 año.'
+  );
 
-  drawParagraphBox(doc, 107, y, 85, 18, '11. RECURSOS',
-    '• Recurso reposición: 1 mes desde notificación\n• Recurso contencioso: 2 meses desde notificación');
+  drawParagraphBox(
+    doc,
+    107,
+    y,
+    85,
+    18,
+    '11. RECURSOS',
+    '• Recurso reposición: 1 mes desde notificación\n• Recurso contencioso: 2 meses desde notificación'
+  );
 
   // ===== PAGE 4: PRESCRIPTION & ENFORCEMENT =====
   doc.addPage();
@@ -537,32 +747,80 @@ const buildInfractionPages = async (
   doc.setTextColor(0, 0, 0);
 
   y += 35;
-  drawParagraphBox(doc, 16, y, 88, 22, '13. EJECUCIÓN FORZOSA',
-    '• Recargo apremio: 20% + intereses\n• Embargo de bienes\n• Anotación ficheros de morosos\n• Comunicación a DGT');
+  drawParagraphBox(
+    doc,
+    16,
+    y,
+    88,
+    22,
+    '13. EJECUCIÓN FORZOSA',
+    '• Recargo apremio: 20% + intereses\n• Embargo de bienes\n• Anotación ficheros de morosos\n• Comunicación a DGT'
+  );
 
-  drawParagraphBox(doc, 107, y, 85, 22, '14. INHABILITACIÓN PERMISO',
-    'Conforme arts. 68-71 TRLTSV. Suspensión/privación permiso como sanción accesoria independiente.');
+  drawParagraphBox(
+    doc,
+    107,
+    y,
+    85,
+    22,
+    '14. INHABILITACIÓN PERMISO',
+    'Conforme arts. 68-71 TRLTSV. Suspensión/privación permiso como sanción accesoria independiente.'
+  );
 
   // ===== PAGE 5: DATA PROTECTION =====
   doc.addPage();
   await drawHeader(doc, 5, totalPages);
 
   y = 32;
-  y = drawSectionTitle(doc, '17', 'Información Protección de Datos Personales', y, 'RGPD (UE 2016/679) · LOPDGDD (LO 3/2018) · LO 7/2021');
+  y = drawSectionTitle(
+    doc,
+    '17',
+    'Información Protección de Datos Personales',
+    y,
+    'RGPD (UE 2016/679) · LOPDGDD (LO 3/2018) · LO 7/2021'
+  );
 
-  drawParagraphBox(doc, 16, y + 1, 88, 30, 'RESPONSABLE TRATAMIENTO',
-    'Ayuntamiento Daganzo Arriba · Plaza de la Villa 1 · 28814 Daganzo · Policía Local: Glorieta de Alcalá s/n · Tel. 91 887 59 19 · policia@ayto-daganzo.org');
+  drawParagraphBox(
+    doc,
+    16,
+    y + 1,
+    88,
+    30,
+    'RESPONSABLE TRATAMIENTO',
+    'Ayuntamiento Daganzo Arriba · Plaza de la Villa 1 · 28814 Daganzo · Policía Local: Glorieta de Alcalá s/n · Tel. 91 887 59 19 · policia@ayto-daganzo.org'
+  );
 
-  drawParagraphBox(doc, 107, y + 1, 85, 30, 'FINALIDADES DATOS',
-    '• Gestión procedimiento sancionador\n• Control del tráfico\n• Prevención infracciones\n• Cobro ejecutivo\n• Destinatarios: DGT, órganos judiciales, administraciones');
+  drawParagraphBox(
+    doc,
+    107,
+    y + 1,
+    85,
+    30,
+    'FINALIDADES DATOS',
+    '• Gestión procedimiento sancionador\n• Control del tráfico\n• Prevención infracciones\n• Cobro ejecutivo\n• Destinatarios: DGT, órganos judiciales, administraciones'
+  );
 
   y += 35;
-  drawParagraphBox(doc, 16, y, 178, 15, 'AUTORIDAD CONTROL - AEPD',
-    'Calle Jorge Juan 6, 28001 Madrid - www.aepd.es · Derechos: Acceso, rectificación, supresión, limitación, oposición (conforme RGPD y LOPDGDD)');
+  drawParagraphBox(
+    doc,
+    16,
+    y,
+    178,
+    15,
+    'AUTORIDAD CONTROL - AEPD',
+    'Calle Jorge Juan 6, 28001 Madrid - www.aepd.es · Derechos: Acceso, rectificación, supresión, limitación, oposición (conforme RGPD y LOPDGDD)'
+  );
 
   y += 20;
-  drawParagraphBox(doc, 16, y, 178, 12, 'V. VALIDACIÓN JURÍDICA',
-    'El presente boletín se ajusta a normativa vigente en materia de tráfico (RDL 6/2015), procedimiento sancionador (RD 320/1994; Ley 39/2015) y protección de datos (RGPD; LOPDGDD; LO 7/2021).');
+  drawParagraphBox(
+    doc,
+    16,
+    y,
+    178,
+    12,
+    'V. VALIDACIÓN JURÍDICA',
+    'El presente boletín se ajusta a normativa vigente en materia de tráfico (RDL 6/2015), procedimiento sancionador (RD 320/1994; Ley 39/2015) y protección de datos (RGPD; LOPDGDD; LO 7/2021).'
+  );
 
   y += 18;
   doc.setFont('helvetica', 'bold');
@@ -643,7 +901,12 @@ export const ReportService = {
   async generateInfractionPdf(log: InfractionLog, filename?: string): Promise<ArrayBuffer> {
     const doc = await createDoc();
     const exp = getExpedienteNumber();
-    await buildInfractionPages(doc, log, filename || `Expediente_${log.id}_${log.plate || 'SENT'}.pdf`, exp);
+    await buildInfractionPages(
+      doc,
+      log,
+      filename || `Expediente_${log.id}_${log.plate || 'SENT'}.pdf`,
+      exp
+    );
     return doc.output('arraybuffer');
   },
 
@@ -656,12 +919,11 @@ export const ReportService = {
     const reportBlob = bufferToBlob(buffer);
     const reportHash = await calculateSHA256(reportBlob);
     custodyLog.addEntry(
-      CustodyLogService.logReportAction(
-        'REPORT_EXPORTED',
-        'OPERATOR_SYSTEM',
-        String(log.id),
-        { exportFormat: 'PDF', fileName: file, fileHash: reportHash }
-      )
+      CustodyLogService.logReportAction('REPORT_EXPORTED', 'OPERATOR_SYSTEM', String(log.id), {
+        exportFormat: 'PDF',
+        fileName: file,
+        fileHash: reportHash,
+      })
     );
 
     const url = URL.createObjectURL(reportBlob);
@@ -672,7 +934,9 @@ export const ReportService = {
     URL.revokeObjectURL(url);
   },
 
-  async generateAndSaveInfractionPdf(log: InfractionLog): Promise<{ filename: string; path: string }> {
+  async generateAndSaveInfractionPdf(
+    log: InfractionLog
+  ): Promise<{ filename: string; path: string }> {
     const expNum = getExpedienteNumber().replace(/\//g, '_');
     const filename = `Expediente_${expNum}_${log.plate || 'SENT'}.pdf`;
     const buffer = await this.generateInfractionPdf(log, filename);
@@ -687,7 +951,9 @@ export const ReportService = {
     return { filename, path };
   },
 
-  async generateBatchPdf(infractions: InfractionLog[]): Promise<{ buffer: ArrayBuffer; filename: string }> {
+  async generateBatchPdf(
+    infractions: InfractionLog[]
+  ): Promise<{ buffer: ArrayBuffer; filename: string }> {
     const doc = await createDoc();
     const filename = `Sentinel_Denuncias_${formatTimestamp()}.pdf`;
 
@@ -727,7 +993,9 @@ export const ReportService = {
     return data.path as string;
   },
 
-  async generateAndSaveBatchPdf(infractions: InfractionLog[]): Promise<{ filename: string; path: string }> {
+  async generateAndSaveBatchPdf(
+    infractions: InfractionLog[]
+  ): Promise<{ filename: string; path: string }> {
     const { buffer, filename } = await this.generateBatchPdf(infractions);
 
     let dateStr: string | undefined;

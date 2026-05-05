@@ -5,7 +5,7 @@ import {
   validateAuditResponse,
   validateGeometryResponse,
   scoreResponseConfidence,
-  requiresManualReview
+  requiresManualReview,
 } from './geminiResponseValidator.js';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
@@ -115,10 +115,13 @@ const filterSnapshotsForAI = (snapshots = [], contextSnapshots = [], zoomSnapsho
   // zoomSnapshots    = vehicle close-up triplet for plate/detail visibility
   // We interleave them: [context_entrada, zoom_crítica, context_salida] for maximum information
   const forensicTriplet = [];
-  if (contextSnapshots.length > 0) forensicTriplet.push(contextSnapshots[0]);         // entrada (context)
-  if (zoomSnapshots.length > 1) forensicTriplet.push(zoomSnapshots[Math.floor((zoomSnapshots.length - 1) / 2)]); // crítica (zoom)
-  else if (contextSnapshots.length > 1) forensicTriplet.push(contextSnapshots[Math.floor((contextSnapshots.length - 1) / 2)]);
-  if (contextSnapshots.length > 2) forensicTriplet.push(contextSnapshots[contextSnapshots.length - 1]); // salida (context)
+  if (contextSnapshots.length > 0) forensicTriplet.push(contextSnapshots[0]); // entrada (context)
+  if (zoomSnapshots.length > 1)
+    forensicTriplet.push(zoomSnapshots[Math.floor((zoomSnapshots.length - 1) / 2)]); // crítica (zoom)
+  else if (contextSnapshots.length > 1)
+    forensicTriplet.push(contextSnapshots[Math.floor((contextSnapshots.length - 1) / 2)]);
+  if (contextSnapshots.length > 2)
+    forensicTriplet.push(contextSnapshots[contextSnapshots.length - 1]); // salida (context)
   else if (zoomSnapshots.length > 0) forensicTriplet.push(zoomSnapshots[zoomSnapshots.length - 1]);
 
   if (forensicTriplet.length > 0) {
@@ -131,8 +134,8 @@ const filterSnapshotsForAI = (snapshots = [], contextSnapshots = [], zoomSnapsho
   if (snapshots.length === 2) return [snapshots[0], snapshots[1]];
 
   const first = snapshots[0];
-  const mid   = snapshots[Math.floor((snapshots.length - 1) / 2)];
-  const last  = snapshots[snapshots.length - 1];
+  const mid = snapshots[Math.floor((snapshots.length - 1) / 2)];
+  const last = snapshots[snapshots.length - 1];
   return [first, mid, last];
 };
 
@@ -216,16 +219,21 @@ export const generateGeometryWithGemini = async ({ directives, instruction, imag
     }
 
     const validatedLines = (data.lines || [])
-      .filter((line) =>
-        line &&
-        typeof line?.x1 === 'number' &&
-        typeof line?.y1 === 'number' &&
-        typeof line?.x2 === 'number' &&
-        typeof line?.y2 === 'number' &&
-        line.x1 >= 0 && line.x1 <= 1 &&
-        line.y1 >= 0 && line.y1 <= 1 &&
-        line.x2 >= 0 && line.x2 <= 1 &&
-        line.y2 >= 0 && line.y2 <= 1
+      .filter(
+        (line) =>
+          line &&
+          typeof line?.x1 === 'number' &&
+          typeof line?.y1 === 'number' &&
+          typeof line?.x2 === 'number' &&
+          typeof line?.y2 === 'number' &&
+          line.x1 >= 0 &&
+          line.x1 <= 1 &&
+          line.y1 >= 0 &&
+          line.y1 <= 1 &&
+          line.x2 >= 0 &&
+          line.x2 <= 1 &&
+          line.y2 >= 0 &&
+          line.y2 <= 1
       )
       .map((line) => ({
         ...line,
@@ -292,7 +300,9 @@ export const analyzeTrajectoryWithGemini = async ({
 
         // Skip images larger than 5MB (Gemini has limits)
         if (sizeBytes > 5 * 1024 * 1024) {
-          console.warn(`[GEMINI] Snapshot too large (${(sizeBytes / 1024 / 1024).toFixed(1)}MB), skipping`);
+          console.warn(
+            `[GEMINI] Snapshot too large (${(sizeBytes / 1024 / 1024).toFixed(1)}MB), skipping`
+          );
           return null;
         }
 
@@ -402,7 +412,8 @@ export const analyzeTrajectoryWithGemini = async ({
     // Calcular confidence score
     const confidenceScore = scoreResponseConfidence(rawData, selectedSnapshots, track);
     rawData._confidenceScore = confidenceScore;
-    rawData._requiresManualReview = rawData._requiresManualReview || requiresManualReview(rawData, confidenceScore);
+    rawData._requiresManualReview =
+      rawData._requiresManualReview || requiresManualReview(rawData, confidenceScore);
 
     if (confidenceScore < 0.7) {
       console.warn(`[GEMINI_CONFIDENCE] Low confidence score: ${confidenceScore.toFixed(2)}`);
@@ -420,7 +431,9 @@ export const analyzeTrajectoryWithGemini = async ({
         : 'LOW',
       ruleCategory: sanitizeText(rawData.ruleCategory || line.label || 'TRAJECTORY'),
       legalBase: sanitizeText(rawData.legalBase || 'Revisión Manual'),
-      reasoning: Array.isArray(rawData.reasoning) ? rawData.reasoning.map(r => sanitizeText(String(r))) : [],
+      reasoning: Array.isArray(rawData.reasoning)
+        ? rawData.reasoning.map((r) => sanitizeText(String(r)))
+        : [],
       visualTimestamp: new Date().toLocaleTimeString(),
       telemetry: {
         speedEstimated: rawData.telemetry?.speedEstimated || kinematics.speed,

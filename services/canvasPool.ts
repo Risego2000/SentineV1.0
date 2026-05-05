@@ -47,10 +47,7 @@ export class CanvasPoolManager {
       defaultWidth: config.defaultWidth || 1920,
       defaultHeight: config.defaultHeight || 1080,
     };
-    logger.info(
-      'CANVAS_POOL',
-      `Initialized with max pool size: ${this.config.maxPoolSize}`
-    );
+    logger.info('CANVAS_POOL', `Initialized with max pool size: ${this.config.maxPoolSize}`);
   }
 
   /**
@@ -180,7 +177,7 @@ export class CanvasPoolManager {
     const inUseCount = this.pool.filter((c) => c.inUse).length;
     const hitRate =
       this.stats.requestCount > 0
-        ? (this.stats.cacheHitCount / this.stats.requestCount * 100).toFixed(1)
+        ? ((this.stats.cacheHitCount / this.stats.requestCount) * 100).toFixed(1)
         : '0';
 
     return {
@@ -211,7 +208,10 @@ export class CanvasPoolManager {
    */
   logStats() {
     const stats = this.getStats();
-    logger.info('CANVAS_POOL', `Stats - Size: ${stats.poolSize}/${stats.maxPoolSize}, In Use: ${stats.inUse}, Hit Rate: ${stats.cacheHitRate}`);
+    logger.info(
+      'CANVAS_POOL',
+      `Stats - Size: ${stats.poolSize}/${stats.maxPoolSize}, In Use: ${stats.inUse}, Hit Rate: ${stats.cacheHitRate}`
+    );
   }
 }
 

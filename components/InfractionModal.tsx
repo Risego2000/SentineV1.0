@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { X, Scale, FileDown, CheckCircle, Ban } from 'lucide-react';
+import { X, Scale } from 'lucide-react';
 import { InfractionLog } from '../types';
-import { ReportService } from '../services/ReportService';
-import { useSentinel } from '../hooks/useSentinel';
 import { useHelp } from '../hooks/useHelp';
-import { EvidenceGallery } from './RightSidebar/EvidenceGallery';
 
 interface InfractionModalProps {
   log: InfractionLog;
@@ -12,28 +9,44 @@ interface InfractionModalProps {
 }
 
 export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
-  const [activeTab, setActiveTab] = useState<'evidence' | 'gallery'>('evidence');
-  const { validateInfraction } = useSentinel();
+  const [activeTab, setActiveTab] = useState<'evidence'>('evidence');
   const { helpProps } = useHelp();
-  const isValidated = log.validationStatus === 'validated';
-
-  const generatePDF = async () => {
-    if (!isValidated) return;
-    await ReportService.downloadInfractionPdf(
-      log,
-      `ACTA_PERICIAL_${log.plate || 'SENT'}_${log.id.toString().slice(0, 8)}.pdf`
-    );
+  const pickDistinctTriplet = (frames: string[] = [], fallbackPool: string[] = []): string[] => {
+    const clean = frames.filter((f): f is string => !!f && typeof f === 'string');
+    if (clean.length === 0) return [];
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const f of clean) {
+      if (seen.has(f)) continue;
+      seen.add(f);
+      unique.push(f);
+    }
+    if (unique.length >= 3) {
+      const mid = Math.floor((unique.length - 1) / 2);
+      return [unique[0], unique[mid], unique[unique.length - 1]];
+    }
+    for (const f of fallbackPool) {
+      if (!f || seen.has(f)) continue;
+      seen.add(f);
+      unique.push(f);
+      if (unique.length >= 3) break;
+    }
+    if (unique.length >= 3) return [unique[0], unique[1], unique[2]];
+    if (unique.length === 2) return [unique[0], unique[1], unique[1]];
+    return [unique[0], unique[0], unique[0]];
   };
-
-  const handleValidate = () => {
-    validateInfraction(log.id, 'validated');
-    onClose();
-  };
-
-  const handleReject = () => {
-    validateInfraction(log.id, 'rejected');
-    onClose();
-  };
+  const contextPool = [
+    ...(log.extraSnapshots || []),
+    ...(log.zoomSnapshots || []),
+    ...(log.image ? [log.image] : []),
+  ];
+  const detailPool = [
+    ...(log.zoomSnapshots || []),
+    ...(log.extraSnapshots || []),
+    ...(log.image ? [log.image] : []),
+  ];
+  const contextTriplet = pickDistinctTriplet(log.extraSnapshots || [], contextPool);
+  const detailTriplet = pickDistinctTriplet(log.zoomSnapshots || [], detailPool);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -71,16 +84,6 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
               >
                 Evidencia AI
               </button>
-              <button
-                onClick={() => setActiveTab('gallery')}
-                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 ${
-                  activeTab === 'gallery'
-                    ? 'text-blue-500 border-blue-500'
-                    : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
-              >
-                Galería
-              </button>
             </div>
 
             {/* Tab Content */}
@@ -91,12 +94,15 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     🎬 Escenas Generales (Contexto)
                   </h3>
-                  {log.extraSnapshots && log.extraSnapshots.length >= 3 ? (
+                  {contextTriplet.length >= 3 ? (
                     <div className="grid grid-cols-1 gap-4">
                       {[
-                        { img: log.extraSnapshots[0], label: 'FOTOGRAMA 01 - ENTRADA EN ROI' },
-                        { img: log.extraSnapshots[1], label: 'FOTOGRAMA 02 - POSICIÓN CRÍTICA' },
-                        { img: log.extraSnapshots[2], label: 'FOTOGRAMA 03 - SALIDA / CONFIRMACIÓN' },
+                        { img: contextTriplet[0], label: 'FOTOGRAMA 01 - ENTRADA EN ROI' },
+                        { img: contextTriplet[1], label: 'FOTOGRAMA 02 - POSICIÓN CRÍTICA' },
+                        {
+                          img: contextTriplet[2],
+                          label: 'FOTOGRAMA 03 - SALIDA / CONFIRMACIÓN',
+                        },
                       ].map((frame, idx) => (
                         <div
                           key={idx}
@@ -133,16 +139,16 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                 </div>
 
                 {/* DETALLES DE MATRÍCULA */}
-                {log.zoomSnapshots && log.zoomSnapshots.length >= 3 && (
+                {detailTriplet.length >= 3 && (
                   <div className="space-y-4 border-t border-white/10 pt-6">
                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       🔍 Detalle de Matrícula (OCR)
                     </h3>
                     <div className="grid grid-cols-1 gap-4">
                       {[
-                        { img: log.zoomSnapshots[0], label: 'DETALLE 01 - ENTRADA' },
-                        { img: log.zoomSnapshots[1], label: 'DETALLE 02 - CRÍTICA' },
-                        { img: log.zoomSnapshots[2], label: 'DETALLE 03 - SALIDA' },
+                        { img: detailTriplet[0], label: 'DETALLE 01 - ENTRADA' },
+                        { img: detailTriplet[1], label: 'DETALLE 02 - CRÍTICA' },
+                        { img: detailTriplet[2], label: 'DETALLE 03 - SALIDA' },
                       ].map((frame, idx) => (
                         <div
                           key={`zoom-${idx}`}
@@ -163,7 +169,9 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                     </div>
                     {log.plate && log.plate !== 'DESCONOCIDO' && (
                       <div className="bg-amber-500/10 border border-amber-500/30 rounded p-3 mt-2">
-                        <span className="text-[9px] text-slate-400 uppercase">Matrícula Detectada:</span>
+                        <span className="text-[9px] text-slate-400 uppercase">
+                          Matrícula Detectada:
+                        </span>
                         <div className="text-lg font-black text-amber-400 font-mono mt-1">
                           {log.plate}
                         </div>
@@ -172,10 +180,6 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
                   </div>
                 )}
               </div>
-            )}
-
-            {activeTab === 'gallery' && (
-              <EvidenceGallery infractionId={log.id} />
             )}
           </div>
 
@@ -243,37 +247,7 @@ export const InfractionModal = ({ log, onClose }: InfractionModalProps) => {
               </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="p-8 border-t border-white/5 bg-white/[0.01] space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleReject}
-                  className="py-3 px-4 border border-white/10 rounded hover:bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
-                  {...helpProps('Rechazar esta infracción y eliminar del registro.')}
-                >
-                  <Ban size={14} /> Descartar
-                </button>
-                <button
-                  onClick={handleValidate}
-                  className="py-3 px-4 bg-blue-600 rounded hover:bg-blue-500 text-white text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg"
-                  {...helpProps('Validar infracción para procesamiento legal.')}
-                >
-                  <CheckCircle size={14} /> Validar
-                </button>
-              </div>
-              <button
-                onClick={generatePDF}
-                disabled={!isValidated}
-                className="w-full py-3 text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-500"
-                {...helpProps(
-                  isValidated
-                    ? 'Descargar informe PDF con evidencia fotográfica validada.'
-                    : 'Valide la infracción antes de generar el PDF.'
-                )}
-              >
-                <FileDown size={14} /> Generar Expediente PDF Validado
-              </button>
-            </div>
+            <div className="p-6 border-t border-white/5 bg-white/[0.01]" />
           </div>
         </div>
       </div>

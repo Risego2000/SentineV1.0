@@ -121,7 +121,13 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
         setUploadProgress((prev) => Math.min(prev + Math.random() * 30, 95));
       }, 500);
 
-      const result = await uploadEvidenceFile(infractionId, pendingFile, fileType, pendingFile.name, true);
+      const result = await uploadEvidenceFile(
+        infractionId,
+        pendingFile,
+        fileType,
+        pendingFile.name,
+        true
+      );
       clearInterval(progressInterval);
       setUploadProgress(100);
 
@@ -151,15 +157,26 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
             <div className="flex-1">
               <h2 className="text-lg font-bold text-white mb-2">Vídeo H.265 Detectado</h2>
               <p className="text-slate-400 text-sm">
-                Este vídeo usa codec H.265 (HEVC). Muchos navegadores no lo soportan nativamente. Necesitará conversión a H.264.
+                Este vídeo usa codec H.265 (HEVC). Sentinel intentará reproducirlo directamente sin
+                pérdida de calidad. Si tu entorno no soporta HEVC, se usará fallback automático.
               </p>
               <p className="text-slate-500 text-xs mt-4 space-y-2">
-                <div><strong>📤 Opción 1: Subir ahora</strong> (conversión en servidor)</div>
-                <div className="ml-4 text-slate-600">Se convierte automáticamente a H.264 con aceleración GPU</div>
-                <div className="ml-4 text-slate-600">Tiempo estimado: 2-5 minutos según duración del vídeo</div>
+                <div>
+                  <strong>📤 Opción 1: Subir ahora</strong> (mantener flujo original)
+                </div>
+                <div className="ml-4 text-slate-600">
+                  Se prioriza reproducción directa HEVC y puente WASM local
+                </div>
+                <div className="ml-4 text-slate-600">
+                  Solo si falla, se activa transcodificación de respaldo
+                </div>
 
-                <div className="mt-2"><strong>❌ Opción 2: Cancelar</strong> (convertir localmente)</div>
-                <div className="ml-4 text-slate-600">Si tienes una herramienta de conversión disponible, puede ser más rápido</div>
+                <div className="mt-2">
+                  <strong>❌ Opción 2: Cancelar</strong> (convertir localmente)
+                </div>
+                <div className="ml-4 text-slate-600">
+                  Si tienes una herramienta de conversión disponible, puede ser más rápido
+                </div>
               </p>
             </div>
           </div>
@@ -178,7 +195,7 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
               onClick={handleUploadAsIs}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
             >
-              Subir y Convertir
+              Subir Archivo
             </button>
           </div>
         </div>
@@ -192,10 +209,7 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-white">Subir Evidencia</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/10 rounded text-slate-400"
-          >
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded text-slate-400">
             <X size={20} />
           </button>
         </div>
@@ -217,9 +231,7 @@ export const EvidenceUploadDialog: React.FC<EvidenceUploadDialogProps> = ({
             <Upload className="mx-auto mb-3 text-slate-400" size={32} />
             <p className="text-white font-semibold mb-1">Arrastra archivos aquí</p>
             <p className="text-slate-500 text-sm">o haz clic para seleccionar</p>
-            <p className="text-slate-600 text-xs mt-2">
-              Fotos (máx 20MB) • Videos (máx 100MB)
-            </p>
+            <p className="text-slate-600 text-xs mt-2">Fotos (máx 20MB) • Videos (máx 100MB)</p>
             <input
               ref={fileInputRef}
               type="file"

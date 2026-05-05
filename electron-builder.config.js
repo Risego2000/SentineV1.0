@@ -13,12 +13,7 @@ module.exports = {
   },
 
   // Files to include in final package
-  files: [
-    'dist/**/*',
-    'node_modules/**/*',
-    'package.json',
-    'package-lock.json',
-  ],
+  files: ['dist/**/*', 'node_modules/**/*', 'package.json', 'package-lock.json'],
 
   // Additional files/resources to bundle
   extraFiles: [

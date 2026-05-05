@@ -1,16 +1,9 @@
 import React, { memo, useState } from 'react';
-import {
-  ShieldAlert,
-  Activity,
-  Terminal as TerminalIcon,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Shield,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, Shield } from 'lucide-react';
 import { InfractionFeed } from './RightSidebar/InfractionFeed';
 import { SystemTerminal } from './RightSidebar/SystemTerminal';
 import { PredictiveAnalytics } from './Sidebar/PredictiveAnalytics';
+import { TacticalMetrics } from './RightSidebar/TacticalMetrics';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useHelp } from '../hooks/useHelp';
 import { useAuth } from '../hooks/useAuth';
@@ -25,7 +18,7 @@ export const RightSidebar = memo(() => {
 
   return (
     <aside
-      className={`transition-all duration-300 ease-in-out border-l border-white/5 flex flex-col bg-[#0d0d0f] z-50 h-screen shrink-0 overflow-hidden ${
+      className={`sidebar-unified transition-all duration-300 ease-in-out border-l border-white/5 flex flex-col bg-[#0d0d0f] z-50 h-screen shrink-0 overflow-hidden ${
         isRightSidebarCollapsed ? 'w-16' : 'w-80'
       }`}
     >
@@ -75,18 +68,18 @@ export const RightSidebar = memo(() => {
             onClick={() => setActiveTab('infractions')}
             className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
               activeTab === 'infractions'
-                ? 'text-blue-500 bg-blue-500/5'
+                ? 'text-red-500 bg-red-500/5'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
             {...helpProps('Ver listado de infracciones detectadas y peritajes.')}
           >
-            Sanciones
+            Infracciones
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
             className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
               activeTab === 'analytics'
-                ? 'text-blue-500 bg-blue-500/5'
+                ? 'text-red-500 bg-red-500/5'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
             {...helpProps('Ver métricas tácticas y análisis predictivo del tráfico.')}
@@ -97,7 +90,7 @@ export const RightSidebar = memo(() => {
             onClick={() => setActiveTab('terminal')}
             className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
               activeTab === 'terminal'
-                ? 'text-blue-500 bg-blue-500/5'
+                ? 'text-red-500 bg-red-500/5'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
             {...helpProps('Monitorizar registros internos del sistema y eventos AI.')}
@@ -129,73 +122,69 @@ export const RightSidebar = memo(() => {
                 }}
               />
             </button>
-            <button
-              onClick={() => {
-                toggleRightSidebar();
-                setActiveTab('infractions');
-              }}
-              className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500 border border-blue-500/20"
-              {...helpProps('Abrir panel de Sanciones')}
-            >
-              <ShieldAlert size={16} />
-            </button>
-            <button
-              onClick={() => {
-                toggleRightSidebar();
-                setActiveTab('analytics');
-              }}
-              className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 border border-white/5"
-              {...helpProps('Abrir panel de Métricas')}
-            >
-              <Activity size={16} />
-            </button>
-            <button
-              onClick={() => {
-                toggleRightSidebar();
-                setActiveTab('terminal');
-              }}
-              className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 border border-white/5"
-              {...helpProps('Abrir Terminal de Sistema')}
-            >
-              <TerminalIcon size={16} />
-            </button>
           </div>
         ) : (
           <>
-            {activeTab === 'infractions' && <InfractionFeed />}
+            {activeTab === 'infractions' && (
+              <div className="flex-1 min-h-0 p-4 overflow-y-auto custom-scrollbar">
+                <button
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('sentinel:set-view', { detail: 'expedients' })
+                    )
+                  }
+                  className="w-full mb-3 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors border border-red-500/30 bg-red-500/8 text-red-500/85"
+                  {...helpProps('Abrir el módulo de infracciones y expedientes.')}
+                >
+                  MODULO DE INFRACCIONES
+                </button>
+                <div className="horizon-card rounded-[20px] border border-white/5 bg-[#020617]/35 overflow-hidden">
+                  <InfractionFeed />
+                </div>
+              </div>
+            )}
             {activeTab === 'analytics' && (
               <div className="flex-1 flex flex-col min-h-0 p-4 space-y-6 overflow-y-auto custom-scrollbar">
+                <TacticalMetrics />
                 <PredictiveAnalytics />
               </div>
             )}
-            {activeTab === 'terminal' && <SystemTerminal />}
+            {activeTab === 'terminal' && (
+              <div className="flex-1 min-h-0 p-4 overflow-y-auto custom-scrollbar">
+                <div className="horizon-card rounded-[20px] border border-white/5 bg-[#020617]/35 overflow-hidden min-h-full">
+                  <SystemTerminal />
+                </div>
+              </div>
+            )}
           </>
         )}
 
-        <div className="shrink-0 px-4 border-t border-white/5 bg-white/[0.02] h-14 flex items-center">
-          <div className="flex items-center gap-3 w-full">
-            <div className="w-9 h-9 rounded-xl bg-slate-950 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-inner">
-              <Shield className="w-4 h-4 text-blue-500" />
+        {!isRightSidebarCollapsed && (
+          <div className="shrink-0 px-4 border-t border-white/5 bg-white/[0.02] h-14 flex items-center">
+            <div className="flex items-center gap-3 w-full">
+              <div className="w-9 h-9 rounded-xl bg-slate-950 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                <Shield className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-black text-white uppercase tracking-tight leading-none truncate">
+                  {user?.name || user?.email?.split('@')[0] || 'Operador'}
+                </span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest truncate">
+                  {user?.email?.split('@')[0] || 'operador'}
+                </span>
+              </div>
+              <button
+                onClick={() => logout()}
+                disabled={isLoggingOut}
+                aria-label="Cerrar sesión"
+                className="w-9 h-9 rounded-xl bg-slate-950 border border-red-500/30 flex items-center justify-center hover:bg-red-500/5 transition-all active:scale-95 disabled:opacity-50 shrink-0 shadow-inner group"
+                {...helpProps('Cerrar sesión')}
+              >
+                <LogOut className="w-4 h-4 text-red-500/80 group-hover:text-red-500 transition-colors" />
+              </button>
             </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-black text-white uppercase tracking-tight leading-none truncate">
-                {user?.name || user?.email?.split('@')[0] || 'Operador'}
-              </span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest truncate">
-                {user?.email?.split('@')[0] || 'operador'}
-              </span>
-            </div>
-            <button
-              onClick={() => logout()}
-              disabled={isLoggingOut}
-              aria-label="Cerrar sesión"
-              className="w-9 h-9 rounded-xl bg-slate-950 border border-red-500/30 flex items-center justify-center hover:bg-red-500/5 transition-all active:scale-95 disabled:opacity-50 shrink-0 shadow-inner group"
-              {...helpProps('Cerrar sesión')}
-            >
-              <LogOut className="w-4 h-4 text-red-500/80 group-hover:text-red-500 transition-colors" />
-            </button>
           </div>
-        </div>
+        )}
       </div>
     </aside>
   );

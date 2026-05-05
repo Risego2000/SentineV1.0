@@ -1,23 +1,25 @@
-import { useCallback } from 'react';
-import { useSentinel } from './useSentinel';
+import { useCallback, useContext } from 'react';
+import { SentinelContext } from '../context/SentinelContext';
 
 export const useHelp = () => {
-  const { setHelpMsg } = useSentinel();
+  const sentinel = useContext(SentinelContext);
 
   const showHelp = useCallback(
     (msg: string) => {
-      setHelpMsg(msg);
+      sentinel?.setHelpMsg?.(msg);
     },
-    [setHelpMsg]
+    [sentinel]
   );
 
   const clearHelp = useCallback(() => {
-    setHelpMsg(null);
-  }, [setHelpMsg]);
+    sentinel?.setHelpMsg?.(null);
+  }, [sentinel]);
 
   const helpProps = (msg: string) => ({
     onMouseEnter: () => showHelp(msg),
     onMouseLeave: () => clearHelp(),
+    onFocus: () => showHelp(msg),
+    onBlur: () => clearHelp(),
   });
 
   return { showHelp, clearHelp, helpProps };

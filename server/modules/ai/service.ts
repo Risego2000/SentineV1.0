@@ -20,6 +20,9 @@ export interface InfractionAnalysisRequest {
   };
   timestamp?: string;
   evidenceUrls?: string[];
+  directives?: string;
+  lineLabel?: string;
+  lineType?: string;
 }
 
 export interface InfractionAnalysisResult {
@@ -54,7 +57,8 @@ export interface GeometryAnalysisResult {
  */
 export class AIAnalysisService {
   private geminiApiKey: string;
-  private geminiEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  private geminiEndpoint: string =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   constructor(geminiApiKey?: string) {
     this.geminiApiKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
@@ -155,11 +159,20 @@ export class AIAnalysisService {
     const geometryInfo = request.geometryData
       ? ` Speed: ${request.geometryData.speed} km/h, Angle: ${request.geometryData.angle}°`
       : '';
+    const directivesInfo = request.directives
+      ? `\nOperator directives (must be enforced):\n${request.directives}`
+      : '';
+    const geometryLineInfo =
+      request.lineLabel || request.lineType
+        ? `\nTriggered geometry: ${request.lineLabel || 'N/A'} (${request.lineType || 'N/A'})`
+        : '';
 
     return `You are a traffic violation analyst. Analyze the following infraction:
 
 Infraction Type: ${request.infractionType}${plateInfo}${geometryInfo}
 Timestamp: ${request.timestamp || 'Unknown'}
+${geometryLineInfo}
+${directivesInfo}
 
 Based on the information provided, provide a JSON response with:
 1. confirmed (boolean): Is this a valid violation?
@@ -207,11 +220,11 @@ Respond ONLY with valid JSON, no additional text.`;
    */
   private getLocalAnalysis(request: InfractionAnalysisRequest): InfractionAnalysisResult {
     const severityMap: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
-      'rebase_linea': 'medium',
-      'giro_prohibido': 'high',
-      'exceso_velocidad': 'critical',
-      'invasión_carril': 'high',
-      'doble_fila': 'low',
+      rebase_linea: 'medium',
+      giro_prohibido: 'high',
+      exceso_velocidad: 'critical',
+      invasión_carril: 'high',
+      doble_fila: 'low',
     };
 
     const severity = severityMap[request.infractionType.toLowerCase()] ?? 'medium';
@@ -254,7 +267,9 @@ Respond ONLY with valid JSON, no additional text.`;
   /**
    * Calculate turn angle from trajectory
    */
-  private calculateTurnAngle(points: Array<{ x: number; y: number; timestamp: number }>): number | undefined {
+  private calculateTurnAngle(
+    points: Array<{ x: number; y: number; timestamp: number }>
+  ): number | undefined {
     if (points.length < 3) return undefined;
 
     const first = points[0];
@@ -279,11 +294,7 @@ Respond ONLY with valid JSON, no additional text.`;
   /**
    * Determine if geometry violates traffic rules
    */
-  private isGeometryViolation(
-    infractionType: string,
-    speed?: number,
-    angle?: number
-  ): boolean {
+  private isGeometryViolation(infractionType: string, speed?: number, angle?: number): boolean {
     const type = infractionType.toLowerCase();
 
     if (type.includes('velocidad') && speed && speed > 60) return true;
@@ -298,11 +309,11 @@ Respond ONLY with valid JSON, no additional text.`;
    */
   private getArticleNumber(infractionType: string): string {
     const articles: Record<string, string> = {
-      'rebase_linea': '67.1',
-      'giro_prohibido': '78.2',
-      'exceso_velocidad': '88.1',
-      'invasión_carril': '89.3',
-      'doble_fila': '91.2',
+      rebase_linea: '67.1',
+      giro_prohibido: '78.2',
+      exceso_velocidad: '88.1',
+      invasión_carril: '89.3',
+      doble_fila: '91.2',
     };
     return articles[infractionType.toLowerCase()] ?? '67.1';
   }

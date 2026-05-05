@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { LoginScreen } from './components/LoginScreen';
 import { useAuth } from './hooks/useAuth';
-import { SentinelProvider } from './context/SentinelProvider';
 import './index.css';
 
 const AuthenticatedApp = () => {
@@ -28,11 +27,7 @@ const AuthenticatedApp = () => {
     return <LoginScreen />;
   }
 
-  return (
-    <SentinelProvider viewerId="global">
-      <App />
-    </SentinelProvider>
-  );
+  return <App />;
 };
 
 const container = document.getElementById('root');

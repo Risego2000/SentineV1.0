@@ -28,6 +28,7 @@ export const EngineSettings = () => {
     setAuditPreset,
     currentKinematicPreset,
     setKinematicPreset,
+    systemStatus,
   } = useSentinel();
   const { helpProps } = useHelp();
 
@@ -181,6 +182,59 @@ export const EngineSettings = () => {
                 <span className="text-[9px] font-black uppercase tracking-tight">{data.label}</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* 4. OCR AUTOMÁTICO (SIN ACCIÓN MANUAL) */}
+        <div
+          className="space-y-4 pt-6 border-t border-white/5"
+          {...helpProps(
+            'OCR automático de matrículas: solo vehículos con grabación ROI A, mejora de imagen, recortes de placa y confirmación IA de respaldo.'
+          )}
+        >
+          <div className="flex items-center gap-2 px-1">
+            <ShieldCheck size={12} className="text-blue-500" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              OCR Forense Automático
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div
+              className="p-2 rounded-[12px] border border-blue-500 bg-blue-500/10 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)] text-[9px] font-black uppercase tracking-tight text-center"
+              {...helpProps(
+                'ROI A Gate: habilita OCR solo cuando el vehículo entra en la zona ROI A para evitar lecturas fuera de contexto.'
+              )}
+            >
+              ROI A Gate
+            </div>
+            <div
+              className="p-2 rounded-[12px] border border-blue-500 bg-blue-500/10 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)] text-[9px] font-black uppercase tracking-tight text-center"
+              {...helpProps(
+                'Image Enhance: aplica mejora forense de imagen (contraste, nitidez y reducción de ruido) antes del reconocimiento de matrícula.'
+              )}
+            >
+              Image Enhance
+            </div>
+            <div
+              className="p-2 rounded-[12px] border border-blue-500 bg-blue-500/10 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)] text-[9px] font-black uppercase tracking-tight text-center"
+              {...helpProps(
+                'Plate Crops: genera recortes de la zona de matrícula en varios frames para aumentar precisión y robustez del OCR.'
+              )}
+            >
+              Plate Crops
+            </div>
+            <div
+              className={`p-2 rounded-[12px] border text-[9px] font-black uppercase tracking-tight text-center ${
+                systemStatus.ocrGeminiConfirmation
+                  ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                  : 'border-slate-600/30 bg-slate-800/40 text-slate-400'
+              }`}
+              {...helpProps(
+                'Gemini Confirm: valida o corrige el resultado OCR con IA cuando hay ambigüedad, devolviendo matrícula final con mayor fiabilidad.'
+              )}
+            >
+              Gemini Confirm
+            </div>
           </div>
         </div>
       </div>

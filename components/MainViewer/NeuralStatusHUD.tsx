@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useSentinel } from '../../hooks/useSentinel';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { useHelp } from '../../hooks/useHelp';
 
 const PHASE_CONFIG = {
   standby: {
@@ -62,6 +63,7 @@ const PHASE_CONFIG = {
 export const NeuralStatusHUD = () => {
   const { statusMsg, fps, bufferStatus } = useSentinel();
   const { gridSize } = useLayoutStore();
+  const { helpProps } = useHelp();
 
   // mini = 4 viewers, compact = 2 viewers, normal = 1 viewer
   const mini = gridSize >= 4;
@@ -78,6 +80,22 @@ export const NeuralStatusHUD = () => {
   const roiB = bufferStatus.roiBLabel ?? 'ROI B';
   const photos = bufferStatus.capturedPhotos ?? 0;
   const plate = bufferStatus.plateCandidate;
+  const hasPlate = !!plate && plate.trim().length > 0;
+  const plateState: 'searching' | 'unread' | 'read' = hasPlate
+    ? 'read'
+    : phase === 'roi_a' || phase === 'confirmed' || phase === 'saving'
+      ? 'searching'
+      : photos > 0
+        ? 'unread'
+        : 'searching';
+  const plateText =
+    plateState === 'read' ? plate : plateState === 'unread' ? 'NO_LEÍDA' : 'BUSCANDO...';
+  const plateColor =
+    plateState === 'read'
+      ? 'text-amber-400'
+      : plateState === 'unread'
+        ? 'text-red-400'
+        : 'text-slate-500';
 
   const roiAActive = phase === 'roi_a' || phase === 'confirmed' || phase === 'saving';
   const roiBActive = phase === 'confirmed' || phase === 'saving';
@@ -110,14 +128,18 @@ export const NeuralStatusHUD = () => {
     >
       <div
         className={
-          'bg-[#020617]/90 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex flex-row items-stretch border-l-4 transition-all duration-500 w-full max-w-5xl mx-auto ' +
+          'pointer-events-auto bg-[#020617]/90 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex flex-row items-stretch border-l-4 transition-all duration-500 w-full max-w-5xl mx-auto ' +
           rounded +
           ' ' +
           cfg.border
         }
+        {...helpProps('Buffer forense: estado en tiempo real del flujo ROI, OCR y métricas operativas.')}
       >
         {/* SECTION 1: HEADER & STATUS */}
-        <div className={'flex flex-col justify-center border-r border-white/5 ' + pad}>
+        <div
+          className={'flex flex-col justify-center border-r border-white/5 ' + pad}
+          {...helpProps('Estado del buffer forense y fase operativa actual.')}
+        >
           <div className="flex items-center gap-2 mb-1">
             <div className={'p-0.5 rounded bg-black/40 ' + cfg.color}>{cfg.icon(iconSz)}</div>
             <span
@@ -141,7 +163,10 @@ export const NeuralStatusHUD = () => {
         </div>
 
         {/* SECTION 2: BUFFER PROGRESS */}
-        <div className={'flex flex-col justify-center flex-1 border-r border-white/5 ' + pad}>
+        <div
+          className={'flex flex-col justify-center flex-1 border-r border-white/5 ' + pad}
+          {...helpProps('Progreso temporal del buffer forense sobre ventana táctica de 40 segundos.')}
+        >
           <div className="flex items-center justify-between mb-1">
             <span className={'font-mono font-bold text-slate-500 ' + txtLabel}>
               {bufferStatus.seconds.toFixed(1)}s / 40.0s
@@ -167,6 +192,7 @@ export const NeuralStatusHUD = () => {
         {/* SECTION 3: ROI FLOW */}
         <div
           className={'flex items-center justify-center border-r border-white/5 ' + pad + ' ' + gap}
+          {...helpProps('Flujo secuencial de detección entre ROI A y ROI B.')}
         >
           <div
             className={
@@ -204,7 +230,7 @@ export const NeuralStatusHUD = () => {
 
         {/* SECTION 4: METRICS */}
         <div className={'flex items-center ' + pad + ' gap-4'}>
-          <div className="flex flex-col">
+          <div className="flex flex-col" {...helpProps('Número de capturas fotográficas forenses generadas.')}>
             <span className={'font-black text-slate-600 uppercase tracking-widest ' + txtMeta}>
               Fotos
             </span>
@@ -213,22 +239,19 @@ export const NeuralStatusHUD = () => {
               <span className={'font-black text-white font-mono ' + txtVal}>{photos}</span>
             </div>
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col" {...helpProps('Estado OCR de matrícula detectada en el buffer actual.')}>
             <span className={'font-black text-slate-600 uppercase tracking-widest ' + txtMeta}>
               Matrícula
             </span>
             <span
               className={
-                'font-black font-mono truncate max-w-[80px] ' +
-                txtVal +
-                ' ' +
-                (plate ? 'text-amber-400' : 'text-slate-700')
+                'font-black font-mono truncate max-w-[110px] ' + txtVal + ' ' + plateColor
               }
             >
-              {plate ?? '---'}
+              {plateText}
             </span>
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col" {...helpProps('Rendimiento instantáneo del procesamiento en fotogramas por segundo.')}>
             <span className={'font-black text-slate-600 uppercase tracking-widest ' + txtMeta}>
               FPS
             </span>
@@ -242,7 +265,10 @@ export const NeuralStatusHUD = () => {
 
       {/* Infraction Banner (if confirmed) */}
       {phase === 'confirmed' && (
-        <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-1.5 self-center animate-in fade-in duration-300 backdrop-blur-md">
+        <div
+          className="pointer-events-auto flex items-center gap-1.5 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-1.5 self-center animate-in fade-in duration-300 backdrop-blur-md"
+          {...helpProps('Infracción confirmada por cruce ROI A → ROI B.')}
+        >
           <CheckCircle2 size={mini ? 10 : 12} className="text-red-400" />
           <span className={'font-black text-red-400 uppercase tracking-wider ' + txtLabel}>
             {roiA} → {roiB} · INFRACCIÓN CONFIRMADA
@@ -254,9 +280,10 @@ export const NeuralStatusHUD = () => {
       {statusMsg && (
         <div
           className={
-            'bg-red-500/10 border border-red-500/30 px-3 py-1.5 backdrop-blur-md flex items-center gap-2 self-center animate-in fade-in ' +
+            'pointer-events-auto bg-red-500/10 border border-red-500/30 px-3 py-1.5 backdrop-blur-md flex items-center gap-2 self-center animate-in fade-in ' +
             rounded
           }
+          {...helpProps('Alerta operativa del sistema forense.')}
         >
           <AlertTriangle size={mini ? 10 : 12} className="text-red-500 animate-bounce" />
           <span className={'font-black text-red-500 uppercase tracking-widest ' + txtLabel}>

@@ -35,9 +35,7 @@ function parsePositiveIntEnv(
   if (raw === undefined || raw === '') return fallback;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(
-      `[ENV] ${name} inválida: "${raw}". Debe ser entero entre ${min} y ${max}.`
-    );
+    throw new Error(`[ENV] ${name} inválida: "${raw}". Debe ser entero entre ${min} y ${max}.`);
   }
   return parsed;
 }
@@ -62,12 +60,7 @@ export function validateServerEnv(): ServerConfig {
     2_000_000_000
   );
   const maxReportMb = parsePositiveIntEnv('REPORT_MAX_MB', 100, 1, 2000);
-  const maxTranscodeConcurrency = parsePositiveIntEnv(
-    'TRANSCODE_MAX_CONCURRENCY',
-    2,
-    1,
-    16
-  );
+  const maxTranscodeConcurrency = parsePositiveIntEnv('TRANSCODE_MAX_CONCURRENCY', 2, 1, 16);
 
   const rateLimitWindowMs = parsePositiveIntEnv(
     'API_RATE_LIMIT_WINDOW_MS',
@@ -75,12 +68,7 @@ export function validateServerEnv(): ServerConfig {
     1000,
     3_600_000
   );
-  const rateLimitMaxRequests = parsePositiveIntEnv(
-    'API_RATE_LIMIT_MAX_REQUESTS',
-    120,
-    1,
-    10_000
-  );
+  const rateLimitMaxRequests = parsePositiveIntEnv('API_RATE_LIMIT_MAX_REQUESTS', 120, 1, 10_000);
 
   const apiToken = process.env.SENTINEL_API_TOKEN || '';
   const allowedOrigins = (

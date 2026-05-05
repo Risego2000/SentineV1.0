@@ -5,49 +5,59 @@
  */
 
 export type ExpedientState =
-  | 'DETECTED'        // Infracción detectada automáticamente
-  | 'UNDER_REVIEW'    // Esperando revisión de operador
-  | 'VALIDATED'       // Aprobado por operador (listo para firma)
-  | 'REJECTED'        // Rechazado por operador (no procede)
-  | 'SIGNED'          // Firmado digitalmente
-  | 'EXPORTED'        // Exportado como reporte oficial
-  | 'ARCHIVED';       // Archivado (fin de ciclo de vida)
+  | 'DETECTED' // Infracción detectada automáticamente
+  | 'UNDER_REVIEW' // Esperando revisión de operador
+  | 'VALIDATED' // Aprobado por operador (listo para firma)
+  | 'REJECTED' // Rechazado por operador (no procede)
+  | 'SIGNED' // Firmado digitalmente
+  | 'EXPORTED' // Exportado como reporte oficial
+  | 'ARCHIVED'; // Archivado (fin de ciclo de vida)
 
 export interface ExpedientStateTransition {
   from: ExpedientState;
   to: ExpedientState;
-  actor: string;              // Usuario/sistema que realiza transición
-  timestamp: number;          // UTC timestamp
-  reason?: string;            // Motivo (especialmente para REJECTED)
-  signature?: string;         // Hash de firma (para SIGNED)
-  notes?: string;             // Notas adicionales
+  actor: string; // Usuario/sistema que realiza transición
+  timestamp: number; // UTC timestamp
+  reason?: string; // Motivo (especialmente para REJECTED)
+  signature?: string; // Hash de firma (para SIGNED)
+  notes?: string; // Notas adicionales
 }
 
 export interface ExpedientValidation {
   isValid: boolean;
-  validatedBy: string;        // Operador que validó
-  validatedAt: number;        // UTC timestamp
-  reason?: string;            // Motivo de rechazo
-  evidenceVerified: boolean;  // ¿Se verificó evidencia?
-  plateVerified: boolean;     // ¿Se verificó placa?
-  speedVerified: boolean;     // ¿Se verificó velocidad?
+  validatedBy: string; // Operador que validó
+  validatedAt: number; // UTC timestamp
+  reason?: string; // Motivo de rechazo
+  evidenceVerified: boolean; // ¿Se verificó evidencia?
+  plateVerified: boolean; // ¿Se verificó placa?
+  speedVerified: boolean; // ¿Se verificó velocidad?
   notes?: string;
 }
 
 export interface ExpedientSignature {
   isSigned: boolean;
   signedBy: string;
-  signedAt: number;           // UTC timestamp
-  signatureHash: string;      // SHA-256 de contenido firmado
-  certFingerprint?: string;   // Huella digital del certificado
+  signedAt: number; // UTC timestamp
+  signatureHash: string; // SHA-256 de contenido firmado
+  certFingerprint?: string; // Huella digital del certificado
   method: 'manual' | 'digital' | 'biometric';
 }
 
 export interface ExpedientAuditEntry {
-  timestamp: number;          // UTC
-  action: string;             // DETECTED, VALIDATED, REJECTED, SIGNED, EXPORTED, etc.
-  actor: string;              // Usuario/sistema
+  timestamp: number; // UTC
+  action: string; // DETECTED, VALIDATED, REJECTED, SIGNED, EXPORTED, etc.
+  actor: string; // Usuario/sistema
   details?: Record<string, any>;
+}
+
+export interface ExpedientCustodyRow {
+  fileName: string;
+  kind: 'ORIGINAL' | 'PROCESADA' | 'REPORTE';
+  expectedHash: string;
+  calculatedHash: string;
+  isValid: boolean;
+  checkedAt: string;
+  note?: string;
 }
 
 /**
@@ -56,75 +66,113 @@ export interface ExpedientAuditEntry {
  */
 export interface Expedient {
   // Identificación
-  id: string;                           // Único: YYYY-MM-DD-HHmmss-trackId
-  infractionId: string;                 // Referencia a InfractionLog
+  id: string; // Único: YYYY-MM-DD-HHmmss-trackId
+  infractionId: string; // Referencia a InfractionLog
 
   // Metadatos legales
-  createdAt: number;                    // UTC timestamp (cuando se detectó)
-  updatedAt: number;                    // Última modificación
+  createdAt: number; // UTC timestamp (cuando se detectó)
+  updatedAt: number; // Última modificación
   state: ExpedientState;
 
   // Información del caso
   violationType: 'STOP' | 'FORBIDDEN_TURN' | 'SPEED_VIOLATION' | 'OTHER';
-  location: string;                     // Descripción de ubicación
-  timestamp: number;                    // Cuando ocurrió la infracción
-  vehicleDescription: string;           // Marca/modelo (si está disponible)
-  licensePlate: string;                 // Placa extraída por OCR
+  location: string; // Descripción de ubicación
+  timestamp: number; // Cuando ocurrió la infracción
+  vehicleDescription: string; // Marca/modelo (si está disponible)
+  licensePlate: string; // Placa extraída por OCR
 
   // DATOS DEL LUGAR DE LA INFRACCIÓN
-  via?: string;                         // Vía/Calle/Carretera
-  numeroPuntoKilometrico?: string;      // KM / Nº / Punto Kilométrico
-  municipio?: string;                   // Término municipal
-  provincia?: string;                   // Provincia
-  latitud?: number;                     // Coordenada GPS
-  longitud?: number;                    // Coordenada GPS
-  gravedad?: 'Leve' | 'Grave' | 'Muy Grave';  // Gravedad de la infracción
+  via?: string; // Vía/Calle/Carretera
+  numeroPuntoKilometrico?: string; // KM / Nº / Punto Kilométrico
+  municipio?: string; // Término municipal
+  provincia?: string; // Provincia
+  latitud?: number; // Coordenada GPS
+  longitud?: number; // Coordenada GPS
+  gravedad?: 'Leve' | 'Grave' | 'Muy Grave'; // Gravedad de la infracción
 
   // DATOS DEL VEHÍCULO
-  marca?: string;                       // Marca del vehículo
-  modelo?: string;                      // Modelo del vehículo
-  color?: string;                       // Color del vehículo
-  numeroChasis?: string;                // Número de bastidor (VIN)
-  estadoITV?: string;                   // Estado del ITV (Vigente/Caducada)
-  seguroObligatorio?: boolean;          // ¿Tiene seguro?
+  marca?: string; // Marca del vehículo
+  modelo?: string; // Modelo del vehículo
+  color?: string; // Color del vehículo
+  numeroChasis?: string; // Número de bastidor (VIN)
+  estadoITV?: string; // Estado del ITV (Vigente/Caducada)
+  seguroObligatorio?: boolean; // ¿Tiene seguro?
 
   // DATOS DEL TITULAR DEL VEHÍCULO
-  titularNombre?: string;               // Apellidos y nombre / Razón social
-  titularDNI?: string;                  // DNI / NIE / Pasaporte / CIF
-  titularDomicilio?: string;            // Domicilio a efectos de notificación
-  titularLocalidad?: string;            // Localidad
-  titularProvincia?: string;            // Provincia
-  titularTelefono?: string;             // Teléfono de contacto
-  titularEmail?: string;                // Correo electrónico
+  titularNombre?: string; // Apellidos y nombre / Razón social
+  titularDNI?: string; // DNI / NIE / Pasaporte / CIF
+  titularDomicilio?: string; // Domicilio a efectos de notificación
+  titularLocalidad?: string; // Localidad
+  titularProvincia?: string; // Provincia
+  titularTelefono?: string; // Teléfono de contacto
+  titularEmail?: string; // Correo electrónico
 
   // DATOS DEL CONDUCTOR
-  conductorNombre?: string;             // Apellidos y nombre del conductor
-  conductorDNI?: string;                // DNI / NIE / Pasaporte / CIF
-  conductorPermiso?: string;            // Número de permiso de conducir
-  conductorClase?: string;              // Clase / Subclase
-  conductorDomicilio?: string;          // Domicilio completo del conductor
-  conductorLocalidad?: string;          // Localidad
-  conductorProvincia?: string;          // Provincia
-  conductorTelefono?: string;           // Teléfono de contacto
-  conductorEmail?: string;              // Correo electrónico
+  conductorNombre?: string; // Apellidos y nombre del conductor
+  conductorDNI?: string; // DNI / NIE / Pasaporte / CIF
+  conductorPermiso?: string; // Número de permiso de conducir
+  conductorClase?: string; // Clase / Subclase
+  conductorDomicilio?: string; // Domicilio completo del conductor
+  conductorLocalidad?: string; // Localidad
+  conductorProvincia?: string; // Provincia
+  conductorTelefono?: string; // Teléfono de contacto
+  conductorEmail?: string; // Correo electrónico
 
   // DESCRIPCIÓN DE HECHOS
-  descripcionDetalladaHechos?: string;  // Descripción detallada de los hechos constitutivos
-  circunstanciasAgravantes?: string;    // Circunstancias agravantes
+  descripcionDetalladaHechos?: string; // Descripción detallada de los hechos constitutivos
+  circunstanciasAgravantes?: string; // Circunstancias agravantes
+
+  // Información IA/Análisis de Preinforme
+  severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'; // Nivel de severidad de infracción
+  ruleCategory?: string; // Categoría de regla vulnerada
+  description?: string; // Descripción de la infracción detectada
+  legalBase?: string; // Base legal / Artículos vulnerados
+  normaConductaNombre?: string;
+  normaConductaAbreviatura?: string;
+  articuloConducta?: string;
+  articuloConductaTexto?: string;
+  normaSancionadoraNombre?: string;
+  normaSancionadoraAbreviatura?: string;
+  articuloSancionador?: string;
+  articuloSancionadorTexto?: string;
+  codigoSenal?: string;
+  descripcionSenal?: string;
+  definicionInfraccion?: string;
+  conductaDenunciada?: string;
+  sancionEuros?: number;
+  puntosDetraccion?: number;
+  riesgoNivel?: number;
+  reasoning?: string[]; // Puntos de confirmación / razonamientos
+  makeModel?: string; // Marca y modelo del vehículo
+  videoTimeCode?: string; // Código de tiempo del video (OSD)
+  visualTimestamp?: string; // Timestamp visual/GPS
+  ocrResults?: string[]; // Resultados del OCR para placa
+  plateOcr?: string; // Placa detectada por OCR
+  plateOcrCandidates?: string[]; // Candidatos OCR alternativos
+  validationStatus?: 'pending' | 'validated' | 'rejected';
+  playbackTime?: number; // Tiempo de reproducción en el video
+  videoClip?: string; // Clip de video (si existe)
+  telemetrySpeedEstimated?: string; // Telemetría IA: velocidad estimada
+  telemetryBehaviorAnomalies?: string; // Telemetría IA: anomalías
+  operativeCode?: string; // Código operativo de la regla
+  priority?: 'CRÍTICA' | 'ALTA' | 'MEDIA-ALTA' | 'MEDIA' | 'BAJA';
+  priorityLevel?: number;
+  fineAmount?: number;
+  pointsDeducted?: number;
 
   // Evidencia
-  evidenceId: string;                   // Referencia a EvidenceDB
-  photosCount: number;                  // Cantidad de fotos capturadas
-  videoClipHash: string;                // SHA-256 del clip de video
+  evidenceId: string; // Referencia a EvidenceDB
+  photosCount: number; // Cantidad de fotos capturadas
+  videoClipHash: string; // SHA-256 del clip de video
 
   // Fotos para exportación (Base64)
-  image?: string;                       // Foto principal (base64)
-  extraSnapshots?: string[];            // Fotos generales de contexto (base64)
-  zoomSnapshots?: string[];             // Fotos de detalle/zoom (base64)
+  image?: string; // Foto principal (base64)
+  extraSnapshots?: string[]; // Fotos generales de contexto (base64)
+  zoomSnapshots?: string[]; // Fotos de detalle/zoom (base64)
 
   // Validación
   validation?: ExpedientValidation;
-  rejectionReason?: string;             // Si state === REJECTED
+  rejectionReason?: string; // Si state === REJECTED
 
   // Firma Digital
   signature: ExpedientSignature;
@@ -134,14 +182,20 @@ export interface Expedient {
   auditLog: ExpedientAuditEntry[];
 
   // Metadatos operacionales
-  operator?: string;                    // Operador que validó
-  supervisor?: string;                  // Supervisor que firmó
-  tags?: string[];                      // Para categorización (urgente, recurso, etc.)
+  operator?: string; // Operador que validó
+  supervisor?: string; // Supervisor que firmó
+  tags?: string[]; // Para categorización (urgente, recurso, etc.)
 
   // Cumplimiento Legal
-  dpiaCertified?: boolean;              // ¿Cumple DPIA/EIPD?
-  dataRetentionDays?: number;           // Días de retención
-  deleteScheduledAt?: number;           // Cuándo se eliminará
+  dpiaCertified?: boolean; // ¿Cumple DPIA/EIPD?
+  dataRetentionDays?: number; // Días de retención
+  deleteScheduledAt?: number; // Cuándo se eliminará
+
+  // Cadena de custodia (verificación visible y exportable)
+  custodyLastCheckedAt?: number;
+  custodyLastStatus?: 'SUCCESS' | 'FAILURE' | 'PENDING';
+  custodyLastSummary?: string;
+  custodyVerificationRows?: ExpedientCustodyRow[];
 }
 
 /**

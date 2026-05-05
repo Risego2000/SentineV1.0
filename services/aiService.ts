@@ -66,6 +66,39 @@ const postJson = async <T>(endpoint: string, payload: unknown): Promise<T> => {
   return (await response.json()) as T;
 };
 
+const isRetryableAiError = (error: unknown): boolean => {
+  const msg = String(error || '').toLowerCase();
+  return (
+    msg.includes('aborterror') ||
+    msg.includes('timed out') ||
+    msg.includes('network') ||
+    msg.includes('503') ||
+    msg.includes('econnreset')
+  );
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const postJsonWithRetry = async <T>(
+  endpoint: string,
+  payload: unknown,
+  retries = 1
+): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await postJson<T>(endpoint, payload);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !isRetryableAiError(error)) {
+        break;
+      }
+      await sleep(800 * (attempt + 1));
+    }
+  }
+  throw lastError;
+};
+
 export const AIService = {
   /**
    * Sentinel AI Geometric Engine.
@@ -97,11 +130,15 @@ export const AIService = {
     directives: string,
     auditPreset: AuditPresetType = 'standard'
   ): Promise<AuditResponse> {
-    return postJson<AuditResponse>('/api/ai/audit', {
-      track,
-      line,
-      directives,
-      auditPreset: normalizeBackendAuditPreset(auditPreset),
-    });
+    return postJsonWithRetry<AuditResponse>(
+      '/api/ai/audit',
+      {
+        track,
+        line,
+        directives,
+        auditPreset: normalizeBackendAuditPreset(auditPreset),
+      },
+      2
+    );
   },
 };

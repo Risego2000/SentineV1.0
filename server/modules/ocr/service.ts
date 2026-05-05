@@ -5,6 +5,7 @@
 
 import { spawnSync } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { logger } from '../../../services/logger';
 
 export interface PlateExtractionResult {
@@ -50,7 +51,6 @@ export class OCRServiceBackend {
   private getDefaultPythonPath(): string {
     // Try bundled Python first
     const bundledPython = path.join(process.cwd(), 'resources', 'python', 'python.exe');
-    const fs = require('fs');
     if (fs.existsSync(bundledPython)) {
       return bundledPython;
     }
@@ -61,9 +61,15 @@ export class OCRServiceBackend {
   /**
    * Extract license plate from base64 image using PaddleOCR
    */
-  async extractPlate(imageBase64: string): Promise<PlateExtractionResult> {
+  async extractPlate(imageBase64: string | string[]): Promise<PlateExtractionResult> {
     try {
-      if (!imageBase64) {
+      const images = Array.isArray(imageBase64)
+        ? imageBase64.filter((x): x is string => typeof x === 'string' && x.length > 0)
+        : imageBase64
+          ? [imageBase64]
+          : [];
+
+      if (images.length === 0) {
         return {
           plate: null,
           candidates: [],
@@ -72,9 +78,15 @@ export class OCRServiceBackend {
         };
       }
 
-      // Call Python OCR script
-      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath, 'extract-plate', imageBase64], {
+      const payload = JSON.stringify({
+        operation: 'extract_plate',
+        images,
+      });
+
+      // Call Python OCR script through stdin (prevents Windows argv size issues).
+      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath], {
         encoding: 'utf-8',
+        input: payload,
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer
         timeout: 30000, // 30 seconds timeout
       });
@@ -90,7 +102,11 @@ export class OCRServiceBackend {
       }
 
       if (result.status !== 0) {
-        logger.error('OCR_BACKEND', `Python script exited with code ${result.status}`, result.stderr);
+        logger.error(
+          'OCR_BACKEND',
+          `Python script exited with code ${result.status}`,
+          result.stderr
+        );
         return {
           plate: null,
           candidates: [],
@@ -109,7 +125,11 @@ export class OCRServiceBackend {
           method: ocrResult.method || 'paddleocr',
         };
       } catch (parseError) {
-        logger.error('OCR_BACKEND', 'Failed to parse Python output', parseError, result.stdout);
+        logger.error(
+          'OCR_BACKEND',
+          `Failed to parse Python output: ${String(result.stdout || '').slice(0, 500)}`,
+          parseError
+        );
         return {
           plate: null,
           candidates: [],
@@ -135,9 +155,14 @@ export class OCRServiceBackend {
     try {
       if (!imageBase64) return null;
 
-      // Call Python OCR script
-      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath, 'detect-region', imageBase64], {
+      const payload = JSON.stringify({
+        operation: 'detect_region',
+        image: imageBase64,
+      });
+
+      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath], {
         encoding: 'utf-8',
+        input: payload,
         maxBuffer: 10 * 1024 * 1024,
         timeout: 30000,
       });
@@ -176,12 +201,32 @@ export class OCRServiceBackend {
         };
       }
 
-      // Timestamp extraction via Gemini API would go here
-      // For now, return null (fallback to client-side)
+      const payload = JSON.stringify({
+        operation: 'extract_timestamp',
+        image: imageBase64,
+      });
+
+      const result = spawnSync(this.pythonExePath, [this.ocrScriptPath], {
+        encoding: 'utf-8',
+        input: payload,
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 30000,
+      });
+
+      if (result.error || result.status !== 0) {
+        logger.warn(
+          'OCR_BACKEND',
+          'Timestamp extraction process failed',
+          result.error || result.stderr
+        );
+        return { timestamp: null, osdText: null, confidence: 0 };
+      }
+
+      const parsed = JSON.parse(result.stdout || '{}');
       return {
-        timestamp: null,
-        osdText: null,
-        confidence: 0,
+        timestamp: parsed.timestamp || null,
+        osdText: parsed.raw_text || null,
+        confidence: parsed.confidence ? 1 : 0,
       };
     } catch (error) {
       logger.warn('OCR_BACKEND', 'Timestamp extraction failed', error);

@@ -21,12 +21,7 @@ const config = {
   },
 
   // Files to include in packaged app
-  files: [
-    'dist/**/*',
-    'node_modules/**/*',
-    'package.json',
-    'package-lock.json',
-  ],
+  files: ['dist/**/*', 'node_modules/**/*', 'package.json', 'package-lock.json'],
 
   // Additional resources to bundle
   extraFiles: [

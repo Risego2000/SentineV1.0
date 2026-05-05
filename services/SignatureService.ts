@@ -41,26 +41,16 @@ export class SignatureService {
       const contentToSign = this.prepareSignableContent(expedient);
 
       // Calculate hash of content
-      const contentHash = await calculateSHA256(
-        new Blob([contentToSign], { type: 'text/plain' })
-      );
+      const contentHash = await calculateSHA256(new Blob([contentToSign], { type: 'text/plain' }));
 
       // Generate signature (in production: use actual digital certificate)
-      const signature = await this.generateSignature(
-        contentHash,
-        signerName,
-        options
-      );
+      const signature = await this.generateSignature(contentHash, signerName, options);
 
-      logger.info(
-        'SIGNATURE_SERVICE',
-        `Expedient ${expedient.id} signed by ${signerName}`,
-        {
-          method: options.method,
-          contentHash: contentHash.substring(0, 16),
-          signatureHash: signature.substring(0, 16),
-        }
-      );
+      logger.info('SIGNATURE_SERVICE', `Expedient ${expedient.id} signed by ${signerName}`, {
+        method: options.method,
+        contentHash: contentHash.substring(0, 16),
+        signatureHash: signature.substring(0, 16),
+      });
 
       return signature;
     } catch (error) {
@@ -89,9 +79,7 @@ export class SignatureService {
 
     try {
       const contentToSign = this.prepareSignableContent(expedient);
-      const contentHash = await calculateSHA256(
-        new Blob([contentToSign], { type: 'text/plain' })
-      );
+      const contentHash = await calculateSHA256(new Blob([contentToSign], { type: 'text/plain' }));
 
       // In production: verify signature using public key
       // For now: verify hash matches expected
@@ -165,10 +153,7 @@ export class SignatureService {
       `=== AUDIT TRAIL (IMMUTABLE) ===`,
       ...expedient.auditLog
         .slice(-10) // Last 10 entries
-        .map(
-          (e) =>
-            `${new Date(e.timestamp).toISOString()} | ${e.action} | ${e.actor}`
-        ),
+        .map((e) => `${new Date(e.timestamp).toISOString()} | ${e.action} | ${e.actor}`),
       ``,
       `=== SIGNATURE AUTHORIZATION ===`,
       `By signing this document, I certify that:`,
@@ -214,10 +199,7 @@ export class SignatureService {
    * Verify signature internally
    * In production: use public key cryptography
    */
-  private static verifySignatureInternal(
-    contentHash: string,
-    signatureHash: string
-  ): boolean {
+  private static verifySignatureInternal(contentHash: string, signatureHash: string): boolean {
     // Basic check: signature should be 64 chars (SHA-256)
     if (signatureHash.length !== 64) {
       return false;
@@ -299,7 +281,7 @@ export class SignatureService {
 }
 
 // Singleton instance (if needed for caching)
-let instance: typeof SignatureService | null = null;
+const instance: typeof SignatureService | null = null;
 
 export function getSignatureService(): typeof SignatureService {
   return SignatureService;

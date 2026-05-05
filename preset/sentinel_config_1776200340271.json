@@ -78,9 +78,7 @@
     "currentKinematicPreset": "full",
     "calibration": 0.05,
     "analysisGridSize": 1,
-    "selectedProtocolIds": [
-      "roi-turn-demo"
-    ]
+    "selectedProtocolIds": ["roi-turn-demo"]
   },
   "layout": {
     "gridSize": 1,

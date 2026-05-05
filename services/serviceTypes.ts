@@ -49,7 +49,7 @@ export function err<T>(
  * Video/Codec related types
  */
 export interface VideoInfo {
-  codec: typeof AppConfig.Video.SUPPORTED_CODECS[number] | 'unknown';
+  codec: (typeof AppConfig.Video.SUPPORTED_CODECS)[number] | 'unknown';
   duration: number;
   width: number;
   height: number;
@@ -59,7 +59,7 @@ export interface VideoInfo {
 export interface TranscodeOptions {
   inputPath: string;
   outputPath: string;
-  outputCodec: typeof AppConfig.Video.SUPPORTED_CODECS[number];
+  outputCodec: (typeof AppConfig.Video.SUPPORTED_CODECS)[number];
   preset?: 'ultrafast' | 'fast' | 'medium' | 'slow';
   profile?: 'baseline' | 'main' | 'high';
 }
@@ -172,11 +172,7 @@ export function isValidJson(value: unknown): value is Record<string, unknown> {
 /**
  * Strict number validation with range
  */
-export function isNumberInRange(
-  value: unknown,
-  min: number = 0,
-  max: number = 1
-): value is number {
+export function isNumberInRange(value: unknown, min: number = 0, max: number = 1): value is number {
   return typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
 }
 
@@ -184,11 +180,7 @@ export function isNumberInRange(
  * Strict string validation with length limits
  */
 export function isValidString(value: unknown, minLength = 1, maxLength = 255): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length >= minLength &&
-    value.length <= maxLength
-  );
+  return typeof value === 'string' && value.length >= minLength && value.length <= maxLength;
 }
 
 /**

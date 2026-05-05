@@ -6,6 +6,7 @@
 
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { retryWithBackoff, fallbacks } from './errorRecoveryService.js';
 
@@ -18,7 +19,18 @@ try {
   __dirname = path.join(process.cwd(), 'services');
 }
 
-const PADDLE_OCR_SCRIPT = path.join(__dirname, 'paddle_ocr_extractor.py');
+const resolvePythonExecutable = () => {
+  const bundled = path.join(process.cwd(), 'resources', 'python', 'python.exe');
+  try {
+    if (process.platform === 'win32' && fs.existsSync(bundled)) return bundled;
+  } catch {
+    // Fallback to system python.
+  }
+  return 'python';
+};
+
+const PADDLE_OCR_SCRIPT = path.join(process.cwd(), 'resources', 'paddle_ocr_extractor.py');
+const PYTHON_EXE = resolvePythonExecutable();
 
 /**
  * Run Python PaddleOCR script with given input
@@ -28,81 +40,111 @@ const PADDLE_OCR_SCRIPT = path.join(__dirname, 'paddle_ocr_extractor.py');
 async function runPaddleOcr(request) {
   return new Promise((resolve, reject) => {
     let timeoutHandle = null;
+    let settled = false;
+    let earlyExit = null;
 
-    const process = spawn('python', [PADDLE_OCR_SCRIPT], {
+    const childProc = spawn(PYTHON_EXE, [PADDLE_OCR_SCRIPT], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
     });
 
     let stdout = '';
     let stderr = '';
-    let isResolved = false;
+
+    const fail = (error, shouldKill = false) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutHandle);
+      if (shouldKill) {
+        try {
+          childProc.kill('SIGTERM');
+        } catch {
+          // ignore kill errors
+        }
+      }
+      reject(error);
+    };
+
+    const succeed = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutHandle);
+      resolve(value);
+    };
 
     // Set timeout
     timeoutHandle = setTimeout(() => {
-      if (!isResolved) {
-        isResolved = true;
-        process.kill('SIGTERM');
-        reject(new Error('PaddleOCR process timeout (2 minutes)'));
-      }
+      fail(new Error('PaddleOCR process timeout (2 minutes)'), true);
     }, 120000);
 
-    process.stdout.on('data', (data) => {
+    childProc.stdout.on('data', (data) => {
       stdout += data.toString();
     });
 
-    process.stderr.on('data', (data) => {
+    childProc.stderr.on('data', (data) => {
       stderr += data.toString();
     });
 
-    process.stdin.on('error', (error) => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeoutHandle);
-        console.error('[PaddleOCR] Failed to write request to Python stdin:', error);
-        process.kill('SIGTERM');
-        reject(error);
-      }
+    childProc.stdin.on('error', (error) => {
+      console.error('[PaddleOCR] Failed to write request to Python stdin:', error);
+      const details = stderr?.trim() ? ` | stderr: ${stderr.trim()}` : '';
+      const wrapped = new Error(`PaddleOCR stdin write failed (${error.code || 'UNKNOWN'}): ${error.message}${details}`);
+      wrapped.code = error.code || 'EPIPE';
+      fail(wrapped, true);
     });
 
-    process.on('error', (error) => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeoutHandle);
-        console.error('[PaddleOCR] Process error:', error);
-        reject(error);
-      }
+    childProc.on('error', (error) => {
+      console.error('[PaddleOCR] Process error:', error);
+      fail(error);
     });
 
-    process.on('close', (code) => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeoutHandle);
+    childProc.on('exit', (code, signal) => {
+      if (settled) return;
+      earlyExit = { code, signal };
+    });
 
-        if (code !== 0 && code !== null) {
-          // code can be null if process was killed
-          console.error('[PaddleOCR] Python script failed:', stderr);
-          reject(new Error(`PaddleOCR process exited with code ${code}: ${stderr}`));
-          return;
-        }
+    childProc.on('close', (code) => {
+      if (settled) return;
 
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (err) {
-          console.error('[PaddleOCR] Failed to parse output:', stdout);
-          reject(new Error(`Invalid JSON output from PaddleOCR: ${err.message}`));
-        }
+      if (code !== 0 && code !== null) {
+        console.error('[PaddleOCR] Python script failed:', stderr);
+        const err = new Error(`PaddleOCR process exited with code ${code}: ${stderr}`);
+        err.code = 'PROCESS_EXIT';
+        fail(err);
+        return;
+      }
+
+      if (!stdout || !stdout.trim()) {
+        const exitInfo = earlyExit
+          ? `exitCode=${earlyExit.code}, signal=${earlyExit.signal}`
+          : 'exit info unavailable';
+        const err = new Error(
+          `PaddleOCR returned empty output (${exitInfo}). stderr: ${stderr || 'none'}`
+        );
+        err.code = 'EOF';
+        fail(err);
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        succeed(result);
+      } catch (err) {
+        console.error('[PaddleOCR] Failed to parse output:', stdout);
+        fail(new Error(`Invalid JSON output from PaddleOCR: ${err.message}`));
       }
     });
 
     // Send request as JSON to stdin. Python may exit early on startup errors,
     // so handle EPIPE/EOF through the stdin error listener above.
-    process.stdin.write(JSON.stringify(request), (error) => {
+    childProc.stdin.write(JSON.stringify(request), (error) => {
       if (error) {
-        process.stdin.emit('error', error);
+        childProc.stdin.emit('error', error);
         return;
       }
-      process.stdin.end();
+      if (!settled) {
+        childProc.stdin.end();
+      }
     });
   });
 }
@@ -117,7 +159,9 @@ export async function extractLicensePlateFromImages(base64Images = []) {
       return { plate: 'NO_IMAGES', candidates: [], confidence: 0 };
     }
 
-    console.log(`[PaddleOCR] Processing ${base64Images.length} image(s) for license plate extraction...`);
+    console.log(
+      `[PaddleOCR] Processing ${base64Images.length} image(s) for license plate extraction...`
+    );
 
     // 🔴 USE AUTO-RETRY WITH EXPONENTIAL BACKOFF
     const result = await retryWithBackoff(
@@ -131,7 +175,9 @@ export async function extractLicensePlateFromImages(base64Images = []) {
       { maxRetries: 3 }
     );
 
-    console.log(`[PaddleOCR] Result: plate="${result.plate}", candidates=${JSON.stringify(result.candidates)}`);
+    console.log(
+      `[PaddleOCR] Result: plate="${result.plate}", candidates=${JSON.stringify(result.candidates)}`
+    );
     return result;
   } catch (error) {
     console.error('[PaddleOCR] Error extracting license plate (all retries failed):', error);
@@ -164,7 +210,9 @@ export async function extractTimestampFromOSD(base64Image) {
       { maxRetries: 2 } // Fewer retries for timestamp (simpler task)
     );
 
-    console.log(`[PaddleOCR] OSD text: "${result.osdText}", extracted timestamp: "${result.timestamp}"`);
+    console.log(
+      `[PaddleOCR] OSD text: "${result.osdText}", extracted timestamp: "${result.timestamp}"`
+    );
     return result;
   } catch (error) {
     console.error('[PaddleOCR] Error extracting timestamp (all retries failed):', error);

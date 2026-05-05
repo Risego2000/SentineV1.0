@@ -8,6 +8,7 @@ import { Expedient, createExpedient } from '../domain/Expedient';
 import { ExpedientStateMachine } from '../domain/ExpedientStateMachine';
 import { SignatureService } from './SignatureService';
 import { logger } from './logger';
+import { evidenceDB } from './EvidenceDB';
 import {
   ExpedientRepository,
   initializeExpedientRepository,
@@ -55,6 +56,118 @@ export class ExpedientService {
     this.repository = initializeExpedientRepository(supabase as any);
   }
 
+  private async hydrateEvidence(expedient: Expedient): Promise<Expedient> {
+    if (
+      expedient.image ||
+      expedient.extraSnapshots?.length ||
+      expedient.zoomSnapshots?.length ||
+      expedient.videoClip
+    ) {
+      return expedient;
+    }
+
+    try {
+      // 1) Primary source: raw evidence package by evidenceId (IndexedDB/memory).
+      const rawEvidence = expedient.evidenceId
+        ? await evidenceDB.getEvidence(String(expedient.evidenceId))
+        : null;
+
+      let hydratedFromEvidence: Expedient = expedient;
+      if (rawEvidence) {
+        hydratedFromEvidence = {
+          ...hydratedFromEvidence,
+          image:
+            hydratedFromEvidence.image ||
+            rawEvidence.zoomSnapshots?.[rawEvidence.zoomSnapshots.length - 1] ||
+            rawEvidence.contextSnapshots?.[0] ||
+            rawEvidence.snapshots?.[0],
+          extraSnapshots: hydratedFromEvidence.extraSnapshots?.length
+            ? hydratedFromEvidence.extraSnapshots
+            : rawEvidence.contextSnapshots || hydratedFromEvidence.extraSnapshots,
+          zoomSnapshots: hydratedFromEvidence.zoomSnapshots?.length
+            ? hydratedFromEvidence.zoomSnapshots
+            : rawEvidence.zoomSnapshots || hydratedFromEvidence.zoomSnapshots,
+          videoClip:
+            hydratedFromEvidence.videoClip || rawEvidence.clip || hydratedFromEvidence.videoClip,
+          ocrResults: hydratedFromEvidence.ocrResults?.length
+            ? hydratedFromEvidence.ocrResults
+            : rawEvidence.ocrResults || hydratedFromEvidence.ocrResults,
+          photosCount:
+            hydratedFromEvidence.photosCount ||
+            (rawEvidence.contextSnapshots?.length || 0) + (rawEvidence.zoomSnapshots?.length || 0),
+        };
+      }
+
+      // If we already have evidence populated after rawEvidence hydration, return early.
+      if (
+        hydratedFromEvidence.image ||
+        hydratedFromEvidence.extraSnapshots?.length ||
+        hydratedFromEvidence.zoomSnapshots?.length ||
+        hydratedFromEvidence.videoClip
+      ) {
+        return hydratedFromEvidence;
+      }
+
+      // 2) Secondary source: infraction logs cache (legacy/fallback).
+      const infractions = await evidenceDB.getAllInfractions();
+      const match = infractions.find((infraction) => {
+        const id = String(infraction.id);
+        return id === hydratedFromEvidence.infractionId || id === hydratedFromEvidence.evidenceId;
+      });
+
+      if (!match) return hydratedFromEvidence;
+
+      return {
+        ...hydratedFromEvidence,
+        image: match.image ?? hydratedFromEvidence.image,
+        extraSnapshots: match.extraSnapshots ?? hydratedFromEvidence.extraSnapshots,
+        zoomSnapshots: match.zoomSnapshots ?? hydratedFromEvidence.zoomSnapshots,
+        ocrResults: match.ocrResults ?? hydratedFromEvidence.ocrResults,
+        plateOcr: match.plateOcr ?? hydratedFromEvidence.plateOcr,
+        plateOcrCandidates: match.plateOcrCandidates ?? hydratedFromEvidence.plateOcrCandidates,
+        videoClip: match.videoClip ?? hydratedFromEvidence.videoClip,
+        playbackTime: match.playbackTime ?? hydratedFromEvidence.playbackTime,
+        videoTimeCode: match.videoTimeCode ?? hydratedFromEvidence.videoTimeCode,
+        visualTimestamp: match.visualTimestamp ?? hydratedFromEvidence.visualTimestamp,
+        makeModel: match.makeModel ?? hydratedFromEvidence.makeModel,
+        vehicleDescription: match.makeModel ?? hydratedFromEvidence.vehicleDescription,
+        color: match.color ?? hydratedFromEvidence.color,
+        description: match.description ?? hydratedFromEvidence.description,
+        descripcionDetalladaHechos:
+          match.description ?? hydratedFromEvidence.descripcionDetalladaHechos,
+        severity: match.severity ?? hydratedFromEvidence.severity,
+        ruleCategory: match.ruleCategory ?? hydratedFromEvidence.ruleCategory,
+        legalBase: match.legalBase ?? hydratedFromEvidence.legalBase,
+        reasoning: match.reasoning ?? hydratedFromEvidence.reasoning,
+        telemetrySpeedEstimated:
+          match.telemetry?.speedEstimated ?? hydratedFromEvidence.telemetrySpeedEstimated,
+        telemetryBehaviorAnomalies:
+          match.telemetry?.behaviorAnomalies ?? hydratedFromEvidence.telemetryBehaviorAnomalies,
+        operativeCode: match.operativeCode ?? hydratedFromEvidence.operativeCode,
+        priority: match.priority ?? hydratedFromEvidence.priority,
+        priorityLevel: match.priorityLevel ?? hydratedFromEvidence.priorityLevel,
+        fineAmount: match.fineAmount ?? hydratedFromEvidence.fineAmount,
+        pointsDeducted: match.pointsDeducted ?? hydratedFromEvidence.pointsDeducted,
+        photosCount:
+          hydratedFromEvidence.photosCount ||
+          Number(Boolean(match.image)) +
+            (match.extraSnapshots?.length || 0) +
+            (match.zoomSnapshots?.length || 0),
+      };
+    } catch (error) {
+      logger.warn(
+        'EXPEDIENT_SERVICE',
+        'Could not hydrate expedient evidence from local cache',
+        error
+      );
+      return expedient;
+    }
+  }
+
+  private async hydrateEvidenceList(expedients: Expedient[]): Promise<Expedient[]> {
+    return Promise.all(expedients.map((expedient) => this.hydrateEvidence(expedient)));
+  }
+
   /**
    * Create new expedient from infraction detection
    */
@@ -94,7 +207,8 @@ export class ExpedientService {
       if (!this.repository) {
         return null;
       }
-      return await this.repository.getById(id);
+      const expedient = await this.repository.getById(id);
+      return expedient ? await this.hydrateEvidence(expedient) : null;
     } catch (error) {
       logger.error('EXPEDIENT_SERVICE', 'Failed to get expedient', error);
       return null;
@@ -220,10 +334,7 @@ export class ExpedientService {
   /**
    * Sign expedient (create official legal document)
    */
-  async signExpedient(
-    id: string,
-    request: SignExpedientRequest
-  ): Promise<Expedient | null> {
+  async signExpedient(id: string, request: SignExpedientRequest): Promise<Expedient | null> {
     try {
       const expedient = await this.getExpedient(id);
       if (!expedient) {
@@ -273,10 +384,7 @@ export class ExpedientService {
   /**
    * Export expedient as official report
    */
-  async exportExpedient(
-    id: string,
-    request: ExportExpedientRequest
-  ): Promise<string | null> {
+  async exportExpedient(id: string, request: ExportExpedientRequest): Promise<string | null> {
     try {
       const expedient = await this.getExpedient(id);
       if (!expedient) {
@@ -371,7 +479,7 @@ export class ExpedientService {
       if (!this.repository) {
         return [];
       }
-      return await this.repository.getByState(state);
+      return await this.hydrateEvidenceList(await this.repository.getByState(state));
     } catch (error) {
       logger.error('EXPEDIENT_SERVICE', 'Failed to get expedients by state', error);
       return [];
@@ -386,7 +494,7 @@ export class ExpedientService {
       if (!this.repository) {
         return [];
       }
-      return await this.repository.getAll();
+      return await this.hydrateEvidenceList(await this.repository.getAll());
     } catch (error) {
       logger.error('EXPEDIENT_SERVICE', 'Failed to get all expedients', error);
       return [];
@@ -447,6 +555,23 @@ export class ExpedientService {
     } catch (error) {
       logger.error('EXPEDIENT_SERVICE', `Failed to update expedient ${expedient.id}`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Delete expedient permanently
+   */
+  async deleteExpedient(id: string): Promise<boolean> {
+    try {
+      if (!this.repository) return false;
+      const ok = await this.repository.deleteById(id);
+      if (ok) {
+        logger.info('EXPEDIENT_SERVICE', `Deleted expedient ${id}`);
+      }
+      return ok;
+    } catch (error) {
+      logger.error('EXPEDIENT_SERVICE', `Failed to delete expedient ${id}`, error);
+      return false;
     }
   }
 }

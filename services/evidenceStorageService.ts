@@ -27,10 +27,7 @@ export interface EvidenceFile {
 /**
  * Compress image file
  */
-export async function compressImage(
-  file: Blob,
-  quality: number = 0.8
-): Promise<Blob> {
+export async function compressImage(file: Blob, quality: number = 0.8): Promise<Blob> {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -42,9 +39,13 @@ export async function compressImage(
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          canvas.toBlob((blob) => {
-            resolve(blob || file);
-          }, 'image/jpeg', quality);
+          canvas.toBlob(
+            (blob) => {
+              resolve(blob || file);
+            },
+            'image/jpeg',
+            quality
+          );
         } else {
           resolve(file);
         }
@@ -171,10 +172,7 @@ export async function deleteEvidenceFile(fileId: string): Promise<boolean> {
     if (storageError) throw storageError;
 
     // Delete from database
-    const { error: dbError } = await supabase
-      .from('evidence_files')
-      .delete()
-      .eq('id', fileId);
+    const { error: dbError } = await supabase.from('evidence_files').delete().eq('id', fileId);
 
     if (dbError) throw dbError;
     return true;

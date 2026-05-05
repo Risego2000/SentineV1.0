@@ -33,7 +33,9 @@ export const generateBoletin = ({
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text('Sistema de Fiscalización Automática - Sentinel AI v16', pageWidth / 2, margin + 17, { align: 'center' });
+    doc.text('Sistema de Fiscalización Automática - Sentinel AI v16', pageWidth / 2, margin + 17, {
+      align: 'center',
+    });
 
     // Border
     doc.setDrawColor(0, 51, 102);
@@ -84,10 +86,14 @@ export const generateBoletin = ({
     doc.text(`Tipo: ${sanitizeText(infractionType || 'Infracción de tráfico')}`, margin + 10, yPos);
     yPos += 5;
 
-    const severityText = severity === 'CRITICAL' ? 'CRÍTICA'
-      : severity === 'HIGH' ? 'ALTA'
-        : severity === 'MEDIUM' ? 'MEDIA'
-          : 'BAJA';
+    const severityText =
+      severity === 'CRITICAL'
+        ? 'CRÍTICA'
+        : severity === 'HIGH'
+          ? 'ALTA'
+          : severity === 'MEDIUM'
+            ? 'MEDIA'
+            : 'BAJA';
     doc.text(`Gravedad: ${severityText}`, margin + 10, yPos);
     yPos += 10;
 
@@ -99,7 +105,9 @@ export const generateBoletin = ({
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    const descriptionText = sanitizeText(description || 'Infracción detectada por sistema de visión automática');
+    const descriptionText = sanitizeText(
+      description || 'Infracción detectada por sistema de visión automática'
+    );
     const lines = doc.splitTextToSize(descriptionText, contentWidth - 10);
     doc.text(lines, margin + 10, yPos);
     yPos += lines.length * 5 + 5;

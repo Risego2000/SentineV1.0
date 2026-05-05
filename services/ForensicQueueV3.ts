@@ -5,10 +5,7 @@
  */
 
 import { AuditJob, createAuditJob } from '../types/auditJob';
-import {
-  ForensicRule,
-  FORENSIC_RULES,
-} from '../types/forensicRules';
+import { ForensicRule, FORENSIC_RULES } from '../types/forensicRules';
 import { Track, GeometryLine, InfractionLog, AuditPresetType } from '../types';
 import { evidenceDB } from './EvidenceDB';
 import { logger } from './logger';
@@ -362,15 +359,23 @@ export class ForensicQueueV3 {
           throw new Error(`Evidence not found for job ${current.job.id}`);
         }
       } else {
-        // Select frames for analysis
-        contextSnapshots = this.selectTriplet(
-          evidence.contextSnapshots,
-          evidence.snapshots.filter((_, i) => i % 2 === 0)
-        );
-        zoomSnapshots = this.selectTriplet(
-          evidence.zoomSnapshots,
-          evidence.snapshots.filter((_, i) => i % 2 === 1)
-        );
+        // Keep full evidence snapshots for expediente/gallery output
+        const allContextSnapshots: string[] = Array.isArray(evidence.contextSnapshots)
+          ? [...evidence.contextSnapshots]
+          : [];
+        const allZoomSnapshots: string[] = Array.isArray(evidence.zoomSnapshots)
+          ? [...evidence.zoomSnapshots]
+          : [];
+
+        // Use all captured frames (no triplet truncation).
+        contextSnapshots =
+          allContextSnapshots.length > 0
+            ? allContextSnapshots
+            : evidence.snapshots.filter((_, i) => i % 2 === 0);
+        zoomSnapshots =
+          allZoomSnapshots.length > 0
+            ? allZoomSnapshots
+            : evidence.snapshots.filter((_, i) => i % 2 === 1);
 
         logger.info(
           'FORENSIC_QUEUE',
@@ -441,8 +446,9 @@ export class ForensicQueueV3 {
         };
 
         // Run OCR and AI analysis in parallel for faster processing
+        const ocrFrames = allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots;
         const [ocrResult, auditResult] = await Promise.all([
-          OCRSynchronizer.extractLicensePlate(zoomSnapshots),
+          OCRSynchronizer.extractLicensePlate(ocrFrames),
           AIService.analyzeTrajectory(
             compatibleTrack,
             compatibleGeometry,
@@ -524,6 +530,26 @@ export class ForensicQueueV3 {
           }
         }
 
+        // Consistency guard: if geometry confirms forbidden turn, never keep contradictory AI narrative.
+        if (
+          isForbiddenTurnSequence ||
+          (geometricAnalysis.infraction && geometricAnalysis.ruleCategory === 'GIRO_PROHIBIDO')
+        ) {
+          const sequenceLabels = current.job.geometryState.roiSequenceLabels || ['ROI A', 'ROI B'];
+          finalAuditResult.infraction = true;
+          finalAuditResult.ruleCategory = 'GIRO_PROHIBIDO';
+          finalAuditResult.severity =
+            geometricAnalysis.severity || finalAuditResult.severity || 'HIGH';
+          finalAuditResult.description =
+            geometricAnalysis.description ||
+            `Giro prohibido confirmado por secuencia ROI ${sequenceLabels.join(' → ')}.`;
+          finalAuditResult.reasoning = [
+            `Secuencia ROI confirmada: ${sequenceLabels.join(' → ')}.`,
+            `Track #${current.job.trackState.id} detectado en orden válido de zonas.`,
+            'La validación geométrica prevalece sobre narrativa IA contradictoria.',
+          ];
+        }
+
         if (finalAuditResult.infraction) {
           current.currentStatus = 'completed';
 
@@ -534,7 +560,9 @@ export class ForensicQueueV3 {
 
           // Get rule information to extract priority and sanctions
           const matchedRule = FORENSIC_RULES.find(
-            (r) => r.name === finalAuditResult.ruleCategory || r.operativeCode === finalAuditResult.ruleCategory
+            (r) =>
+              r.name === finalAuditResult.ruleCategory ||
+              r.operativeCode === finalAuditResult.ruleCategory
           );
           const priority = matchedRule
             ? InfractionExclusionService.getCriticalityLevel(matchedRule.id)
@@ -551,9 +579,12 @@ export class ForensicQueueV3 {
               finalAuditResult.plate && finalAuditResult.plate !== 'DESCONOCIDO'
                 ? finalAuditResult.plate
                 : plateOCR.plate || 'DESCONOCIDO',
-            image: zoomSnapshots[zoomSnapshots.length - 1] || evidence.snapshots[0],
-            extraSnapshots: contextSnapshots,
-            zoomSnapshots,
+            image:
+              allZoomSnapshots[allZoomSnapshots.length - 1] ||
+              zoomSnapshots[zoomSnapshots.length - 1] ||
+              evidence.snapshots[0],
+            extraSnapshots: allContextSnapshots.length ? allContextSnapshots : contextSnapshots,
+            zoomSnapshots: allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots,
             ocrResults: evidence.ocrResults,
             plateOcr: plateOCR.plate,
             plateOcrCandidates: plateOCR.candidates,
@@ -576,9 +607,7 @@ export class ForensicQueueV3 {
           };
 
           // PHASE 3: Log evidence creation in custody log
-          const evidenceHash = await calculateSHA256(
-            new Blob([JSON.stringify(evidence)])
-          );
+          const evidenceHash = await calculateSHA256(new Blob([JSON.stringify(evidence)]));
 
           custodyLog.addEntry(
             CustodyLogService.logEvidenceAction(
@@ -605,6 +634,7 @@ export class ForensicQueueV3 {
           );
 
           if (this.listeners.size > 0) {
+            logger.info('FORENSIC_QUEUE', `✓ Emitting validated infraction for Job ${current.job.id}: ${infractionLog.plate}`);
             this.listeners.forEach((listener) => listener(infractionLog));
           }
         } else {
@@ -628,11 +658,7 @@ export class ForensicQueueV3 {
 
         // PHASE 3: Log evidence deletion
         custodyLog.addEntry(
-          CustodyLogService.logEvidenceAction(
-            'EVIDENCE_DELETED',
-            'OPERATOR_SYSTEM',
-            current.job.id
-          )
+          CustodyLogService.logEvidenceAction('EVIDENCE_DELETED', 'OPERATOR_SYSTEM', current.job.id)
         );
 
         // Save final state
@@ -758,57 +784,21 @@ export class ForensicQueueV3 {
     failureReason: string
   ): Promise<void> {
     try {
-      const fallbackLog: InfractionLog = {
-        id: Date.now(),
-        infraction: false, // Mark as unresolved, not as infraction
-        severity: 'CRITICAL', // Mark for urgent manual review
-        ruleCategory: 'MANUAL_REVIEW',
-        description: `Análisis automático falló. Requiere revisión manual: ${failureReason}`,
-        plate: plateOCR?.plate || 'DESCONOCIDO',
-        makeModel: 'DESCONOCIDO',
-        color: 'DESCONOCIDO',
-        videoTimeCode: current.job.snapshot.videoTimeCode,
-        legalBase: 'Revisión Manual',
-        reasoning: [
-          `Error en auditoría forense: ${failureReason}`,
-          `Vehículo #${current.job.trackState.id} en zona: ${current.job.geometryState.lineLabel}`,
-          `Reintentos realizados: ${current.retries}/${this.maxRetries}`,
-          'La evidencia se preserva para revisión manual por operador.',
-        ],
-        image: zoomSnapshots?.[zoomSnapshots.length - 1] || evidence?.snapshots?.[0],
-        extraSnapshots: contextSnapshots || [],
-        zoomSnapshots: zoomSnapshots || [],
-        ocrResults: evidence?.ocrResults || [],
-        plateOcr: plateOCR?.plate,
-        plateOcrCandidates: plateOCR?.candidates || [],
-        videoClip: evidence?.clip,
-        time: new Date().toLocaleTimeString(),
-        localTime: current.job.snapshot.localTime,
-        playbackTime: current.job.snapshot.playbackTime,
-        viewerId: current.job.viewerId,
-        visualTimestamp: current.job.snapshot.videoTimeCode, // ISO timestamp from snapshot
-        telemetry: {
-          speedEstimated: `${current.job.trackState.avgVelocity || 0} km/h`,
-          behaviorAnomalies: current.job.trackState.anomalyLabel || 'None',
-        },
-      };
+      // IMPORTANT: Do NOT emit fallback as infraction log
+      // Only emit when analysis is successful (line 637)
+      // This prevents creation of duplicate expedients
 
-      // Emit to listeners for UI display and storage
-      if (this.listeners.size > 0) {
-        this.listeners.forEach((listener) => listener(fallbackLog));
-      }
-
-      // Audit log the fallback creation
-      logger.auditLog('FALLBACK_AUDIT', `/forensic/job/${current.job.id}/manual-review`, 202, {
-        reason: failureReason.substring(0, 100),
+      // Log the failure for audit purposes only
+      logger.auditLog('FORENSIC_FAILURE', `/forensic/job/${current.job.id}/analysis-failed`, 400, {
+        reason: failureReason.substring(0, 200),
         retries: current.retries,
         maxRetries: this.maxRetries,
-        plate: fallbackLog.plate,
+        plate: plateOCR?.plate || 'UNKNOWN',
       });
 
       logger.warn(
         'FORENSIC_QUEUE',
-        `Registro de revisión manual creado para Job ${current.job.id}: ${failureReason}`
+        `Job ${current.job.id} analysis failed after ${current.retries} retries: ${failureReason.substring(0, 100)}`
       );
 
       // Cleanup evidence after creating fallback log
@@ -888,7 +878,10 @@ export class ForensicQueueV3 {
     try {
       const deletedCount = await forensicQueuePersistence.cleanupExpiredJobs();
       if (deletedCount > 0) {
-        logger.info('FORENSIC_QUEUE', `Limpiados ${deletedCount} trabajos expirados de persistencia`);
+        logger.info(
+          'FORENSIC_QUEUE',
+          `Limpiados ${deletedCount} trabajos expirados de persistencia`
+        );
       }
       return deletedCount;
     } catch (error) {
@@ -947,18 +940,23 @@ export class ForensicQueueV3 {
     ) {
       // PHASE 5: Enhanced forbidden turn detection with multiple criteria
       const turnCriteria = {
-        followsSequence: matchesOrderedRoiSequence([...roiHistory], [...geometryState.roiSequenceIds]),
+        followsSequence: matchesOrderedRoiSequence(
+          [...roiHistory],
+          [...geometryState.roiSequenceIds]
+        ),
         // Check: spent significant time in middle zone (not just skipped it)
         durationConsistent: true, // TODO: compare timeInROI['mid'] > 200ms
         // Check: significant direction change (heading delta > 45°)
-        angleChange: Math.abs((trackState.heading || 0) - (trackState.heading || 0)) > Math.PI * 0.25,
+        angleChange:
+          Math.abs((trackState.heading || 0) - (trackState.heading || 0)) > Math.PI * 0.25,
         // Check: not stationary (speed > 2 Km/h during turn)
         notStationary: (trackState.velocity || 0) > 2 || (trackState.avgVelocity || 0) > 2,
       };
 
-      const isValidTurn = turnCriteria.followsSequence &&
-                         turnCriteria.durationConsistent &&
-                         turnCriteria.notStationary;
+      const isValidTurn =
+        turnCriteria.followsSequence &&
+        turnCriteria.durationConsistent &&
+        turnCriteria.notStationary;
 
       if (isValidTurn) {
         return {
@@ -966,7 +964,7 @@ export class ForensicQueueV3 {
           ruleCategory: 'GIRO_PROHIBIDO',
           severity: 'HIGH',
           confidence: 0.95, // Slightly reduced for robustness
-          description: `Giro prohibido confirmado: secuencia ${geometryState.roiSequenceLabels?.join(' → ') || 'ROI A → ROI B'}, velocidad ${(trackState.avgVelocity || 0).toFixed(1)} Km/h, ángulo ${(Math.abs(trackState.heading || 0) * 180 / Math.PI).toFixed(0)}°.`,
+          description: `Giro prohibido confirmado: secuencia ${geometryState.roiSequenceLabels?.join(' → ') || 'ROI A → ROI B'}, velocidad ${(trackState.avgVelocity || 0).toFixed(1)} Km/h, ángulo ${((Math.abs(trackState.heading || 0) * 180) / Math.PI).toFixed(0)}°.`,
         };
       }
 
@@ -991,23 +989,22 @@ export class ForensicQueueV3 {
     if (geometryState.violationKind === 'stop_violation') {
       // PHASE 5: Improved STOP detection with multiple criteria
       const stopCriteria = {
-        crossedStopLine: trackState.roiHistory?.some(r => r.includes('stop')),
+        crossedStopLine: trackState.roiHistory?.some((r) => r.includes('stop')),
         failedToStop: (trackState.dwellTime || 0) < 500, // Didn't pause >= 500ms before crossing
         speedAtCrossing: (trackState.velocity || 0) > 2.0, // > 2.0 units/frame at crossing
         notARoll: (trackState.dwellTime || 0) === 0 && (trackState.velocity || 0) > 1.5,
       };
 
-      const isViolation = stopCriteria.crossedStopLine &&
-                         stopCriteria.failedToStop &&
-                         stopCriteria.speedAtCrossing;
+      const isViolation =
+        stopCriteria.crossedStopLine && stopCriteria.failedToStop && stopCriteria.speedAtCrossing;
 
       if (isViolation) {
         return {
           infraction: true,
           ruleCategory: 'INCUMPLIMIENTO_PARADA',
           severity: 'MEDIUM',
-          confidence: 0.90, // Higher confidence with multiple criteria
-          description: `Incumplimiento de parada: velocidad ${(trackState.velocity * 23 * 3.6).toFixed(1)} Km/h, parada ${(trackState.dwellTime || 0)}ms.`,
+          confidence: 0.9, // Higher confidence with multiple criteria
+          description: `Incumplimiento de parada: velocidad ${(trackState.velocity * 23 * 3.6).toFixed(1)} Km/h, parada ${trackState.dwellTime || 0}ms.`,
         };
       }
 
@@ -1045,14 +1042,17 @@ export const forensicQueueV3 = new ForensicQueueV3();
  * This prevents the queue from growing indefinitely
  */
 if (typeof window !== 'undefined') {
-  setInterval(async () => {
-    try {
-      await forensicQueueV3.cleanupExpiredJobs();
-    } catch (error) {
-      console.warn(
-        '[FORENSIC_QUEUE] Error during cleanup:',
-        error instanceof Error ? error.message : String(error)
-      );
-    }
-  }, 5 * 60 * 1000); // 5 minutes
+  setInterval(
+    async () => {
+      try {
+        await forensicQueueV3.cleanupExpiredJobs();
+      } catch (error) {
+        console.warn(
+          '[FORENSIC_QUEUE] Error during cleanup:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    },
+    5 * 60 * 1000
+  ); // 5 minutes
 }

@@ -88,7 +88,7 @@ export class CustodyLogService {
    * Generar UUID simple
    */
   private static generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
@@ -115,7 +115,13 @@ export class CustodyLogService {
    * Registrar acción de reporte
    */
   static logReportAction(
-    action: 'REPORT_GENERATED' | 'REPORT_VALIDATED' | 'REPORT_REJECTED' | 'REPORT_SIGNED' | 'REPORT_EXPORTED' | 'REPORT_ARCHIVED',
+    action:
+      | 'REPORT_GENERATED'
+      | 'REPORT_VALIDATED'
+      | 'REPORT_REJECTED'
+      | 'REPORT_SIGNED'
+      | 'REPORT_EXPORTED'
+      | 'REPORT_ARCHIVED',
     actor: string,
     reportId: string,
     details?: Record<string, unknown>
@@ -161,14 +167,14 @@ export class CustodyLogService {
    * Obtener logs filtrados por entidad
    */
   getEntriesByEntity(entityType: string, entityId: string): AuditLogEntry[] {
-    return this.logs.filter(e => e.entityType === entityType && e.entityId === entityId);
+    return this.logs.filter((e) => e.entityType === entityType && e.entityId === entityId);
   }
 
   /**
    * Obtener logs por actor
    */
   getEntriesByActor(actor: string): AuditLogEntry[] {
-    return this.logs.filter(e => e.actor === actor);
+    return this.logs.filter((e) => e.actor === actor);
   }
 
   /**
@@ -177,21 +183,18 @@ export class CustodyLogService {
   getEntriesByTimeRange(startDate: Date, endDate: Date): AuditLogEntry[] {
     const start = startDate.toISOString();
     const end = endDate.toISOString();
-    return this.logs.filter(e => e.timestamp >= start && e.timestamp <= end);
+    return this.logs.filter((e) => e.timestamp >= start && e.timestamp <= end);
   }
 
   /**
    * Generar reporte de auditoría
    */
-  generateAuditReport(
-    entityType?: string,
-    entityId?: string
-  ): string {
+  generateAuditReport(entityType?: string, entityId?: string): string {
     let filteredLogs = this.logs;
 
     if (entityType && entityId) {
       filteredLogs = filteredLogs.filter(
-        e => e.entityType === entityType && e.entityId === entityId
+        (e) => e.entityType === entityType && e.entityId === entityId
       );
     }
 
@@ -250,7 +253,7 @@ CONCLUSION: Complete audit trail maintained
    */
   private getActionCounts(logs: AuditLogEntry[]): Array<[string, number]> {
     const counts = new Map<string, number>();
-    logs.forEach(log => {
+    logs.forEach((log) => {
       counts.set(log.action, (counts.get(log.action) || 0) + 1);
     });
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -261,7 +264,7 @@ CONCLUSION: Complete audit trail maintained
    */
   private getActorCounts(logs: AuditLogEntry[]): Array<[string, number]> {
     const counts = new Map<string, number>();
-    logs.forEach(log => {
+    logs.forEach((log) => {
       counts.set(log.actor, (counts.get(log.actor) || 0) + 1);
     });
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -284,7 +287,7 @@ CONCLUSION: Complete audit trail maintained
       'Error Message',
     ];
 
-    const rows = this.logs.map(entry => [
+    const rows = this.logs.map((entry) => [
       entry.id,
       entry.timestamp,
       entry.action,
@@ -299,7 +302,7 @@ CONCLUSION: Complete audit trail maintained
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
     ].join('\n');
 
     return csvContent;
@@ -330,12 +333,12 @@ CONCLUSION: Complete audit trail maintained
     const cutoffIso = cutoffDate.toISOString();
 
     const initialCount = this.logs.length;
-    this.logs = this.logs.filter(entry => entry.timestamp > cutoffIso);
+    this.logs = this.logs.filter((entry) => entry.timestamp > cutoffIso);
     const removedCount = initialCount - this.logs.length;
 
     console.warn(
       `[CUSTODY_LOG] Pruned ${removedCount} entries older than ${daysOld} days. ` +
-      `Remaining: ${this.logs.length}`
+        `Remaining: ${this.logs.length}`
     );
 
     return removedCount;

@@ -94,6 +94,7 @@ export interface SentinelContextType {
   startScreenShare: (
     videoRef: React.RefObject<HTMLVideoElement | null>
   ) => Promise<MediaStream | undefined>;
+  stopScreenShare: () => void;
   onFileChange: (file: File, videoRef: React.RefObject<HTMLVideoElement | null>) => void;
   onFilesChange: (files: FileList, videoRef: React.RefObject<HTMLVideoElement | null>) => void;
   loadNextInQueue: () => Promise<void>;
