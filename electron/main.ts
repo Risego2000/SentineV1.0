@@ -469,6 +469,9 @@ ipcMain.handle('app:getVersion', () => {
  */
 ipcMain.handle('app:openDevTools', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    if (!isDev) {
+      throw new Error('DevTools are disabled outside development');
+    }
     mainWindow.webContents.openDevTools();
   }
 });
@@ -732,8 +735,9 @@ ipcMain.handle('file:read', async (event, filePath) => {
     // Security: only allow reading files within app directory
     const appPath = app.getAppPath();
     const resolvedPath = path.resolve(filePath);
+    const rel = path.relative(appPath, resolvedPath);
 
-    if (!resolvedPath.startsWith(appPath)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Access denied: file is outside app directory');
     }
 
@@ -752,8 +756,9 @@ ipcMain.handle('file:write', async (event, filePath, content) => {
     // Security: only allow writing to userData directory
     const userDataPath = app.getPath('userData');
     const resolvedPath = path.resolve(filePath);
+    const rel = path.relative(userDataPath, resolvedPath);
 
-    if (!resolvedPath.startsWith(userDataPath)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Access denied: can only write to userData directory');
     }
 
@@ -807,9 +812,17 @@ ipcMain.handle('file:download', async (event, url, filename) => {
     if (!allowedHosts.has(parsed.hostname)) {
       throw new Error(`Download host not allowed: ${parsed.hostname}`);
     }
+    const safeName = path.basename(String(filename || '').trim());
+    if (!safeName || safeName === '.' || safeName === '..') {
+      throw new Error('Invalid download filename');
+    }
 
     const downloadsPath = app.getPath('downloads');
-    const filePath = path.join(downloadsPath, filename);
+    const filePath = path.join(downloadsPath, safeName);
+    const rel = path.relative(downloadsPath, filePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error('Invalid download path');
+    }
 
     const response = await fetch(parsed.toString());
     if (!response.ok) {

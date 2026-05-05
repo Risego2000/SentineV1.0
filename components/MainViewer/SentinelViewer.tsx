@@ -97,9 +97,31 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const panOriginRef = useRef({ x: 0, y: 0 });
+  const panDeltaRef = useRef({ dx: 0, dy: 0 });
+  const panRafRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const viewportRectCacheRef = useRef<DOMRect | null>(null);
+  const viewportRectCachedAtRef = useRef(0);
   const ZOOM_MIN = 1;
   const ZOOM_MAX = 8;
+
+  const getViewportRect = useCallback((force = false): DOMRect | null => {
+    const viewport = viewportRef.current;
+    if (!viewport) return null;
+    const now = performance.now();
+    if (!force && viewportRectCacheRef.current && now - viewportRectCachedAtRef.current < 120) {
+      return viewportRectCacheRef.current;
+    }
+    const rect = viewport.getBoundingClientRect();
+    viewportRectCacheRef.current = rect;
+    viewportRectCachedAtRef.current = now;
+    return rect;
+  }, []);
+
+  const invalidateViewportRectCache = useCallback(() => {
+    viewportRectCacheRef.current = null;
+    viewportRectCachedAtRef.current = 0;
+  }, []);
 
   useEffect(() => {
     if (!isPlaying && source !== 'none') {
@@ -125,7 +147,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     (clientX: number, clientY: number, deltaY: number) => {
       const viewport = viewportRef.current;
       if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
+      const rect = getViewportRect();
+      if (!rect) return;
       const cx = clientX - rect.left - rect.width / 2;
       const cy = clientY - rect.top - rect.height / 2;
 
@@ -141,13 +164,14 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       setZoom(nextZoom);
       setPan(clampPan(nextPanRaw, nextZoom));
     },
-    [zoom, pan, clampPan]
+    [zoom, pan, clampPan, getViewportRect]
   );
 
   const onViewportMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (zoneSelectionEnabled && !isPlaying && e.button === 0 && viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect();
+        const rect = getViewportRect(true);
+        if (!rect) return;
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         zoneStartRef.current = { x, y };
@@ -161,13 +185,14 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       panOriginRef.current = { ...pan };
       e.preventDefault();
     },
-    [zoneSelectionEnabled, isPlaying, zoom, pan, panEnabled]
+    [zoneSelectionEnabled, isPlaying, zoom, pan, panEnabled, getViewportRect]
   );
 
   const onViewportMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (zoneSelectionEnabled && zoneStartRef.current && viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect();
+        const rect = getViewportRect();
+        if (!rect) return;
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         const sx = zoneStartRef.current.x;
@@ -181,12 +206,25 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         return;
       }
       if (!isPanningRef.current) return;
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
-      setPan(clampPan({ x: panOriginRef.current.x + dx, y: panOriginRef.current.y + dy }, zoom));
+      panDeltaRef.current = {
+        dx: e.clientX - panStartRef.current.x,
+        dy: e.clientY - panStartRef.current.y,
+      };
+      if (panRafRef.current !== null) return;
+      panRafRef.current = requestAnimationFrame(() => {
+        panRafRef.current = null;
+        const { dx, dy } = panDeltaRef.current;
+        setPan(clampPan({ x: panOriginRef.current.x + dx, y: panOriginRef.current.y + dy }, zoom));
+      });
     },
-    [zoneSelectionEnabled, zoom, clampPan]
+    [zoneSelectionEnabled, zoom, clampPan, getViewportRect]
   );
+
+  useEffect(() => {
+    const onResize = () => invalidateViewportRectCache();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [invalidateViewportRectCache]);
 
   const stopPanning = useCallback(() => {
     if (zoneSelectionEnabled && zoneStartRef.current) {
@@ -198,7 +236,21 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       zoneStartRef.current = null;
     }
     isPanningRef.current = false;
+    if (panRafRef.current !== null) {
+      cancelAnimationFrame(panRafRef.current);
+      panRafRef.current = null;
+    }
   }, [zoneSelectionEnabled, zoneDraft]);
+
+  useEffect(
+    () => () => {
+      if (panRafRef.current !== null) {
+        cancelAnimationFrame(panRafRef.current);
+        panRafRef.current = null;
+      }
+    },
+    []
+  );
 
   const stepZoom = useCallback(
     (direction: 'in' | 'out') => {

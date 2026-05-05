@@ -10,6 +10,7 @@ import { InfractionModal } from '../components/InfractionModal';
 import { PDFExportService } from '../services/PDFExportService';
 import { ExcelExportService } from '../services/ExcelExportService';
 import { getExpedientService } from '../services/ExpedientService';
+import { getApiUrl } from '../services/apiConfig';
 import { supabase, SUPABASE_TABLES } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { InfractionLog } from '../types';
@@ -106,6 +107,7 @@ export const ExpedientListPage: React.FC = () => {
   const infractionsTableUnavailableRef = useRef(false);
   const supabaseReadUnavailableRef = useRef(false);
   const infractionLoadInFlightRef = useRef(false);
+  const expedientsLoadInFlightRef = useRef(false);
   const [state, setState] = useState<PageState>({
     expedients: [],
     infractions: [],
@@ -143,6 +145,8 @@ export const ExpedientListPage: React.FC = () => {
   // Auto-refresh expedients to keep dossier data updated in real time.
   useEffect(() => {
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (expedientsLoadInFlightRef.current) return;
       if (!infractionsTableUnavailableRef.current) {
         loadPendingExpedients({ silent: true });
       }
@@ -170,6 +174,8 @@ export const ExpedientListPage: React.FC = () => {
   const loadPendingExpedients = async (
     { silent = false, manual = false }: { silent?: boolean; manual?: boolean } = {}
   ) => {
+    if (expedientsLoadInFlightRef.current) return;
+    expedientsLoadInFlightRef.current = true;
     setState((prev) => ({
       ...prev,
       loading: silent ? prev.loading : true,
@@ -180,7 +186,7 @@ export const ExpedientListPage: React.FC = () => {
     try {
       // Load all active expedients from backend API (bypasses RLS restrictions)
       // The backend uses service role key to query Supabase directly
-      const response = await fetch('http://localhost:3002/api/expedients', {
+      const response = await fetch(getApiUrl('/api/expedients'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -234,13 +240,15 @@ export const ExpedientListPage: React.FC = () => {
         refreshing: false,
         manualRefreshing: false,
       }));
+    } finally {
+      expedientsLoadInFlightRef.current = false;
     }
   };
 
   const loadInfractionLogs = async (): Promise<InfractionLog[]> => {
     try {
       // Load from backend API (cache) instead of Supabase to bypass RLS restrictions
-      const response = await fetch('http://localhost:3002/api/infractions', {
+      const response = await fetch(getApiUrl('/api/infractions'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

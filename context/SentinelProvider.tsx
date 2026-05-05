@@ -53,6 +53,8 @@ export const SentinelProvider = ({
     typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron');
   const AUTO_SERVER_TRANSCODE_FALLBACK = IS_ELECTRON;
   const expedientImagesPersistenceDisabledRef = useRef(false);
+  const lastEngineStatusSentAtRef = useRef(0);
+  const lastEngineStatusSignatureRef = useRef<string>('');
   useEffect(() => {
     try {
       const persisted = window.localStorage.getItem('sentinel_expedient_images_disabled');
@@ -376,7 +378,7 @@ export const SentinelProvider = ({
       // Sync infraction to backend cache (so FORENSE module can access it without RLS issues)
       (async () => {
         try {
-          const syncResponse = await fetch('http://localhost:3002/api/infractions/sync', {
+          const syncResponse = await fetch(getApiUrl('/api/infractions/sync'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -714,7 +716,7 @@ export const SentinelProvider = ({
 
           // Sync expedient to backend cache (so FORENSE module can access it without RLS issues)
           try {
-            const syncResponse = await fetch('http://localhost:3002/api/expedients/sync', {
+            const syncResponse = await fetch(getApiUrl('/api/expedients/sync'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1494,6 +1496,24 @@ export const SentinelProvider = ({
   );
 
   useEffect(() => {
+    const signature = JSON.stringify({
+      statusLabel,
+      source,
+      isPlaying,
+      neural: systemStatus.neural,
+      forensic: systemStatus.forensic,
+      bionics: systemStatus.bionics,
+      vector: systemStatus.vector,
+      mediapipeReady: systemStatus.mediapipeReady,
+    });
+    const now = Date.now();
+    const MIN_PUBLISH_MS = 1500;
+    if (signature === lastEngineStatusSignatureRef.current && now - lastEngineStatusSentAtRef.current < MIN_PUBLISH_MS) {
+      return;
+    }
+    lastEngineStatusSignatureRef.current = signature;
+    lastEngineStatusSentAtRef.current = now;
+
     void publishRealtimeEvent(
       'engine_status',
       {

@@ -661,15 +661,22 @@ const cleanupExpiredIpCameraSessions = () => {
 
 const corsOptions = {
   origin(origin, callback) {
-    // In development, allow localhost on any port
-    if (
-      !origin ||
-      origin.includes('localhost') ||
-      origin.includes('127.0.0.1') ||
-      ALLOWED_ORIGINS.includes(origin)
-    ) {
+    if (!origin) {
       callback(null, true);
       return;
+    }
+    try {
+      const parsed = new URL(origin);
+      const isLoopback =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname === '::1';
+      if (isLoopback || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+    } catch {
+      // Fall through and reject invalid origins.
     }
     callback(new Error('Origin no permitido por CORS.'));
   },
@@ -680,25 +687,54 @@ const corsOptions = {
 
 const apiGuard = (req, res, next) => {
   const origin = req.headers.origin;
-  const isLocalhost = origin?.includes('localhost') || origin?.includes('127.0.0.1') || !origin;
+  const hasOrigin = typeof origin === 'string' && origin.length > 0;
+  let isLoopbackOrigin = false;
+  if (hasOrigin) {
+    try {
+      const parsed = new URL(origin);
+      isLoopbackOrigin =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname === '::1';
+    } catch {
+      isLoopbackOrigin = false;
+    }
+  }
 
-  // Validar origen CORS - allow localhost in development
-  if (origin && !isLocalhost && !ALLOWED_ORIGINS.includes(origin)) {
+  // Validar origen CORS.
+  if (hasOrigin && !isLoopbackOrigin && !ALLOWED_ORIGINS.includes(origin)) {
     logger.warn('AUTH', `CORS origin rechazado: ${origin}`, { ip: req.ip });
     res.status(403).json({ error: 'Origin no permitido.' });
     return;
   }
 
-  // Skip token validation for localhost (development)
-  if (isLocalhost) {
+  if (process.env.NODE_ENV === 'test') {
+    req.user = { authenticated: true, ip: req.ip, isTest: true };
+    next();
+    return;
+  }
+
+  // Preserve desktop/dev compatibility: allow loopback and no-origin traffic.
+  if (!hasOrigin || isLoopbackOrigin) {
     req.user = { authenticated: true, ip: req.ip, isLocalhost: true };
     next();
     return;
   }
 
-  // Require token for non-localhost origins (production)
+  if (!API_TOKEN) {
+    logger.error('AUTH', 'SENTINEL_API_TOKEN no configurado para origen externo', {
+      origin,
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+    });
+    res.status(500).json({ error: 'Server auth misconfigured.' });
+    return;
+  }
+
+  // Require token for non-loopback origins.
   const provided = req.headers.authorization?.replace(/^Bearer\s+/i, '') || '';
-  const expectedToken = API_TOKEN || 'default-insecure-token-change-me';
+  const expectedToken = API_TOKEN;
 
   if (!provided || provided !== expectedToken) {
     logger.warn('AUTH', 'Intento de acceso sin token válido', {
