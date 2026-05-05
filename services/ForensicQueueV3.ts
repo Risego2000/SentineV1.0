@@ -659,6 +659,18 @@ export class ForensicQueueV3 {
             logger.info('FORENSIC_QUEUE', `✓ Emitting validated infraction for Job ${current.job.id}: ${infractionLog.plate}`);
             this.listeners.forEach((listener) => listener(infractionLog));
           }
+
+          // Sync infraction to server for persistence
+          try {
+            await fetch('/api/infractions/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(infractionLog),
+            });
+            logger.debug('FORENSIC_QUEUE', `✓ Infraction synced to server: ${infractionLog.id}`);
+          } catch (syncError) {
+            logger.warn('FORENSIC_QUEUE', `Failed to sync infraction to server: ${syncError}`);
+          }
         } else {
           current.currentStatus = 'cleared';
 
