@@ -22,6 +22,25 @@ const stripCodeFences = (value = '') => {
   return clean;
 };
 
+const extractModelText = (result) => {
+  if (!result) return '';
+  if (typeof result.text === 'string') return result.text;
+  if (typeof result.text === 'function') {
+    try {
+      return String(result.text() || '');
+    } catch {
+      return '';
+    }
+  }
+  // Backward-compatible fallback for candidate-based payloads
+  const candidateText =
+    result?.candidates?.[0]?.content?.parts
+      ?.map((part) => part?.text || '')
+      .join('')
+      .trim() || '';
+  return candidateText;
+};
+
 export const sanitizeText = (text) => {
   return String(text || '')
     .replace(/&/g, '&amp;')
@@ -481,14 +500,8 @@ export const extractLicensePlateFromMultiple = async (base64Images = []) => {
       return { plate: 'NO_IMAGES', confidence: 0 };
     }
 
-    loadLocalEnvFile();
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return { plate: 'NO_API_KEY', confidence: 0 };
-    }
-
-    const client = new GoogleGenAI({ apiKey });
-    const model = client.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
+    const ai = getAIClient();
+    const model = getModelName();
 
     let bestResult = { plate: 'NO_PLATE', confidence: 0 };
 
@@ -499,19 +512,27 @@ export const extractLicensePlateFromMultiple = async (base64Images = []) => {
       try {
         const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
 
-        const response = await model.generateContent([
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: imageData,
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: imageData,
+                  },
+                },
+                {
+                  text: 'Extract ONLY the license plate number from this image. Return JSON: {"plate": "XXXXX", "confidence": 0.95}. If no plate visible: {"plate": "NO_PLATE", "confidence": 0}.',
+                },
+              ],
             },
-          },
-          {
-            text: 'Extract ONLY the license plate number from this image. Return JSON: {"plate": "XXXXX", "confidence": 0.95}. If no plate visible: {"plate": "NO_PLATE", "confidence": 0}.',
-          },
-        ]);
+          ],
+        });
 
-        const responseText = response.response.text();
+        const responseText = extractModelText(response);
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const result = JSON.parse(jsonMatch[0]);
@@ -555,26 +576,25 @@ export const extractTimestampFromOSD = async (base64Image) => {
       return { timestamp: null, osdText: null, confidence: 0 };
     }
 
-    loadLocalEnvFile();
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return { timestamp: null, osdText: null, confidence: 0 };
-    }
-
-    const client = new GoogleGenAI({ apiKey });
-    const model = client.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
+    const ai = getAIClient();
+    const model = getModelName();
 
     const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
 
-    const response = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageData,
-        },
-      },
-      {
-        text: `TASK: Extract the date and time from the video's on-screen display (OSD).
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: imageData,
+              },
+            },
+            {
+              text: `TASK: Extract the date and time from the video's on-screen display (OSD).
 
 LOCATION: Look in the top-left, top-right, bottom-left, or bottom-right corner for date/time text.
 
@@ -602,10 +622,13 @@ If no timestamp found:
 }
 
 CRITICAL: Be extremely precise - extract EXACTLY what you see.`,
-      },
-    ]);
+            },
+          ],
+        },
+      ],
+    });
 
-    const responseText = response.response.text();
+    const responseText = extractModelText(response);
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {

@@ -138,7 +138,7 @@ export const AIService = {
         directives,
         auditPreset: normalizeBackendAuditPreset(auditPreset),
       },
-      2
+      1
     );
   },
 };

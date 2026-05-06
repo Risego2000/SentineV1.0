@@ -1,3 +1,5 @@
+import { getServerPortFromElectron, isElectron } from '../src/utils/electronDetect';
+
 /**
  * API Configuration
  * Centralizes API endpoint URLs and base paths
@@ -74,12 +76,37 @@ export const getApiUrl = (endpoint: string): string => {
  */
 export const apiFetch = async (endpoint: string, options?: RequestInit): Promise<Response> => {
   const url = getApiUrl(endpoint);
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options?.headers,
-    },
-  });
+  const doFetch = (target: string) =>
+    fetch(target, {
+      ...options,
+      headers: {
+        ...options?.headers,
+      },
+    });
+
+  try {
+    const response = await doFetch(url);
+    if (response.ok || !isElectron() || !endpoint.startsWith('/api/')) {
+      return response;
+    }
+
+    // In Electron dev, first render can race before port discovery and hit Vite proxy.
+    // If that fails server-side, force direct backend URL using IPC-discovered port.
+    if (response.status >= 500) {
+      const port = await getServerPortFromElectron();
+      sessionStorage.setItem('sentinel_api_port', String(port));
+      return doFetch(`${window.location.protocol}//127.0.0.1:${port}${endpoint}`);
+    }
+
+    return response;
+  } catch (error) {
+    if (!isElectron() || !endpoint.startsWith('/api/')) {
+      throw error;
+    }
+    const port = await getServerPortFromElectron();
+    sessionStorage.setItem('sentinel_api_port', String(port));
+    return doFetch(`${window.location.protocol}//127.0.0.1:${port}${endpoint}`);
+  }
 };
 
 // Export common endpoints

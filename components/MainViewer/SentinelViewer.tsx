@@ -97,9 +97,31 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const panOriginRef = useRef({ x: 0, y: 0 });
+  const panDeltaRef = useRef({ dx: 0, dy: 0 });
+  const panRafRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const viewportRectCacheRef = useRef<DOMRect | null>(null);
+  const viewportRectCachedAtRef = useRef(0);
   const ZOOM_MIN = 1;
   const ZOOM_MAX = 8;
+
+  const getViewportRect = useCallback((force = false): DOMRect | null => {
+    const viewport = viewportRef.current;
+    if (!viewport) return null;
+    const now = performance.now();
+    if (!force && viewportRectCacheRef.current && now - viewportRectCachedAtRef.current < 120) {
+      return viewportRectCacheRef.current;
+    }
+    const rect = viewport.getBoundingClientRect();
+    viewportRectCacheRef.current = rect;
+    viewportRectCachedAtRef.current = now;
+    return rect;
+  }, []);
+
+  const invalidateViewportRectCache = useCallback(() => {
+    viewportRectCacheRef.current = null;
+    viewportRectCachedAtRef.current = 0;
+  }, []);
 
   useEffect(() => {
     if (!isPlaying && source !== 'none') {
@@ -125,7 +147,8 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
     (clientX: number, clientY: number, deltaY: number) => {
       const viewport = viewportRef.current;
       if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
+      const rect = getViewportRect();
+      if (!rect) return;
       const cx = clientX - rect.left - rect.width / 2;
       const cy = clientY - rect.top - rect.height / 2;
 
@@ -141,13 +164,14 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       setZoom(nextZoom);
       setPan(clampPan(nextPanRaw, nextZoom));
     },
-    [zoom, pan, clampPan]
+    [zoom, pan, clampPan, getViewportRect]
   );
 
   const onViewportMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (zoneSelectionEnabled && !isPlaying && e.button === 0 && viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect();
+        const rect = getViewportRect(true);
+        if (!rect) return;
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         zoneStartRef.current = { x, y };
@@ -161,13 +185,14 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       panOriginRef.current = { ...pan };
       e.preventDefault();
     },
-    [zoneSelectionEnabled, isPlaying, zoom, pan, panEnabled]
+    [zoneSelectionEnabled, isPlaying, zoom, pan, panEnabled, getViewportRect]
   );
 
   const onViewportMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (zoneSelectionEnabled && zoneStartRef.current && viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect();
+        const rect = getViewportRect();
+        if (!rect) return;
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         const sx = zoneStartRef.current.x;
@@ -181,12 +206,25 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
         return;
       }
       if (!isPanningRef.current) return;
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
-      setPan(clampPan({ x: panOriginRef.current.x + dx, y: panOriginRef.current.y + dy }, zoom));
+      panDeltaRef.current = {
+        dx: e.clientX - panStartRef.current.x,
+        dy: e.clientY - panStartRef.current.y,
+      };
+      if (panRafRef.current !== null) return;
+      panRafRef.current = requestAnimationFrame(() => {
+        panRafRef.current = null;
+        const { dx, dy } = panDeltaRef.current;
+        setPan(clampPan({ x: panOriginRef.current.x + dx, y: panOriginRef.current.y + dy }, zoom));
+      });
     },
-    [zoneSelectionEnabled, zoom, clampPan]
+    [zoneSelectionEnabled, zoom, clampPan, getViewportRect]
   );
+
+  useEffect(() => {
+    const onResize = () => invalidateViewportRectCache();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [invalidateViewportRectCache]);
 
   const stopPanning = useCallback(() => {
     if (zoneSelectionEnabled && zoneStartRef.current) {
@@ -198,7 +236,21 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
       zoneStartRef.current = null;
     }
     isPanningRef.current = false;
+    if (panRafRef.current !== null) {
+      cancelAnimationFrame(panRafRef.current);
+      panRafRef.current = null;
+    }
   }, [zoneSelectionEnabled, zoneDraft]);
+
+  useEffect(
+    () => () => {
+      if (panRafRef.current !== null) {
+        cancelAnimationFrame(panRafRef.current);
+        panRafRef.current = null;
+      }
+    },
+    []
+  );
 
   const stepZoom = useCallback(
     (direction: 'in' | 'out') => {
@@ -1007,6 +1059,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </div>
                 <button
                   type="button"
+                  aria-label="Expandir buffer forense"
                   onClick={() => setPausedBufferExpanded(true)}
                   className="h-8 w-8 text-[12px] font-black rounded border border-blue-500/40 text-blue-300 bg-blue-500/10 hover:bg-blue-500/20"
                   {...helpProps('Expandir buffer forense en pausa a vista completa.')}
@@ -1015,6 +1068,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={pausedOcrBusy ? 'Análisis en curso' : 'Reanalizar escena'}
                   disabled={pausedOcrBusy}
                   onClick={() => void runPausedFrameOCR()}
                   className="h-8 w-8 text-[12px] font-black rounded border border-blue-500/40 text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-50"
@@ -1024,6 +1078,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={showEnhancedOnViewport ? 'Ocultar mejora forense' : 'Mostrar mejora forense'}
                   onClick={() => setShowEnhancedOnViewport((v) => !v)}
                   className="h-8 w-8 text-[12px] font-black rounded border border-white/20 text-slate-300 hover:bg-white/10"
                   {...helpProps(
@@ -1036,6 +1091,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label={zoneSelectionEnabled ? 'Desactivar selección de zona' : 'Activar selección de zona'}
                   disabled={pausedOcrBusy}
                   onClick={() => {
                     setZoneSelectionEnabled((v) => !v);
@@ -1062,6 +1118,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label="Limpiar zona seleccionada"
                   disabled={pausedOcrBusy || !zoneSelected}
                   onClick={() => {
                     setZoneSelected(null);
@@ -1075,6 +1132,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
                 </button>
                 <button
                   type="button"
+                  aria-label="Ejecutar análisis en zona"
                   disabled={pausedOcrBusy || !zoneSelected}
                   onClick={() => void runZoneAnalysis()}
                   className="h-8 w-8 text-[12px] font-black rounded border border-emerald-500/50 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50"
@@ -1289,6 +1347,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
             <div className="flex items-center gap-2 bg-[#020617]/88 border border-white/10 rounded-xl p-2 backdrop-blur-md shadow-[0_0_18px_rgba(0,0,0,0.45)]">
               <button
                 type="button"
+                aria-label="Aumentar zoom"
                 onClick={() => stepZoom('in')}
                 onMouseEnter={() => setViewerHint('Aumenta el nivel de zoom del visor.')}
                 onMouseLeave={() => setViewerHint(null)}
@@ -1304,6 +1363,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label="Reducir zoom"
                 onClick={() => stepZoom('out')}
                 onMouseEnter={() => setViewerHint('Reduce el nivel de zoom del visor.')}
                 onMouseLeave={() => setViewerHint(null)}
@@ -1319,6 +1379,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label="Aplicar zoom a región"
                 onClick={zoomToRegion}
                 onMouseEnter={() =>
                   setViewerHint('Dibuja un rectángulo y aplica zoom preciso a esa zona.')
@@ -1336,6 +1397,7 @@ export const SentinelViewer = memo(({ viewerId }: { viewerId: string }) => {
               </button>
               <button
                 type="button"
+                aria-label={panEnabled ? 'Desactivar paneo' : 'Activar paneo'}
                 onClick={() => setPanEnabled((v) => !v)}
                 onMouseEnter={() =>
                   setViewerHint(panEnabled ? 'Desactiva el arrastre para paneo.' : 'Activa el arrastre para paneo.')

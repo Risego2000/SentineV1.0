@@ -24,7 +24,7 @@ except Exception as exc:
     sys.exit(1)
 
 
-ocr = PaddleOCR(use_angle_cls=False, lang="en", show_log=False)
+ocr = PaddleOCR(use_textline_orientation=True, lang="en")
 
 
 def decode_b64_to_bgr(image_b64: str) -> Optional[np.ndarray]:

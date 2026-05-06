@@ -64,8 +64,10 @@ export class ForensicQueueV3 {
   private onEvent?: (event: ForensicQueueEvent) => void;
   private idleResolvers: Array<() => void> = [];
   private maxQueueSize = 50;
-  private maxRetries = 5;
-  private baseRetryDelayMs = 500; // Base delay for exponential backoff
+  private maxRetries = 1; // Reduced from 2 to 1 since OCR is now fixed
+  private baseRetryDelayMs = 100; // Reduced from 300ms for faster retries
+  private maxOcrFrames = 12; // Increased from 4 to 12 for better OCR accuracy with voting
+  private analysisTimeoutMs = 15000; // Reduced from 30s to 15s for faster analysis
   private aiServicePromise: Promise<typeof import('./aiService')> | null = null;
   private persistenceInitialized = false;
   private custodyManifest: CustodyManifest | null = null;
@@ -86,6 +88,18 @@ export class ForensicQueueV3 {
       '16.0.0',
       'COCO-SSD v1.0'
     );
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**
@@ -446,16 +460,24 @@ export class ForensicQueueV3 {
         };
 
         // Run OCR and AI analysis in parallel for faster processing
-        const ocrFrames = allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots;
-        const [ocrResult, auditResult] = await Promise.all([
-          OCRSynchronizer.extractLicensePlate(ocrFrames),
-          AIService.analyzeTrajectory(
-            compatibleTrack,
-            compatibleGeometry,
-            current.job.directives,
-            current.job.auditPreset
-          ),
-        ]);
+        const rawOcrFrames = allZoomSnapshots.length ? allZoomSnapshots : zoomSnapshots;
+        const ocrFrames =
+          rawOcrFrames.length > this.maxOcrFrames
+            ? rawOcrFrames.slice(-this.maxOcrFrames)
+            : rawOcrFrames;
+        const [ocrResult, auditResult] = await this.withTimeout(
+          Promise.all([
+            OCRSynchronizer.extractLicensePlate(ocrFrames),
+            AIService.analyzeTrajectory(
+              compatibleTrack,
+              compatibleGeometry,
+              current.job.directives,
+              current.job.auditPreset
+            ),
+          ]),
+          this.analysisTimeoutMs,
+          'forensic_analysis'
+        );
 
         plateOCR = ocrResult;
 
@@ -636,6 +658,18 @@ export class ForensicQueueV3 {
           if (this.listeners.size > 0) {
             logger.info('FORENSIC_QUEUE', `✓ Emitting validated infraction for Job ${current.job.id}: ${infractionLog.plate}`);
             this.listeners.forEach((listener) => listener(infractionLog));
+          }
+
+          // Sync infraction to server for persistence
+          try {
+            await fetch('/api/infractions/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(infractionLog),
+            });
+            logger.debug('FORENSIC_QUEUE', `✓ Infraction synced to server: ${infractionLog.id}`);
+          } catch (syncError) {
+            logger.warn('FORENSIC_QUEUE', `Failed to sync infraction to server: ${syncError}`);
           }
         } else {
           current.currentStatus = 'cleared';

@@ -7,6 +7,7 @@ import { app, BrowserWindow, ipcMain, Menu, dialog, session, desktopCapturer } f
 import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
+import { autoUpdater } from 'electron-updater';
 
 // Note: __dirname is automatically available in CommonJS (when compiled to .cjs)
 // In Electron context, it will point to the app's directory
@@ -16,6 +17,7 @@ let expressServer: any = null;
 let activeServerPort: number | null = null;
 let isShuttingDown = false;
 let cspConfigured = false;
+let updaterEventsBound = false;
 const isDev = process.env.NODE_ENV !== 'production';
 const SESSION_PARTITION = isDev ? 'persist:sentinel-dev' : 'persist:sentinel';
 
@@ -54,6 +56,30 @@ function ignoreBrokenPipeErrors() {
 }
 
 ignoreBrokenPipeErrors();
+
+function emitUpdaterStatus(status: string, payload: Record<string, unknown> = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('updater:status', { status, ...payload });
+}
+
+function bindAutoUpdaterEvents() {
+  if (updaterEventsBound) return;
+  updaterEventsBound = true;
+  autoUpdater.autoDownload = false;
+
+  autoUpdater.on('checking-for-update', () => emitUpdaterStatus('checking'));
+  autoUpdater.on('update-available', (info) =>
+    emitUpdaterStatus('available', { version: (info as any)?.version || '' })
+  );
+  autoUpdater.on('update-not-available', () => emitUpdaterStatus('not-available'));
+  autoUpdater.on('download-progress', (progressObj) =>
+    emitUpdaterStatus('downloading', { percent: progressObj?.percent || 0 })
+  );
+  autoUpdater.on('update-downloaded', () => emitUpdaterStatus('downloaded'));
+  autoUpdater.on('error', (err) =>
+    emitUpdaterStatus('error', { message: err instanceof Error ? err.message : String(err || '') })
+  );
+}
 
 
 function configureContentSecurityPolicy() {
@@ -469,7 +495,57 @@ ipcMain.handle('app:getVersion', () => {
  */
 ipcMain.handle('app:openDevTools', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    if (!isDev) {
+      throw new Error('DevTools are disabled outside development');
+    }
     mainWindow.webContents.openDevTools();
+  }
+});
+
+ipcMain.handle('app:checkUpdates', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    bindAutoUpdaterEvents();
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
+  }
+});
+
+ipcMain.handle('app:downloadUpdate', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    bindAutoUpdaterEvents();
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
+  }
+});
+
+ipcMain.handle('app:installUpdate', async () => {
+  if (isDev) {
+    emitUpdaterStatus('not-available', { message: 'Updates disabled in development' });
+    return { ok: true, status: 'not-available' };
+  }
+  try {
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown updater error';
+    emitUpdaterStatus('error', { message });
+    return { ok: false, error: message };
   }
 });
 
@@ -732,8 +808,9 @@ ipcMain.handle('file:read', async (event, filePath) => {
     // Security: only allow reading files within app directory
     const appPath = app.getAppPath();
     const resolvedPath = path.resolve(filePath);
+    const rel = path.relative(appPath, resolvedPath);
 
-    if (!resolvedPath.startsWith(appPath)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Access denied: file is outside app directory');
     }
 
@@ -752,8 +829,9 @@ ipcMain.handle('file:write', async (event, filePath, content) => {
     // Security: only allow writing to userData directory
     const userDataPath = app.getPath('userData');
     const resolvedPath = path.resolve(filePath);
+    const rel = path.relative(userDataPath, resolvedPath);
 
-    if (!resolvedPath.startsWith(userDataPath)) {
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Access denied: can only write to userData directory');
     }
 
@@ -797,10 +875,29 @@ ipcMain.handle('file:select', async (event, options = {}) => {
  */
 ipcMain.handle('file:download', async (event, url, filename) => {
   try {
-    const downloadsPath = app.getPath('downloads');
-    const filePath = path.join(downloadsPath, filename);
+    const parsed = new URL(String(url));
+    const allowedHosts = new Set([
+      'localhost',
+      '127.0.0.1',
+      'storage.googleapis.com',
+      'cdn.jsdelivr.net',
+    ]);
+    if (!allowedHosts.has(parsed.hostname)) {
+      throw new Error(`Download host not allowed: ${parsed.hostname}`);
+    }
+    const safeName = path.basename(String(filename || '').trim());
+    if (!safeName || safeName === '.' || safeName === '..') {
+      throw new Error('Invalid download filename');
+    }
 
-    const response = await fetch(url);
+    const downloadsPath = app.getPath('downloads');
+    const filePath = path.join(downloadsPath, safeName);
+    const rel = path.relative(downloadsPath, filePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error('Invalid download path');
+    }
+
+    const response = await fetch(parsed.toString());
     if (!response.ok) {
       throw new Error(`Download failed: ${response.status}`);
     }

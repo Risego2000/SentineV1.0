@@ -8,6 +8,7 @@ declare global {
     electron?: {
       ipc: {
         on: (channel: string, callback: (event: any, ...args: any[]) => void) => () => void;
+        invoke: (channel: string, payload?: any) => Promise<any>;
       };
       app: {
         getAppPath: (pathName: string) => Promise<string>;
@@ -72,20 +73,44 @@ export const getServerPortFromElectron = (): Promise<number> => {
   return new Promise((resolve) => {
     if (isElectron()) {
       const api = getElectronAPI();
+      let resolved = false;
+
+      // Listen immediately for async server-port event from main process.
+      const unsubscribe = api.ipc.on('server-port', (_event, port) => {
+        if (resolved) return;
+        if (Number.isFinite(port)) {
+          resolved = true;
+          sessionStorage.setItem('sentinel_api_port', String(port));
+          console.log(`[Electron] ✓ Server port received via event: ${port}`);
+          unsubscribe();
+          resolve(port);
+        }
+      });
 
       api.api
         .getServerPort()
         .then((port) => {
+          if (resolved) return;
           if (Number.isFinite(port)) {
+            resolved = true;
+            sessionStorage.setItem('sentinel_api_port', String(port));
             console.log(`[Electron] ✓ Server port received via IPC: ${port}`);
+            unsubscribe();
             resolve(port);
             return;
           }
           throw new Error(`Invalid server port: ${port}`);
         })
         .catch((error) => {
+          if (resolved) return;
           console.warn('[Electron] Direct server port request failed, waiting for event:', error);
-          waitForServerPortEvent(resolve);
+          waitForServerPortEvent((port) => {
+            if (resolved) return;
+            resolved = true;
+            sessionStorage.setItem('sentinel_api_port', String(port));
+            unsubscribe();
+            resolve(port);
+          });
         });
     } else {
       // Default to 3002 if not in Electron

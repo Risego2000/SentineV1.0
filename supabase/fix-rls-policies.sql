@@ -33,8 +33,7 @@ CREATE POLICY expedient_images_select_own ON public.expedient_images
 -- Modificar evidence para usar URLs en lugar de base64
 ALTER TABLE public.evidence
   ADD COLUMN IF NOT EXISTS image_url TEXT,
-  ADD COLUMN IF NOT EXISTS storage_path TEXT,
-  MODIFY COLUMN image_base64 TEXT;
+  ADD COLUMN IF NOT EXISTS storage_path TEXT;
 
 -- Crear índices para búsqueda rápida
 CREATE INDEX IF NOT EXISTS idx_evidence_image_url ON public.evidence(image_url);

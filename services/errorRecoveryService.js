@@ -10,10 +10,10 @@ import { logger } from './logger.ts';
  */
 const RETRY_CONFIG = {
   ocr: {
-    maxRetries: 3,
-    baseDelayMs: 500,
-    backoffMultiplier: 2,
-    timeoutMs: 15000,
+    maxRetries: 1,
+    baseDelayMs: 100,
+    backoffMultiplier: 1.5,
+    timeoutMs: 8000,
     retryableErrors: [
       'TIMEOUT',
       'ECONNREFUSED',
@@ -26,10 +26,10 @@ const RETRY_CONFIG = {
     ],
   },
   gemini: {
-    maxRetries: 3,
-    baseDelayMs: 1000,
-    backoffMultiplier: 2.5,
-    timeoutMs: 30000,
+    maxRetries: 1,
+    baseDelayMs: 200,
+    backoffMultiplier: 1.5,
+    timeoutMs: 10000,
     retryableErrors: ['429', 'TIMEOUT', 'INTERNAL_ERROR'],
   },
   transcoding: {

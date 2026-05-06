@@ -6,22 +6,16 @@
 
 import { Router } from 'express';
 import type { ServerConfig } from '../../config/env.js';
+import { proxyToLegacy } from '../../utils/legacyProxy.js';
 
 export function createTranscodingRouter(config: ServerConfig): Router {
   const router = Router();
 
-  // TODO: Implement POST /api/transcode endpoint
-  // - Accept video file upload
-  // - Queue for FFmpeg processing
-  // - Return job ID for status tracking
-
-  router.post('/api/transcode', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
-
-  router.get('/api/transcode/:jobId', async (req, res) => {
-    res.status(501).json({ error: 'Endpoint not yet implemented' });
-  });
+  // Temporary controlled proxy to legacy server.js endpoints.
+  router.post('/api/transcode', proxyToLegacy);
+  router.get('/api/transcode/:jobId', proxyToLegacy);
+  router.get('/api/transcode/progress', proxyToLegacy);
+  router.get('/api/transcode/status', proxyToLegacy);
 
   return router;
 }

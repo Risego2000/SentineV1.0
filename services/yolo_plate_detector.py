@@ -61,15 +61,29 @@ def detect_plate_yolo(image_b64):
         # Load YOLO model
         # Priority: specialized plate detection > general YOLO
         try:
-            # Try to load custom plate model if exists
+            model = None
+
+            # Try 1: Load custom plate model if exists
             model_path = 'models/best_plate.pt'
             if os.path.exists(model_path):
                 model = YOLO(model_path)
                 print(f'[YOLO] Loaded custom plate model from {model_path}', file=sys.stderr)
-            else:
-                # Use general YOLO nano (fast, good for plates)
-                # Will detect objects, then filter for plate-like detections
-                model = YOLO('yolov8n.pt')  # Nano model (fast, 6.2MB)
+
+            # Try 2: Download specialized plate detection model from Roboflow
+            if model is None:
+                try:
+                    roboflow_model_path = 'models/license-plate-detector-roboflow.pt'
+                    if os.path.exists(roboflow_model_path):
+                        model = YOLO(roboflow_model_path)
+                        print(f'[YOLO] Loaded Roboflow plate model', file=sys.stderr)
+                except:
+                    pass
+
+            # Try 3: Use general YOLO small (more accurate than nano)
+            if model is None:
+                # yolov8s is more accurate than yolov8n for small objects like plates
+                model = YOLO('yolov8s.pt')  # Small model (22MB, better accuracy)
+                print(f'[YOLO] Loaded yolov8s.pt for license plate detection', file=sys.stderr)
         except Exception as e:
             return {
                 "plate_box": None,
@@ -80,7 +94,8 @@ def detect_plate_yolo(image_b64):
 
         # Run inference
         try:
-            results = model(img, conf=0.3, verbose=False)
+            # Lower confidence threshold for better detection of small license plates
+            results = model(img, conf=0.25, verbose=False)
 
             if not results or len(results) == 0:
                 return {
@@ -116,16 +131,16 @@ def detect_plate_yolo(image_b64):
 
                     # Filter for plate-like detections
                     # License plates are typically:
-                    # - Rectangular (aspect ratio 3:1 to 5:1)
-                    # - Medium size (100-600 pixels wide, 20-100 pixels tall)
-                    # - Located in lower portion of image
+                    # - Rectangular (aspect ratio 2:1 to 8:1)
+                    # - Medium size (50-800 pixels wide, 15-150 pixels tall)
+                    # - Can be anywhere in image (side mirrors, multi-line plates, etc.)
 
                     aspect_ratio = w / max(h, 1)
                     is_plate_like = (
-                        100 <= w <= 600 and  # Width in typical plate range
-                        20 <= h <= 100 and   # Height in typical plate range
-                        2.5 <= aspect_ratio <= 6.0 and  # Aspect ratio (wider than tall)
-                        y > img_h * 0.3  # Located in lower portion
+                        50 <= w <= 800 and  # Width in typical plate range (wider net)
+                        15 <= h <= 150 and   # Height in typical plate range (wider net)
+                        1.8 <= aspect_ratio <= 8.0 and  # Aspect ratio (more flexible)
+                        y > img_h * 0.0  # Can be anywhere in image
                     )
 
                     detection = {
@@ -159,7 +174,7 @@ def detect_plate_yolo(image_b64):
             # If no plate-like geometry found, use highest confidence detection
             if not best_box and detections:
                 best = max(detections, key=lambda d: d['confidence'])
-                if best['confidence'] > 0.5:  # Require minimum confidence
+                if best['confidence'] > 0.25:  # Lower threshold for better recall
                     best_box = {
                         "x": best['x'],
                         "y": best['y'],

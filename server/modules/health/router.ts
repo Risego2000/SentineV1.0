@@ -16,6 +16,9 @@ export function createHealthRouter(config: ServerConfig): Router {
 
   router.get('/health', controller.getHealth.bind(controller));
   router.get('/ready', controller.getReady.bind(controller));
+  // Backward compatibility with existing frontend/electron clients.
+  router.get('/api/health', controller.getHealth.bind(controller));
+  router.get('/api/ready', controller.getReady.bind(controller));
 
   return router;
 }

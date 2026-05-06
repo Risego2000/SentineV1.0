@@ -22,7 +22,7 @@ const discoverBackendPort = async () => {
     }
   }
   try {
-    const commonPorts = [3002, 3001];
+    const commonPorts = [3002];
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 

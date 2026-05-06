@@ -5,7 +5,12 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-const EVENT_CHANNEL_ALLOWLIST = new Set(['server-port']);
+const EVENT_CHANNEL_ALLOWLIST = new Set(['server-port', 'updater:status']);
+const INVOKE_CHANNEL_ALLOWLIST = new Set([
+  'api:ai:geometry',
+  'api:ai:trajectory',
+  'api:ai:audit',
+]);
 
 /**
  * Expose safe API to renderer
@@ -20,6 +25,12 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on(channel, callback);
       return () => ipcRenderer.off(channel, callback);
     },
+    invoke: (channel: string, payload?: any) => {
+      if (!INVOKE_CHANNEL_ALLOWLIST.has(channel)) {
+        throw new Error(`IPC invoke channel not allowed: ${channel}`);
+      }
+      return ipcRenderer.invoke(channel, payload);
+    },
   },
 
   // App APIs
@@ -27,6 +38,9 @@ contextBridge.exposeInMainWorld('electron', {
     getAppPath: (pathName: string) => ipcRenderer.invoke('app:getPath', pathName),
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     openDevTools: () => ipcRenderer.invoke('app:openDevTools'),
+    checkUpdates: () => ipcRenderer.invoke('app:checkUpdates'),
+    downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
+    installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
   },
 
   // Window control APIs

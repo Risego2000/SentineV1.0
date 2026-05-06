@@ -38,8 +38,41 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
   lastEventType: null,
   stats: defaultStats,
   history: [],
-  setConnected: (connected) => set({ connected }),
-  setStats: (patch) => set((state) => ({ stats: { ...state.stats, ...patch } })),
-  setLastEventType: (type) => set({ lastEventType: type }),
-  setHistory: (rows) => set({ history: rows }),
+  setConnected: (connected) =>
+    set((state) => (state.connected === connected ? state : { connected })),
+  setStats: (patch) =>
+    set((state) => {
+      const nextStats = { ...state.stats, ...patch };
+      const same =
+        state.stats.detections === nextStats.detections &&
+        state.stats.infractions === nextStats.infractions &&
+        state.stats.expedients === nextStats.expedients &&
+        state.stats.activeCameras === nextStats.activeCameras &&
+        state.stats.updatedAt === nextStats.updatedAt;
+      return same ? state : { stats: nextStats };
+    }),
+  setLastEventType: (type) =>
+    set((state) => (state.lastEventType === type ? state : { lastEventType: type })),
+  setHistory: (rows) =>
+    set((state) => {
+      if (state.history.length === rows.length) {
+        let equal = true;
+        for (let i = 0; i < rows.length; i += 1) {
+          const a = state.history[i];
+          const b = rows[i];
+          if (
+            a.ts !== b.ts ||
+            a.detections !== b.detections ||
+            a.infractions !== b.infractions ||
+            a.expedients !== b.expedients ||
+            a.activeCameras !== b.activeCameras
+          ) {
+            equal = false;
+            break;
+          }
+        }
+        if (equal) return state;
+      }
+      return { history: rows };
+    }),
 }));

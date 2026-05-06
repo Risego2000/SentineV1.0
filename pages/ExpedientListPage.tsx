@@ -10,6 +10,7 @@ import { InfractionModal } from '../components/InfractionModal';
 import { PDFExportService } from '../services/PDFExportService';
 import { ExcelExportService } from '../services/ExcelExportService';
 import { getExpedientService } from '../services/ExpedientService';
+import { apiFetch } from '../services/apiConfig';
 import { supabase, SUPABASE_TABLES } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { InfractionLog } from '../types';
@@ -45,6 +46,9 @@ interface InfractionSchemaRow {
   operator_id: string | null;
   extra_data: any;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (value: string): boolean => UUID_RE.test(value);
 
 const mapIncidentToInfractionRow = (row: any): InfractionSchemaRow => ({
   id: String(row.id),
@@ -101,7 +105,9 @@ interface PageState {
 export const ExpedientListPage: React.FC = () => {
   const { user } = useAuth();
   const infractionsTableUnavailableRef = useRef(false);
+  const supabaseReadUnavailableRef = useRef(false);
   const infractionLoadInFlightRef = useRef(false);
+  const expedientsLoadInFlightRef = useRef(false);
   const [state, setState] = useState<PageState>({
     expedients: [],
     infractions: [],
@@ -122,6 +128,7 @@ export const ExpedientListPage: React.FC = () => {
   });
 
   const expedientService = getExpedientService();
+  const wsRef = useRef<WebSocket | null>(null);
   const selectedExpedient = state.expedients.find((e) => e.id === state.selectedExpedientId);
   const selectedInfraction = state.infractions.find((i) => i.id === state.selectedInfractionId);
   const selectedInfractionRow = selectedExpedient
@@ -136,9 +143,105 @@ export const ExpedientListPage: React.FC = () => {
     loadPendingExpedients({ silent: false });
   }, []);
 
+  // Connect to WebSocket for real-time infraction updates
+  useEffect(() => {
+    const connectWebSocket = async () => {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.addEventListener('open', () => {
+          console.log('[ExpedientList] WebSocket connected to realtime updates');
+        });
+
+        ws.addEventListener('message', async (event) => {
+          try {
+            const { type, payload } = JSON.parse(event.data);
+
+            // When a new infraction is synced, refresh the infraction list immediately
+            if (type === 'infraction:synced') {
+              console.log('[ExpedientList] Received infraction:synced notification:', payload);
+
+              // Fetch infractions from the API
+              const response = await apiFetch('/api/infractions', {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (response.ok) {
+                const result = await response.json();
+                const infractions = (result.infractions || []).map((row: any) => ({
+                  id: row.id,
+                  plate: row.plate || row.license_plate,
+                  makeModel: row.make_model || row.makeModel,
+                  color: row.color,
+                  description: row.description,
+                  severity: row.severity,
+                  ruleCategory: row.rule_category || row.ruleCategory,
+                  legalBase: row.legal_base || row.legalBase,
+                  image: row.image_url || row.image,
+                  extraSnapshots: row.extra_snapshots || row.extraSnapshots || [],
+                  zoomSnapshots: row.zoom_snapshots || row.zoomSnapshots || [],
+                  videoClip: row.video_clip_url || row.videoClip,
+                  time: row.time,
+                  playbackTime: row.playback_time || row.playbackTime,
+                  validationStatus: row.validation_status || row.validationStatus,
+                  validatedAt: row.validated_at ? new Date(row.validated_at).getTime() : undefined,
+                  operatorId: row.operator_id || row.operatorId,
+                  fineAmount: row.fine_amount || row.fineAmount,
+                  pointsDeducted: row.points_deducted || row.pointsDeducted,
+                  localTime: row.local_time || row.localTime,
+                  videoTimeCode: row.video_time_code || row.videoTimeCode,
+                }));
+
+                setState((prev) => ({
+                  ...prev,
+                  infractions: infractions,
+                }));
+              }
+            }
+          } catch (err) {
+            console.warn('[ExpedientList] Error processing WebSocket message:', err);
+          }
+        });
+
+        ws.addEventListener('error', (error) => {
+          console.warn('[ExpedientList] WebSocket error:', error);
+        });
+
+        ws.addEventListener('close', () => {
+          console.log('[ExpedientList] WebSocket disconnected, reconnecting in 5s');
+          // Auto-reconnect after 5 seconds
+          setTimeout(() => {
+            if (wsRef.current?.readyState !== WebSocket.OPEN) {
+              connectWebSocket();
+            }
+          }, 5000);
+        });
+
+        wsRef.current = ws;
+      } catch (error) {
+        console.error('[ExpedientList] Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
   // Auto-refresh expedients to keep dossier data updated in real time.
   useEffect(() => {
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (expedientsLoadInFlightRef.current) return;
       if (!infractionsTableUnavailableRef.current) {
         loadPendingExpedients({ silent: true });
       }
@@ -166,6 +269,8 @@ export const ExpedientListPage: React.FC = () => {
   const loadPendingExpedients = async (
     { silent = false, manual = false }: { silent?: boolean; manual?: boolean } = {}
   ) => {
+    if (expedientsLoadInFlightRef.current) return;
+    expedientsLoadInFlightRef.current = true;
     setState((prev) => ({
       ...prev,
       loading: silent ? prev.loading : true,
@@ -176,7 +281,7 @@ export const ExpedientListPage: React.FC = () => {
     try {
       // Load all active expedients from backend API (bypasses RLS restrictions)
       // The backend uses service role key to query Supabase directly
-      const response = await fetch('http://localhost:3002/api/expedients', {
+      const response = await apiFetch('/api/expedients', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -216,10 +321,12 @@ export const ExpedientListPage: React.FC = () => {
         manualRefreshing: false,
       }));
 
-      if (!infractionsTableUnavailableRef.current) {
+      if (!infractionsTableUnavailableRef.current && !supabaseReadUnavailableRef.current) {
         await loadInfractionRowsForExpedients(all);
       }
-      await loadExpedientImages(all);
+      if (!supabaseReadUnavailableRef.current) {
+        await loadExpedientImages(all);
+      }
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -228,13 +335,15 @@ export const ExpedientListPage: React.FC = () => {
         refreshing: false,
         manualRefreshing: false,
       }));
+    } finally {
+      expedientsLoadInFlightRef.current = false;
     }
   };
 
   const loadInfractionLogs = async (): Promise<InfractionLog[]> => {
     try {
       // Load from backend API (cache) instead of Supabase to bypass RLS restrictions
-      const response = await fetch('http://localhost:3002/api/infractions', {
+      const response = await apiFetch('/api/infractions', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -445,8 +554,15 @@ export const ExpedientListPage: React.FC = () => {
   };
 
   const loadExpedientImages = async (expedients: Expedient[]) => {
+    if (supabaseReadUnavailableRef.current) return;
     try {
-      const expedientIds = [...new Set(expedients.map((e) => String(e.id || '')).filter(Boolean))];
+      const expedientIds = [
+        ...new Set(
+          expedients
+            .map((e) => String(e.id || '').trim())
+            .filter((id) => id.length > 0 && isUuid(id))
+        ),
+      ];
       if (!expedientIds.length) return;
 
       const { data, error } = await supabase
@@ -455,6 +571,18 @@ export const ExpedientListPage: React.FC = () => {
         .in('expedient_id', expedientIds);
 
       if (error) {
+        const status = Number((error as any)?.status || 0);
+        const code = String((error as any)?.code || '');
+        const message = String((error as any)?.message || '').toLowerCase();
+        const forbidden =
+          status === 403 ||
+          code === '42501' ||
+          message.includes('permission denied') ||
+          message.includes('forbidden');
+        if (forbidden) {
+          supabaseReadUnavailableRef.current = true;
+          return;
+        }
         console.warn('[EXPEDIENT_PAGE] Failed to load expedient_images:', error.message);
         return;
       }
@@ -547,9 +675,7 @@ export const ExpedientListPage: React.FC = () => {
 
       let { data, error } = await supabase
         .from(SUPABASE_TABLES.INFRACTIONS)
-        .select(
-          'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image_url, extra_snapshots, zoom_snapshots, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
-        )
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(400);
 
@@ -572,22 +698,30 @@ export const ExpedientListPage: React.FC = () => {
 
           const incidentResult = await supabase
             .from('incidents')
-            .select(
-              'id, created_at, updated_at, status, evidence_id, plate, make_model, color, description, severity, rule_category, legal_base, audit_result, image, image_url, extra_snapshots, zoom_snapshots, video_clip, video_clip_url, time, playback_time, local_time, video_time_code, visual_timestamp, telemetry, report_path, report_generated_at, validation_status, validated_at, operator_id, extra_data'
-            )
+            .select('*')
             .order('created_at', { ascending: false })
             .limit(400);
           if (incidentResult.error) {
-            console.warn(
-              '[EXPEDIENT_PAGE] Failed to load incidents fallback rows:',
-              incidentResult.error.message
-            );
+            const incidentStatus = Number((incidentResult.error as any)?.status || 0);
+            const incidentCode = String((incidentResult.error as any)?.code || '');
+            const incidentMessage = String((incidentResult.error as any)?.message || '').toLowerCase();
+            const forbiddenIncidents =
+              incidentStatus === 403 ||
+              incidentCode === '42501' ||
+              incidentMessage.includes('permission denied') ||
+              incidentMessage.includes('forbidden');
+            const missingIncidents = incidentMessage.includes("could not find the table 'public.incidents'");
+
+            console.warn('[EXPEDIENT_PAGE] Failed to load incidents fallback rows:', incidentResult.error.message);
+
+            if (forbiddenIncidents || missingIncidents) {
+              supabaseReadUnavailableRef.current = true;
+            }
+
             setState((prev) => ({
               ...prev,
               infractionsTableUnavailable: true,
-              error:
-                prev.error ||
-                'No hay permisos para leer "infractions/incidents" en Supabase (403). Revisa RLS/políticas.',
+              error: prev.error,
             }));
             return;
           }
