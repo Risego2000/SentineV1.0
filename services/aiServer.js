@@ -22,6 +22,25 @@ const stripCodeFences = (value = '') => {
   return clean;
 };
 
+const extractModelText = (result) => {
+  if (!result) return '';
+  if (typeof result.text === 'string') return result.text;
+  if (typeof result.text === 'function') {
+    try {
+      return String(result.text() || '');
+    } catch {
+      return '';
+    }
+  }
+  // Backward-compatible fallback for candidate-based payloads
+  const candidateText =
+    result?.candidates?.[0]?.content?.parts
+      ?.map((part) => part?.text || '')
+      .join('')
+      .trim() || '';
+  return candidateText;
+};
+
 export const sanitizeText = (text) => {
   return String(text || '')
     .replace(/&/g, '&amp;')
@@ -513,7 +532,7 @@ export const extractLicensePlateFromMultiple = async (base64Images = []) => {
           ],
         });
 
-        const responseText = response.text?.() || '';
+        const responseText = extractModelText(response);
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const result = JSON.parse(jsonMatch[0]);
@@ -609,7 +628,7 @@ CRITICAL: Be extremely precise - extract EXACTLY what you see.`,
       ],
     });
 
-    const responseText = response.text?.() || '';
+    const responseText = extractModelText(response);
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {

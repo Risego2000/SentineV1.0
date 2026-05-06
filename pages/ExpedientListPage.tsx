@@ -10,7 +10,7 @@ import { InfractionModal } from '../components/InfractionModal';
 import { PDFExportService } from '../services/PDFExportService';
 import { ExcelExportService } from '../services/ExcelExportService';
 import { getExpedientService } from '../services/ExpedientService';
-import { getApiUrl } from '../services/apiConfig';
+import { apiFetch } from '../services/apiConfig';
 import { supabase, SUPABASE_TABLES } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { InfractionLog } from '../types';
@@ -164,7 +164,7 @@ export const ExpedientListPage: React.FC = () => {
               console.log('[ExpedientList] Received infraction:synced notification:', payload);
 
               // Fetch infractions from the API
-              const response = await fetch(getApiUrl('/api/infractions'), {
+              const response = await apiFetch('/api/infractions', {
                 method: 'GET',
                 headers: {
                   'Content-Type': 'application/json',
@@ -281,7 +281,7 @@ export const ExpedientListPage: React.FC = () => {
     try {
       // Load all active expedients from backend API (bypasses RLS restrictions)
       // The backend uses service role key to query Supabase directly
-      const response = await fetch(getApiUrl('/api/expedients'), {
+      const response = await apiFetch('/api/expedients', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -343,7 +343,7 @@ export const ExpedientListPage: React.FC = () => {
   const loadInfractionLogs = async (): Promise<InfractionLog[]> => {
     try {
       // Load from backend API (cache) instead of Supabase to bypass RLS restrictions
-      const response = await fetch(getApiUrl('/api/infractions'), {
+      const response = await apiFetch('/api/infractions', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
