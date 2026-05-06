@@ -1,20 +1,20 @@
-# Backend Mode (Temporary Decision)
+# Modo Backend (Decisión Temporal)
 
-Current temporary primary backend mode is:
+El modo backend primario temporal actual es:
 
-- **Option A (primary): `server.js` legacy backend**
+- **Opción A (primaria): backend legacy `server.js`**
 
-Reason:
+Motivo:
 
-- It currently contains the full route surface used by frontend/Electron.
-- Modular backend is still under migration.
+- Actualmente contiene toda la superficie de rutas usada por frontend/Electron.
+- El backend modular sigue en migración.
 
-Operational rules:
+Reglas operativas:
 
-- Use `npm run start` / `npm run dev:api` for normal development and runtime.
-- `server/index.ts` is migration-only (`npm run start:modular` / `npm run dev:api:modular`).
-- Modular TODO modules (`transcoding`, `cameras`, `evidence`, `reports`) now proxy to legacy endpoints to keep compatibility during migration.
+- Usar `npm run start` / `npm run dev:api` para desarrollo y ejecución normal.
+- `server/index.ts` queda solo para migración (`npm run start:modular` / `npm run dev:api:modular`).
+- Los módulos TODO del modular (`transcoding`, `cameras`, `evidence`, `reports`) ahora hacen proxy a endpoints legacy para mantener compatibilidad durante la migración.
 
-Migration note:
+Nota de migración:
 
-- To switch to Option B later, modular routes must be implemented natively and proxy removed.
+- Para cambiar a la Opción B más adelante, las rutas modulares deben implementarse de forma nativa y eliminar el proxy.

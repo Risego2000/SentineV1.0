@@ -1,27 +1,26 @@
-# Production Hardening Checklist
+# Checklist de Hardening para Producción
 
-## 1) Backend token enforcement for loopback
+## 1) Exigir token en backend también para loopback
 
-Set:
+Configurar:
 
 ```env
 SENTINEL_REQUIRE_TOKEN_LOOPBACK=true
-SENTINEL_API_TOKEN=<strong-secret>
+SENTINEL_API_TOKEN=<secreto-fuerte>
 ```
 
-This enforces API token validation even for loopback/no-origin traffic.
+Esto fuerza validación de token API incluso para tráfico loopback/sin origen.
 
-## 2) Supabase RLS hardening
+## 2) Hardening de RLS en Supabase
 
-Run in Supabase SQL Editor:
+Ejecutar en el editor SQL de Supabase:
 
 1. `supabase/harden-rls-production.sql`
 2. `supabase/harden-storage-evidence-production.sql`
 
-## 3) Verification
+## 3) Verificación
 
-1. Backend starts normally.
-2. Requests to protected `/api/*` without token return `401`.
-3. `anon` cannot read sensitive tables (`infractions`, `expedients`, `expedient_images`, `evidence`).
-4. Evidence bucket is private.
-
+1. El backend inicia normalmente.
+2. Las peticiones a `/api/*` protegidas sin token responden `401`.
+3. `anon` no puede leer tablas sensibles (`infractions`, `expedients`, `expedient_images`, `evidence`).
+4. El bucket de evidencias es privado.
