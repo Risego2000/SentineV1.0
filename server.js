@@ -93,6 +93,9 @@ const validateServerEnv = () => {
     .split(',')
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
+  const requireTokenLoopback =
+    (process.env.SENTINEL_REQUIRE_TOKEN_LOOPBACK || '').trim().toLowerCase() === 'true' ||
+    process.env.NODE_ENV === 'production';
 
   if (allowedOrigins.length === 0) {
     throw new Error('[ENV] ALLOWED_ORIGINS no puede quedar vacío.');
@@ -107,6 +110,7 @@ const validateServerEnv = () => {
     rateLimitWindowMs,
     rateLimitMaxRequests,
     apiToken,
+    requireTokenLoopback,
     allowedOrigins,
     allowedCameraHosts,
   };
@@ -122,6 +126,7 @@ const FORENSIC_H264_CRF = 14;
 const RATE_LIMIT_WINDOW_MS = env.rateLimitWindowMs;
 const RATE_LIMIT_MAX_REQUESTS = env.rateLimitMaxRequests;
 const API_TOKEN = env.apiToken;
+const REQUIRE_TOKEN_LOOPBACK = env.requireTokenLoopback;
 const ALLOWED_ORIGINS = env.allowedOrigins;
 const ALLOWED_CAMERA_HOSTS = env.allowedCameraHosts;
 
@@ -718,8 +723,8 @@ const apiGuard = (req, res, next) => {
     return;
   }
 
-  // Preserve desktop/dev compatibility: allow loopback and no-origin traffic.
-  if (!hasOrigin || isLoopbackOrigin) {
+  // Preserve desktop/dev compatibility unless explicitly hardened.
+  if ((!hasOrigin || isLoopbackOrigin) && !REQUIRE_TOKEN_LOOPBACK) {
     req.user = { authenticated: true, ip: req.ip, isLocalhost: true };
     next();
     return;
